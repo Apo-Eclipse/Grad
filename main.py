@@ -1,4 +1,4 @@
-from graphs import presentation_super_agent,behaviour_analyst_super_agent
+from graphs import presentation_super_agent,behaviour_analyst_super_agent, database_agent_super_agent
 from IPython.display import Image, display
 import json
 
@@ -11,7 +11,6 @@ def main():
     # print("Final State:", final_state["final_output"])
 
     final_state = behaviour_analyst_super_agent.invoke({"final_output": "", "result": ""})
-
     # convert string to jarray
     jarray = final_state["result"]
     for j in jarray:

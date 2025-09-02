@@ -1,132 +1,177 @@
-<!DOCTYPE html>
 <html>
 <head>
-<title>John Doe's Financial Report</title>
+<title>Financial Analysis Report</title>
 <style>
-  body { font-family: Arial, sans-serif; }
-  .container { max-width: 800px; margin: 20px auto; padding: 20px; border: 1px solid #ccc; border-radius: 8px; }
-  h1, h2 { color: #333; }
-  .summary, .expense-breakdown, .recommendations, .conclusion {
+  body {
+    font-family: Arial, sans-serif;
+    line-height: 1.6;
+    margin: 20px;
+    background-color: #f4f4f4;
+  }
+  .report-container {
+    max-width: 900px;
+    margin: auto;
+    background: #fff;
+    padding: 30px;
+    border-radius: 8px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+  }
+  h1, h2 {
+    color: #333;
+    text-align: center;
     margin-bottom: 20px;
-    padding: 15px;
+  }
+  h2 {
+    border-bottom: 2px solid #eee;
+    padding-bottom: 10px;
+  }
+  .summary, .expenses, .recommendations {
+    margin-bottom: 30px;
+    padding: 20px;
     background-color: #f9f9f9;
     border-radius: 5px;
+    border: 1px solid #ddd;
   }
-  .expense-item {
+  .summary p, .expenses ul, .recommendations ul {
+    color: #555;
+  }
+  .summary p strong {
+    color: #333;
+  }
+  ul {
+    list-style: none;
+    padding: 0;
+  }
+  li {
+    margin-bottom: 10px;
+    padding: 10px;
+    background: #fff;
+    border: 1px solid #eee;
+    border-radius: 4px;
     display: flex;
     justify-content: space-between;
-    margin-bottom: 8px;
+    align-items: center;
   }
-  .bar-container {
-    width: 100%;
-    background-color: #eee;
+  li span {
+    font-weight: bold;
+  }
+  .expense-bar-container {
+    width: 200px;
+    height: 15px;
+    background-color: #e0e0e0;
     border-radius: 5px;
     overflow: hidden;
   }
-  .bar {
-    height: 20px;
+  .expense-bar {
+    height: 100%;
     background-color: #4CAF50;
-    text-align: center;
-    line-height: 20px;
-    color: white;
-    border-radius: 5px;
   }
-  .recommendation-list, .strength-list, .risk-list {
-    list-style-type: disc;
-    margin-left: 20px;
+  .housing {
+    width: 33%;
+    background-color: #2196F3;
+  }
+  .food {
+    width: 20%;
+    background-color: #ff9800;
+  }
+  .transportation {
+    width: 11%;
+    background-color: #f44336;
+  }
+  .shopping {
+    width: 16%;
+    background-color: #9c27b0;
+  }
+  .entertainment {
+    width: 9%;
+    background-color: #00bcd4;
+  }
+  .healthcare {
+    width: 7%;
+    background-color: #795548;
+  }
+  .education {
+    width: 4%;
+    background-color: #607d8b;
+  }
+  .highlight {
+    background-color: #fff3cd;
+    font-weight: bold;
+  }
+  .recommendation-item {
+      background-color: #e8f5e9;
   }
 </style>
 </head>
 <body>
 
-<div class="container">
-  <h1>John Doe's Financial Report (Past Six Months)</h1>
+<div class="report-container">
+  <h1>John Doe's Financial Analysis Report</h1>
 
   <div class="summary">
-    <h2>Financial Summary</h2>
+    <h2>Summary</h2>
+    <p>This report analyzes John Doe's spending behavior over the past six months.</p>
     <p><strong>Average Monthly Income:</strong> $4,500</p>
     <p><strong>Average Monthly Savings:</strong> $800 (18% of income)</p>
-    <p>Savings rate is slightly below the recommended 20-30% benchmark, with a slight decline in the last two months.</p>
+    <p>Savings have been consistent but show a slight decline in the last two months, falling below the recommended 20-30% benchmark.</p>
+    <p class='highlight'>Strengths: Stable income, regular saving habits, no major debt.</p>
+    <p class='highlight'>Risks: High discretionary spending, potential lifestyle creep.</p>
   </div>
 
-  <div class="expense-breakdown">
+  <div class="expenses">
     <h2>Monthly Expense Breakdown</h2>
-    <div class="expense-item">
-      <span>Housing and Utilities</span>
-      <div class="bar-container">
-        <div class="bar" style="width: 33%;">33% ($1,500)</div>
-      </div>
-    </div>
-    <div class="expense-item">
-      <span>Food and Dining</span>
-      <div class="bar-container">
-        <div class="bar" style="width: 20%;">20% ($900)</div>
-      </div>
-    </div>
-    <div class="expense-item">
-      <span>Shopping and Lifestyle</span>
-      <div class="bar-container">
-        <div class="bar" style="width: 16%;">16% ($700)</div>
-      </div>
-    </div>
-    <div class="expense-item">
-      <span>Transportation</span>
-      <div class="bar-container">
-        <div class="bar" style="width: 11%;">11% ($500)</div>
-      </div>
-    </div>
-    <div class="expense-item">
-      <span>Entertainment and Subscriptions</span>
-      <div class="bar-container">
-        <div class="bar" style="width: 9%;">9% ($400)</div>
-      </div>
-    </div>
-    <div class="expense-item">
-      <span>Healthcare and Insurance</span>
-      <div class="bar-container">
-        <div class="bar" style="width: 7%;">7% ($300)</div>
-      </div>
-    </div>
-    <div class="expense-item">
-      <span>Education and Learning</span>
-      <div class="bar-container">
-        <div class="bar" style="width: 4%;">4% ($200)</div>
-      </div>
-    </div>
-    <p><em>Note: Dining and lifestyle spending are above average compared to common benchmarks. Dining costs rose 12% last quarter.</em></p>
-  </div>
-
-  <div class="financial-health">
-    <h2>Financial Health</h2>
-    <h3>Strengths:</h3>
-    <ul class="strength-list">
-      <li>Stable income</li>
-      <li>Regular saving habits</li>
-      <li>No major debt repayments</li>
+    <ul>
+      <li>Housing and Utilities: $1,500 <span>(33%)</span>
+        <div class="expense-bar-container">
+          <div class="expense-bar housing"></div>
+        </div>
+      </li>
+      <li>Food and Dining: $900 <span>(20%)</span>
+        <div class="expense-bar-container">
+          <div class="expense-bar food"></div>
+        </div>
+      </li>
+      <li>Transportation: $500 <span>(11%)</span>
+        <div class="expense-bar-container">
+          <div class="expense-bar transportation"></div>
+        </div>
+      </li>
+      <li>Shopping and Lifestyle: $700 <span>(16%)</span>
+        <div class="expense-bar-container">
+          <div class="expense-bar shopping"></div>
+        </div>
+      </li>
+      <li>Entertainment and Subscriptions: $400 <span>(9%)</span>
+        <div class="expense-bar-container">
+          <div class="expense-bar entertainment"></div>
+        </div>
+      </li>
+      <li>Healthcare and Insurance: $300 <span>(7%)</span>
+        <div class="expense-bar-container">
+          <div class="expense-bar healthcare"></div>
+        </div>
+      </li>
+      <li>Education and Learning: $200 <span>(4%)</span>
+        <div class="expense-bar-container">
+          <div class="expense-bar education"></div>
+        </div>
+      </li>
     </ul>
-    <h3>Risks:</h3>
-    <ul class="risk-list">
-      <li>Higher-than-necessary discretionary spending</li>
-      <li>Savings rate could be improved</li>
-      <li>Signs of lifestyle creep</li>
-    </ul>
+    <p>Note: Dining and lifestyle spending are above average compared to common benchmarks.</p>
+    <p>Trends: Housing and transportation costs are steady. Dining costs rose 12% last quarter. Lifestyle spending shows seasonal spikes.</p>
   </div>
 
   <div class="recommendations">
     <h2>Recommendations</h2>
-    <ul class="recommendation-list">
-      <li>Raise savings rate to at least 25% by trimming dining and lifestyle expenses.</li>
-      <li>Set a dining budget cap at $600 per month.</li>
-      <li>Monitor impulse purchases more closely with tracking tools.</li>
-      <li>Automate savings to occur before discretionary spending.</li>
-      <li>Explore investment options (e.g., index funds, retirement accounts).</li>
+    <ul>
+      <li class="recommendation-item">Increase savings rate to at least 25% by reducing dining and lifestyle expenses.</li>
+      <li class="recommendation-item">Set a monthly dining budget cap at $600.</li>
+      <li class="recommendation-item">Monitor impulse purchases using tracking tools.</li>
+      <li class="recommendation-item">Automate savings to occur before discretionary spending.</li>
+      <li class="recommendation-item">Explore investment options (e.g., index funds, retirement accounts) for long-term growth.</li>
     </ul>
   </div>
 
-  <div class="conclusion">
-    <h2>Conclusion</h2>
-    <p>John Doe demonstrates generally responsible financial habits with controlled fixed costs and consistent saving. However, his growing discretionary spending requires adjustments to secure stronger financial stability for the future.</p>
-  </div>
 </div>
 
 </body>

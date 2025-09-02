@@ -2,3 +2,4 @@ from .presentation_super_agent.orchestrator import Orchestrator
 from .presentation_super_agent.writer import Writer
 from .presentation_super_agent.visualizer import Visualizer
 from .behaviour_analyst.behaviour_analyst import Behaviour_Analyst
+from .database_agent import DatabaseAgent
