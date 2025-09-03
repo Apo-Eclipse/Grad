@@ -9,13 +9,16 @@ from pydantic import Field, BaseModel
 
 class VisualizerOutput(BaseModel):
     visualization: str = Field(..., description="The visualization code in HTML/CSS format.")
-
+    
 system_prompt = """
     You are the Graph Maker Agent.
-    Convert this insights into visualization code (HTML, CSS):
+    Convert this insights into visualization code (HTML, CSS, JavaScript):
+    Try to include interactive elements where appropriate.
+    Leave space for dynamic data loading and user interactions.
 """
 user_prompt = """
     insights: {insights}
+    message from the orchestrator: {message}
 """
 
 prompt = ChatPromptTemplate.from_messages([

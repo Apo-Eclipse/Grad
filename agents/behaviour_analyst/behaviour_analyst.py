@@ -4,40 +4,46 @@ from langgraph.graph import StateGraph, END
 from typing import Dict, Any
 from langchain_core.prompts import ChatPromptTemplate
 from pydantic import Field, BaseModel
-import sqlite3
-conn = sqlite3.connect("D:/projects/Multi-Agent System/data/database.db")
-
 class Behaviour_AnalystOutput(BaseModel):
-    final_output: str = Field(..., description="The analysis report.")
+    message: str = Field(..., description="The message from the agent. (ok if there is no problem and error if there is)")
+    description: str = Field(..., description="The description of the work done by the agent.")
+    output: str = Field(..., description="what are the steps needed to be done in words")
 
 system_prompt = """
     You are the Behaviour Analyst Agent.
-    Analyze data from the database and provide a report.
-    Try to get insights about user behavior and spending patterns from the dataset.
-    Rules You must follow:
-    1. Focus on key metrics such as average spending, category breakdown, and trends over time.
-    2. Highlight any anomalies or significant changes in behavior.
-    3. Our focus is for one User only.
-    4. Responds with description the the query needed
-    5. Write only SQLite supported Queries
-    6. Responds with the final output in a structured format with no introduction
-    7. Responds in json
-    like:
-    [
-        {{
-            "step": 1,
-            "description": "the description for step 1",
-            "query": "Queries for step 1"
-        }},
-        {{
-            "step": 2,
-            "description": "the description for step 2",
-            "query": "Queries for step 2"
-        }}
-    ]
+    Try to provide simple steps for another database agent to create the queries to retrieve user behavior and spending patterns for only one user.
+    1. Each step to represent a single query that can be executed by the database agent.
+    2. Focus only on one user
+    3. You only write text no code, queries or any other programming constructs.
+    4. Focus on the 4 most important aspects time, location, type of spending, and category.
+    5. Try to combine different aspects to create more comprehensive queries.
+    6. Use metrics like mean, median, mode, min, max to give insights
+    7. You have to respond with 3 things message, description, output
+        * Message: respond with "error" if there is any problem and "ok" if isn't there
+        * Description: respond with what you have done or with error description there is anything like "no enough data".
+        * output: that is the work you have done including the quires and their descriptions, and blank [] if there is error
+            - Write the final output in json formate
+            Like:
+            [
+                "first step",
+                "second step"
+            ]
+    8. Your output should be in the following format:
+    {{
+        "message": "ok",
+        "description": "description of what was done",
+        "output": [
+            "first step",
+            "second step",
+            ....
+        ]
+    }}
+    9. Try to output the maximum number of steps possible you can get.
+    10. Only provide steps that could be found or extracted from the from the data based on the metadata and doesnot require knowledge out of them
+    11. Create steps what could be done by SQL
 """
 
-user_prompt = """
+metadata = """
     "user_table" Table
         Description: Contains demographic and employment details of one user for each row.
     Columns:
@@ -65,11 +71,9 @@ user_prompt = """
         Amount_EGP: Transaction amount in Egyptian Pounds
 """
 
-
 prompt = ChatPromptTemplate.from_messages([
     ("system", system_prompt),
-    ("human", user_prompt),
-    ("human", "Consider only one user to get insights whose ID is 1")
+    ("human", metadata),
 ])
 
 Behaviour_Analyst = prompt | gemini_llm.with_structured_output(Behaviour_AnalystOutput)

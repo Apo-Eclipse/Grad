@@ -8,24 +8,40 @@ import sqlite3
 conn = sqlite3.connect("D:/projects/HR_Chatbot/Data/database.db")
 
 class DatabaseAgentOutput(BaseModel):
-    description: str
-    query: str
+    final_output: str = Field(..., description="The final output of the agent")
 
 
 system_prompt = """
     You are a database_agent
-    Your task is to understand user request and provide the necessary SQL queries to extract the required data.
+    Your task is to understand user request and provide the necessary SQLite queries to extract the required data.
     Rules:
-    1. Focus only in responding with the SQL queries.
+    1. Focus only in responding with the SQL compatible queries.
     2. Do not provide any explanations or additional information.
     3. You must only provide queries that are valid in SQLite.
     4. You are not allowed to provide any queries that update or delete any data, and if you do, the query will be rejected and respond only with "Query rejected".
     5. Our focus is mainly on one User given
+    6. You will receive multiple steps respond with the corresponding SQL queries for each step.
+    7. You cannot write more than one query per step.
+    8. Respond with this formate:
+    Like
+    [
+        {{
+            "step":"step given from the behaviour_analyst",
+            "query": "SQL query corresponding to the step"
+        }},
+        {{
+            "step": "second step from the behaviour_analyst",
+            "query": "SQL query corresponding to the second step"
+        }},
+        ...
+    ]
+    9. You are not allowed to provide any queries that update or delete any data.
 """
 
 metadata = """
     Here is the database metadata:
-    Table: user_table
+    Table Name: user_table 
+    Description: Contain personal data for the user
     columns:
     ------------------------------------------
     Name : "ID": 
@@ -68,8 +84,11 @@ metadata = """
     Type : INTEGER
     Description : The income of the user in EGP
     ------------------------------------------
-
-    Table: transactions_table
+    
+    ==========================================
+    
+    Table Name: transactions_table
+    Description: Contain transaction data for the user
     columns:
     ------------------------------------------
     Name : "Transaction_ID": 
@@ -110,10 +129,9 @@ metadata = """
 
 prompt = ChatPromptTemplate.from_messages([
     ("system", system_prompt),
-    ("system", metadata),
+    ("user", metadata),
     ("user", "focus on user_id 1"),
     ("user", "{request}")
 ])
-
 
 DatabaseAgent = prompt | gemini_llm.with_structured_output(DatabaseAgentOutput)

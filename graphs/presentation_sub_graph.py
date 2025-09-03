@@ -10,41 +10,50 @@ class PresentationState(TypedDict):
     visualization: str
     report: str
     next_step: Annotated[list[str], add]
-    final_output: str
+    final_work: str
+    send_by: str
     
 
 def orchestrator(state: PresentationState) -> Literal['Visualizer', 'Writer', 'end']:
     report = state.get("report", "empty")
     visualization = state.get("visualization", "empty")
-    
-    Output = Orchestrator.invoke({'report': report, 'visualization': visualization})
+    final_work = state.get("final_work", "empty")
+    insights = state.get("insights", "empty")
+    send_by = state.get("send_by", "empty")
+    message = state.get("message", "empty")
+    Output = Orchestrator.invoke({'report': report, 'visualization': visualization, 'final_work': final_work, 'insights': insights, 'send_by': send_by, 'message': message})
     next_step = Output.next_step
+    final_work = Output.final_work
+    
+    print("Output :",end="")
+    print(Output)
+    
     print(f"Orchestrator decided next step: {next_step}")
     
+    print("PresentationState :",end="")
+    print(PresentationState)
+
     if next_step != "end":
         return Command(
-            update={"next_step": [next_step]},
+            update={"next_step": [next_step], "final_work": final_work},
             goto=next_step
         )
     else:
-        
         return Command(
-            update={"next_step": [next_step], "final_output": f"Report:\n{report}\nVisualizations :\n{visualization}"},
+            update={"next_step": [next_step], "final_work": final_work},
             goto=END
         )
 
 def visualizer(state: PresentationState) -> str:
     insights = state['insights']
-    output = Visualizer.invoke({'insights': insights})
-    
-    return {"visualization": output.visualization}
+    output = Visualizer.invoke({'insights': insights, 'message': state.get("message", "empty")})
+    return {"visualization": output.visualization, "send_by": "Visualizer"}
 
 
 def writer(state: PresentationState) -> str:
     insights = state['insights']
-    output = Writer.invoke({'insights': insights})
-    
-    return {"report": output.report}
+    output = Writer.invoke({'insights': insights, 'message': state.get("message", "empty")})
+    return {"report": output.report, "send_by": "Writer"}
 
 
 builder = StateGraph(PresentationState)

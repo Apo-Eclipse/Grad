@@ -11,14 +11,24 @@ class DatabaseAgentState(TypedDict):
     request: str
     output: str
     
-def database_agent(state: DatabaseAgentState) -> Literal['end']:
+def database_agent(state: DatabaseAgentState):
     request = state.get("request", "")
-    Output = DatabaseAgent.invoke({"request": request})
-    conn = sqlite3.connect("D:/projects/HR_Chatbot/Data/database.db")
-    sql = Output.query  
-    table = pd.read_sql(sql, conn)
-    conn.close()
-    return {"request": sql, "output": table}
+    out = DatabaseAgent.invoke({"request": request})
+    # conn = sqlite3.connect("D:/projects/HR_Chatbot/Data/database.db")
+    # sql = state.get("request", "")
+    # table = pd.read_sql(sql, conn)
+    # conn.close()
+    j = json.loads(out.final_output)
+    for step in j:
+        print("-"*30)
+        print("Step:", step['step'])
+        print("Query:", step['query'])
+        conn = sqlite3.connect("D:/projects/Multi-Agent System/data/database.db")
+        table = pd.read_sql(step['query'], conn)
+        print("Results:", table)
+        conn.close()
+    print("-"*30)
+    return {"output": out.final_output}
 
 builder = StateGraph(DatabaseAgentState)
 builder.add_node("database_agent", database_agent)

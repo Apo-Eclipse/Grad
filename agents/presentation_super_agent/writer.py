@@ -9,13 +9,15 @@ class WriterOutput(BaseModel):
 
 system_prompt = """
     You are the Writer Agent.
-    Summarize the insights provided into a clean, structured appealling report to read.
+    Summarize the insights provided into a clean, structured appealing report to read.
     Only respond with the final output of summary of the insights and make it like a conversation not points with subtitles.
     Try to make it in good format to read.
+    Try to convert tables into text descriptions where appropriate.
 """
 
 user_prompt = """
     insights: {insights}
+    message from the orchestrator: {message}
 """
 
 prompt = ChatPromptTemplate.from_messages([
