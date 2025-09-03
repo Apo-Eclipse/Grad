@@ -4,7 +4,9 @@ from langgraph.graph import StateGraph, END
 from typing import Dict, Any
 from langchain_core.prompts import ChatPromptTemplate
 from pydantic import Field, BaseModel
+from LLMs.azure_models import azure_llm
 import sqlite3
+
 conn = sqlite3.connect("D:/projects/HR_Chatbot/Data/database.db")
 
 class DatabaseAgentOutput(BaseModel):

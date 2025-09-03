@@ -4,7 +4,7 @@ import json
 import ast
 
 def main():
-    
+    # presentation agent output
     insights = """
         Step: Retrieve the total spending and the total number of transactions for a specific user.
         Query: SELECT SUM(Amount_EGP) AS Total_Spending, COUNT(Transaction_ID) AS Total_Transactions FROM transactions_table WHERE User_ID = 1;
@@ -189,21 +189,21 @@ def main():
         Results:            Name  Age Gender Job_Title
         0  Ahmed Hassan   24   Male   Student
     """
-
     final_state = presentation_super_agent.invoke({"insights": insights, "final_work": "nothing done till now", "send_by":"User","message": "Hello, pls understand the insights given"})
     with open("outdata/presentation_super_agent_output.html", "w") as f:
         f.write(final_state["final_work"])
-    
+    # ======================================================================
 
-    # print("Presentation Super Agent execution completed.")
-    # print("Final State:", final_state["final_work"])
-    
+    ## behavior analyst agent output
     # final_state = behaviour_analyst_super_agent.invoke({})
     # returned = final_state["returned"].output
     # returned = ast.literal_eval(returned)
     # for step in returned:
     #     print("Step:", step)
+    ##======================================================================
     
+    
+    ## database agent output
     # request = """   Step: Retrieve the total spending and the total number of transactions for a specific user.
     #                 Step: Calculate the mean, median, minimum, and maximum transaction amounts for a specific user.
     #                 Step: Determine the mode of transaction amount for a specific user.
@@ -235,6 +235,7 @@ def main():
     #     print("Step:", step['step'])
     #     print("Query:", step['query'])
     # print("-"*30)
+    ##======================================================================
 
 if __name__ == "__main__":
     main()

@@ -3,6 +3,8 @@ from LLMs.gemini_models import gemini_llm
 from langgraph.graph import END
 from langchain_core.prompts import ChatPromptTemplate
 from pydantic import Field, BaseModel
+from LLMs.azure_models import azure_llm
+
 
 class OrchestratorOutput(BaseModel):
     next_step: Literal['Visualizer', 'Writer', "end"] = Field(..., description="The next agent to handle the task: visualizer, writer, or end if the task is complete.")
@@ -19,14 +21,13 @@ system_prompt = """
     - If report is empty or want to be written in a presentable way -> return Writer
     - If the task is complete and both report and visualizations are good enough and final_work is done -> return end
     - If the user wants to add more insights or details -> return Writer
-    - After all work done is integrated into the final output and add the writings with the visualizations in a presentable way with (html,css,js)
-    - You have to respond with what was written and the visualization and the integrated work together in (html,css,js)
+    - After all work done is and add the writings with the visualizations in a presentable way with (html,css,js) and return the code inside it
     - You have to give message to the next agent
     Formate:
     {{
         "report": "{report}",
         "visualization": "{visualization}",
-        "final_work": "(html,css,js) page contain combinations of what was done by the 2 agents from visualizations and what was written",
+        "final_work": "must contain code (html,css,js) that contain combinations of what was done by the 2 agents from visualizations and what was written",
         "next_step": "the agent that should handle the next step",
         "message": "Any additional messages or instructions to the next agent"
     }}

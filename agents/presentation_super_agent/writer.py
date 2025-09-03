@@ -3,6 +3,8 @@ from LLMs.gemini_models import gemini_llm
 from langgraph.graph import StateGraph, END
 from langchain_core.prompts import ChatPromptTemplate
 from pydantic import Field, BaseModel
+from LLMs.azure_models import azure_llm
+
 
 class WriterOutput(BaseModel):
     report: str = Field(..., description="The final written report.")
