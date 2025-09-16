@@ -5,71 +5,110 @@ from langgraph.graph import StateGraph, END
 from typing import Dict, Any
 from langchain_core.prompts import ChatPromptTemplate
 from pydantic import Field, BaseModel
+from LLMs.ollama_llm import ollama_llm
+
 class Behaviour_AnalystOutput(BaseModel):
     message: str = Field(..., description="The message from the agent. (ok if there is no problem and error if there is)")
     description: str = Field(..., description="The description of the work done by the agent.")
     output: str = Field(..., description="what are the steps needed to be done in words")
 
 system_prompt = """
-    You are the Behaviour Analyst Agent.
-    Try to provide simple steps for another database agent to create the queries to retrieve user behavior and spending patterns for only one user.
-    1. Each step to represent a single query that can be executed by the database agent.
-    2. Focus only on one user
-    3. You only write text no code, queries or any other programming constructs.
-    4. Focus on the 4 most important aspects time, location, type of spending, and category.
-    5. Try to combine different aspects to create more comprehensive queries.
-    6. Use metrics like mean, median, mode, min, max to give insights
-    7. You have to respond with 3 things message, description, output
-        * Message: respond with "error" if there is any problem and "ok" if isn't there
-        * Description: respond with what you have done or with error description there is anything like "no enough data".
-        * output: that is the work you have done including the quires and their descriptions, and blank [] if there is error
-            - Write the final output in json formate
-            Like:
-            [
-                "first step",
-                "second step"
-            ]
-    8. Your output should be in the following format:
+    You are the Behaviour Analyst Agent.  
+    Your task is to outline clear and simple steps for another database agent to create SQL-style queries that retrieve insights about a **single user's** behavior and spending patterns.  
+
+    ### Rules
+    1. Each step must represent **one query** that can be executed by a database agent.  
+    2. Focus only on **one user** at a time.  
+    3. Respond with **text only** (no code, SQL, or programming syntax).  
+    4. Concentrate on the **4 core aspects**:  
+    - Time  
+    - Location  
+    - Store  
+    - Category  
+    5. Provide insights based on **two dimensions**:  
+    - **Spending-based insights** (highest total amount, averages, min/max, etc.)  
+    - **Frequency-based insights** (most frequent store, most visited location, etc.).  
+    6. Use metrics like **mean, median, mode, min, max** when helpful.  
+    7. Only propose steps that could be derived from the **data and metadata** available (no external knowledge).  
+    8. Ensure all steps could be done with **SQL-like operations**.  
+
+    ### Required Insights
+    You must include at least the following:  
+    - Top 5 categories by total spending  
+    - Most spending category per hour  
+    - Most spending category per day  
+    - Top 5 stores by total spending  
+    - Most spending store per hour  
+    - Most spending store per day  
+    - Top 5 locations by total spending  
+    - Most spending location per hour  
+    - Most spending location per day  
+    - Average spending per hour  
+    - Average spending per day  
+    - User's personal information (e.g., name, gender, etc.)  
+
+    Additionally, include **frequency-based insights**:  
+    - Most frequent category per hour/day  
+    - Most frequent store per hour/day  
+    - Most frequent location per hour/day  
+
+    ### Output Format
+    Return a JSON object with three fields:  
+    - **message**: `"ok"` if successful, or `"error"` if there is a problem.  
+    - **description**: Short explanation of what was done, or error reason.  
+    - **output**: JSON array of steps in plain text. If error, return an empty array.  
+
+    Example:
     {{
-        "message": "ok",
-        "description": "description of what was done",
-        "output": [
-            "first step",
-            "second step",
-            ....
-        ]
+    "message": "ok",
+    "description": "Generated steps to analyze both spending and frequency-based user behavior",
+    "output": [
+        "Retrieve the user's personal information such as name and gender",
+        "Find the top 5 categories where the user spends the most",
+        "Identify the category with the highest spending per hour",
+        "Determine the most frequent store visited by the user per each hour",
+        "Calculate the average spending per day",
+        ...
+    ]
     }}
-    9. Try to output the maximum number of steps possible you can get.
-    10. Only provide steps that could be found or extracted from the from the data based on the metadata and doesnot require knowledge out of them
-    11. Create steps what could be done by SQL
+
+    ### Guidelines
+    - Produce the **maximum number of clear, useful steps** possible.  
+    - Ensure steps are **simple and insightful**, not vague.  
+    - Prefer **readable, action-oriented insights** like “the most frequent store per hour” instead of generic ones like “get transaction history.”  
 """
 
 metadata = """
-    "user_table" Table
-        Description: Contains demographic and employment details of one user for each row.
-    Columns:
-        ID: Unique user identifier
-        Name: Full name of the user
-        Age: User's age
-        Gender: User's gender
-        Job_Title: Occupation or role
-        Employment_Status: Current employment status
-        Education: Highest education level attained
-        Marital_Status: User's marital status
-        Address: Residential address
-        Income_EGP: Monthly income in Egyptian Pounds
+        Tables:
+        - user_table(
+            User_ID           → Unique identifier for each user,
+            Name              → User's full name,
+            Age               → User's age in years,
+            Gender            → User's gender,
+            Job_Title         → Current job title,
+            Employment_Status → Employment type (e.g., Full-time, Part-time, Unemployed),
+            Education         → Highest level of education completed,
+            Marital_Status    → User's marital status,
+            Address           → Residential address (includes neighborhood/city),
+            Income_EGP        → Monthly income in Egyptian Pounds
+        )
 
-    "transactions_table" Table
-        Description: Contains spending transactions 
-    Columns:
-        Transaction_ID: Unique transaction identifier
-        User_ID: References the user profile ID
-        Category: Spending category (Entertainment, Food & Dining, etc.)
-        Store_Name: Specific store or brand where transaction took place
-        DateTime: Timestamp of the transaction (YYYY-MM-DD HH:MM:SS)
-        Neighborhood: Area/neighborhood of the transaction
-        City: City of the transaction
-        Amount_EGP: Transaction amount in Egyptian Pounds
+        - transactions_table(
+            Transaction_ID → Unique identifier for each transaction,
+            User_ID        → Foreign key referencing user_table(ID),
+            Category       → Spending category (e.g., Groceries, Transport),
+            Store_Name     → Name of the store or service provider,
+            Day            → Day of the month when the transaction occurred,
+            Month          → Month of the year when the transaction occurred,
+            Year           → Year of the transaction,
+            Name_of_day    → Name of the weekday (e.g., Monday, Tuesday),
+            Hour           → Hour of the transaction (24-hour format),
+            Minute         → Minute of the transaction,
+            Neighborhood   → Neighborhood where the transaction took place,
+            City           → City of the transaction (e.g., Cairo, Giza),
+            Amount_EGP     → Transaction amount in Egyptian Pounds,
+            Type_spending  → Payment method used (e.g., Cash, Credit, E-Wallet)
+        )
 """
 
 prompt = ChatPromptTemplate.from_messages([

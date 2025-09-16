@@ -18,6 +18,6 @@ azure_llm = AzureChatOpenAI(
     openai_api_version=app_settings.AZURE_OPENAI_API_VERSION,
     azure_endpoint=app_settings.AZURE_OPENAI_ENDPOINT,
     api_key=app_settings.AZURE_OPENAI_API_KEY,
-    temperature=1,
+    temperature=0.4,
     max_retries=2,
 )

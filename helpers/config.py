@@ -11,7 +11,7 @@ class settings(BaseSettings):
     AZURE_OPENAI_DEPLOYMENT_NAME: str  | None = None
 
     class Config:
-        env_file = str(Path(__file__).resolve().parent.parent / "env" / ".env")
+        env_file = ".env"
         extra = "allow"   
 
 

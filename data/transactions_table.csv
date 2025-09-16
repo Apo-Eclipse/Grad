@@ -1,151 +1,241 @@
-Transaction_ID,User_ID,Category,Store_Name,DateTime,Neighborhood,City,Amount_EGP
-1,1,Entertainment,PlayStation Store (Online),4/13/2025 21:47,Online,Online,780
-2,1,Food & Dining,Starbucks – Zamalek,7/18/2025 11:27,Zamalek,Cairo,65
-3,1,Entertainment,Steam (Online),5/4/2025 0:35,Online,Online,295
-4,1,Travel,Go Bus – Alexandria,1/29/2025 7:28,Al Mesallah,Alexandria,155
-5,1,Shopping,Amazon Egypt (Souq) (Online),8/28/2025 0:44,Online,Online,665
-6,1,Entertainment,Steam (Online),5/13/2025 1:06,Online,Online,505
-7,1,Food & Dining,Domino's Pizza – Downtown,3/8/2025 21:16,Downtown,Cairo,235
-8,1,Food & Dining,Pizza Hut – Downtown,11/30/2024 17:59,Downtown,Cairo,190
-9,1,Food & Dining,Domino's Pizza – Downtown,10/14/2024 21:56,Downtown,Cairo,175
-10,1,Entertainment,Steam (Online),9/5/2024 21:49,Online,Online,250
-11,1,Shopping,iStore Egypt – Heliopolis,7/11/2025 17:17,Heliopolis,Cairo,3165
-12,1,Food & Dining,Domino's Pizza – Downtown,6/9/2025 19:22,Downtown,Cairo,220
-13,1,Shopping,Jumia (Online),9/16/2024 2:40,Online,Online,1895
-14,1,Entertainment,Steam (Online),6/9/2025 22:59,Online,Online,425
-15,1,Entertainment,Steam (Online),9/15/2024 20:14,Online,Online,470
-16,1,Food & Dining,Domino's Pizza – Downtown,2/7/2025 19:04,Downtown,Cairo,160
-17,1,Travel,EgyptAir – Cairo Intl. Airport,3/23/2025 7:41,Cairo International Airport,Cairo,3660
-18,1,Shopping,Jumia (Online),1/9/2025 22:15,Online,Online,675
-19,1,Food & Dining,Domino's Pizza – Downtown,11/5/2024 20:57,Downtown,Cairo,240
-20,1,Entertainment,Steam (Online),6/22/2025 0:48,Online,Online,695
-21,1,Shopping,Raya Electronics – Heliopolis,10/14/2024 15:50,Heliopolis,Cairo,1860
-22,1,Entertainment,PlayStation Store (Online),2/15/2025 23:33,Online,Online,805
-23,1,Entertainment,Cineplex – Mall of Arabia,9/17/2024 23:07,Mall of Arabia,6th of October City,150
-24,1,Education,Cairo University Bookshop,10/7/2024 12:07,Giza (CU Campus),Giza,105
-25,1,Food & Dining,Pizza Hut – Downtown,8/30/2025 22:56,Downtown,Cairo,220
-26,1,Food & Dining,Starbucks – Zamalek,6/1/2025 11:58,Zamalek,Cairo,70
-27,1,Education,Cairo University Bookshop,10/8/2024 14:38,Giza (CU Campus),Giza,180
-28,1,Shopping,Amazon Egypt (Souq) (Online),6/10/2025 2:58,Online,Online,1095
-29,1,Food & Dining,Pizza Hut – Downtown,8/22/2025 17:59,Downtown,Cairo,180
-30,1,Education,Cairo University Bookshop,5/1/2025 10:15,Giza (CU Campus),Giza,95
-31,1,Entertainment,PlayStation Store (Online),7/19/2025 0:48,Online,Online,560
-32,1,Shopping,Raya Electronics – Heliopolis,9/28/2024 17:35,Heliopolis,Cairo,3890
-33,1,Shopping,Amazon Egypt (Souq) (Online),10/25/2024 22:59,Online,Online,1255
-34,1,Shopping,iStore Egypt – Heliopolis,8/31/2024 16:25,Heliopolis,Cairo,1820
-35,1,Food & Dining,Pizza Hut – Downtown,12/10/2024 20:07,Downtown,Cairo,180
-36,1,Food & Dining,Domino's Pizza – Downtown,8/21/2025 21:35,Downtown,Cairo,255
-37,1,Entertainment,PlayStation Store (Online),7/26/2025 0:14,Online,Online,640
-38,1,Education,Diwan Bookstore – Zamalek,7/26/2025 18:15,Zamalek,Cairo,160
-39,1,Entertainment,Steam (Online),11/28/2024 23:15,Online,Online,560
-40,1,Food & Dining,Pizza Hut – Downtown,5/26/2025 17:06,Downtown,Cairo,185
-41,1,Food & Dining,Pizza Hut – Downtown,2/2/2025 20:55,Downtown,Cairo,230
-42,1,Shopping,Jumia (Online),10/5/2024 23:46,Online,Online,740
-43,1,Shopping,City Stars Mall – Nasr City,4/26/2025 15:12,Nasr City,Cairo,2800
-44,1,Food & Dining,Pizza Hut – Downtown,5/30/2025 19:29,Downtown,Cairo,210
-45,1,Shopping,City Stars Mall – Nasr City,1/17/2025 20:55,Nasr City,Cairo,2745
-46,1,Entertainment,PlayStation Store (Online),10/2/2024 0:05,Online,Online,1245
-47,1,Shopping,iStore Egypt – Heliopolis,6/7/2025 17:31,Heliopolis,Cairo,1700
-48,1,Food & Dining,Pizza Hut – Downtown,8/1/2025 18:24,Downtown,Cairo,170
-49,1,Education,Cairo University Bookshop,1/11/2025 12:27,Giza (CU Campus),Giza,135
-50,1,Travel,Go Bus – Alexandria,9/27/2024 9:09,Al Mesallah,Alexandria,130
-51,1,Entertainment,PlayStation Store (Online),11/8/2024 0:47,Online,Online,450
-52,1,Food & Dining,Starbucks – Zamalek,12/30/2024 11:58,Zamalek,Cairo,80
-53,1,Entertainment,PlayStation Store (Online),12/14/2024 21:04,Online,Online,610
-54,1,Shopping,Amazon Egypt (Souq) (Online),5/3/2025 22:37,Online,Online,735
-55,1,Entertainment,PlayStation Store (Online),1/29/2025 2:33,Online,Online,715
-56,1,Shopping,iStore Egypt – Heliopolis,9/23/2024 19:20,Heliopolis,Cairo,4145
-57,1,Entertainment,Steam (Online),9/22/2024 1:20,Online,Online,610
-58,1,Shopping,City Stars Mall – Nasr City,8/27/2025 17:39,Nasr City,Cairo,1800
-59,1,Shopping,City Stars Mall – Nasr City,11/29/2024 15:32,Nasr City,Cairo,1695
-60,1,Food & Dining,Domino's Pizza – Downtown,7/27/2025 18:23,Downtown,Cairo,220
-61,1,Shopping,Amazon Egypt (Souq) (Online),11/26/2024 2:51,Online,Online,1040
-62,1,Shopping,Jumia (Online),11/21/2024 22:56,Online,Online,1805
-63,1,Entertainment,PlayStation Store (Online),11/21/2024 22:38,Online,Online,1295
-64,1,Shopping,iStore Egypt – Heliopolis,9/14/2024 19:54,Heliopolis,Cairo,4595
-65,1,Food & Dining,Domino's Pizza – Downtown,8/5/2025 17:40,Downtown,Cairo,245
-66,1,Entertainment,Cineplex – Mall of Arabia,8/30/2025 20:49,Mall of Arabia,6th of October City,115
-67,1,Food & Dining,Domino's Pizza – Downtown,6/10/2025 22:28,Downtown,Cairo,205
-68,1,Travel,Go Bus – Alexandria,8/27/2025 6:04,Al Mesallah,Alexandria,125
-69,1,Entertainment,Steam (Online),11/25/2024 22:37,Online,Online,425
-70,1,Entertainment,Steam (Online),8/10/2025 20:57,Online,Online,330
-71,1,Entertainment,Steam (Online),9/24/2024 23:39,Online,Online,445
-72,1,Entertainment,Steam (Online),6/9/2025 0:56,Online,Online,410
-73,1,Shopping,Jumia (Online),3/14/2025 1:51,Online,Online,2025
-74,1,Shopping,iStore Egypt – Heliopolis,4/17/2025 15:50,Heliopolis,Cairo,2115
-75,1,Shopping,Amazon Egypt (Souq) (Online),8/12/2025 0:12,Online,Online,555
-76,1,Education,Diwan Bookstore – Zamalek,3/28/2025 15:14,Zamalek,Cairo,90
-77,1,Food & Dining,Pizza Hut – Downtown,3/16/2025 19:55,Downtown,Cairo,210
-78,1,Education,Cairo University Bookshop,3/5/2025 15:32,Giza (CU Campus),Giza,150
-79,1,Shopping,Amazon Egypt (Souq) (Online),11/30/2024 22:07,Online,Online,525
-80,1,Shopping,Raya Electronics – Heliopolis,11/7/2024 16:02,Heliopolis,Cairo,1430
-81,1,Food & Dining,Domino's Pizza – Downtown,3/24/2025 20:38,Downtown,Cairo,190
-82,1,Food & Dining,Starbucks – Zamalek,5/26/2025 9:02,Zamalek,Cairo,70
-83,1,Food & Dining,Starbucks – Zamalek,11/29/2024 8:23,Zamalek,Cairo,95
-84,1,Shopping,Jumia (Online),3/15/2025 2:54,Online,Online,755
-85,1,Education,Cairo University Bookshop,12/15/2024 12:42,Giza (CU Campus),Giza,170
-86,1,Shopping,Jumia (Online),4/2/2025 0:26,Online,Online,2535
-87,1,Food & Dining,Koshary Abou Tarek – Ramses,6/3/2025 14:25,Ramses,Cairo,95
-88,1,Education,Cairo University Bookshop,4/7/2025 11:27,Giza (CU Campus),Giza,90
-89,1,Shopping,Jumia (Online),3/20/2025 23:43,Online,Online,995
-90,1,Shopping,Amazon Egypt (Souq) (Online),6/6/2025 1:32,Online,Online,1665
-91,1,Food & Dining,Domino's Pizza – Downtown,7/15/2025 18:43,Downtown,Cairo,330
-92,1,Entertainment,Steam (Online),6/17/2025 21:30,Online,Online,330
-93,1,Shopping,City Stars Mall – Nasr City,1/10/2025 17:56,Nasr City,Cairo,1355
-94,1,Shopping,Jumia (Online),9/9/2024 23:15,Online,Online,1835
-95,1,Entertainment,PlayStation Store (Online),7/8/2025 0:11,Online,Online,680
-96,1,Travel,Go Bus – Alexandria,1/6/2025 6:35,Al Mesallah,Alexandria,155
-97,1,Shopping,City Stars Mall – Nasr City,1/10/2025 15:51,Nasr City,Cairo,2015
-98,1,Food & Dining,Starbucks – Zamalek,10/31/2024 9:48,Zamalek,Cairo,65
-99,1,Shopping,Amazon Egypt (Souq) (Online),12/16/2024 23:57,Online,Online,1750
-100,1,Health,El Ezaby Pharmacy – Heliopolis,1/13/2025 13:48,Heliopolis,Cairo,70
-101,1,Education,Cairo University Bookshop,12/8/2024 13:40,Giza (CU Campus),Giza,80
-102,1,Entertainment,PlayStation Store (Online),8/31/2024 22:21,Online,Online,940
-103,1,Shopping,City Stars Mall – Nasr City,6/22/2025 15:14,Nasr City,Cairo,2105
-104,1,Shopping,Jumia (Online),5/14/2025 23:21,Online,Online,500
-105,1,Entertainment,PlayStation Store (Online),5/18/2025 1:57,Online,Online,1195
-106,1,Shopping,Jumia (Online),8/21/2025 2:24,Online,Online,1475
-107,1,Food & Dining,Domino's Pizza – Downtown,4/1/2025 20:54,Downtown,Cairo,210
-108,1,Health,Seif Pharmacy – Ramses,11/29/2024 20:47,Ramses,Cairo,320
-109,1,Shopping,iStore Egypt – Heliopolis,12/25/2024 15:17,Heliopolis,Cairo,4450
-110,1,Food & Dining,Pizza Hut – Downtown,3/12/2025 22:43,Downtown,Cairo,240
-111,1,Entertainment,Steam (Online),1/4/2025 2:34,Online,Online,330
-112,1,Travel,EgyptAir – Cairo Intl. Airport,11/16/2024 11:01,Cairo International Airport,Cairo,2705
-113,1,Entertainment,Steam (Online),1/7/2025 22:24,Online,Online,660
-114,1,Food & Dining,Domino's Pizza – Downtown,3/12/2025 20:17,Downtown,Cairo,185
-115,1,Health,Seif Pharmacy – Ramses,4/24/2025 10:30,Ramses,Cairo,300
-116,1,Entertainment,Cineplex – Mall of Arabia,3/5/2025 19:41,Mall of Arabia,6th of October City,135
-117,1,Food & Dining,Koshary Abou Tarek – Ramses,8/11/2025 12:15,Ramses,Cairo,70
-118,1,Travel,EgyptAir – Cairo Intl. Airport,6/14/2025 7:08,Cairo International Airport,Cairo,1990
-119,1,Food & Dining,Starbucks – Zamalek,5/12/2025 10:44,Zamalek,Cairo,75
-120,1,Shopping,Raya Electronics – Heliopolis,10/25/2024 18:47,Heliopolis,Cairo,1445
-121,1,Shopping,Amazon Egypt (Souq) (Online),6/9/2025 0:37,Online,Online,775
-122,1,Travel,EgyptAir – Cairo Intl. Airport,9/19/2024 9:25,Cairo International Airport,Cairo,3655
-123,1,Food & Dining,Starbucks – Zamalek,9/12/2024 8:06,Zamalek,Cairo,70
-124,1,Food & Dining,Koshary Abou Tarek – Ramses,10/28/2024 12:50,Ramses,Cairo,70
-125,1,Education,Diwan Bookstore – Zamalek,12/2/2024 17:42,Zamalek,Cairo,180
-126,1,Shopping,Jumia (Online),3/10/2025 23:52,Online,Online,2290
-127,1,Food & Dining,Domino's Pizza – Downtown,10/10/2024 20:45,Downtown,Cairo,170
-128,1,Shopping,Jumia (Online),12/7/2024 1:39,Online,Online,710
-129,1,Health,El Ezaby Pharmacy – Heliopolis,1/5/2025 15:52,Heliopolis,Cairo,205
-130,1,Food & Dining,Domino's Pizza – Downtown,4/28/2025 17:17,Downtown,Cairo,270
-131,1,Shopping,Amazon Egypt (Souq) (Online),1/6/2025 2:24,Online,Online,510
-132,1,Shopping,Amazon Egypt (Souq) (Online),3/18/2025 22:22,Online,Online,1330
-133,1,Food & Dining,Domino's Pizza – Downtown,10/30/2024 22:56,Downtown,Cairo,185
-134,1,Food & Dining,Starbucks – Zamalek,5/26/2025 7:15,Zamalek,Cairo,80
-135,1,Food & Dining,Starbucks – Zamalek,4/30/2025 10:41,Zamalek,Cairo,90
-136,1,Shopping,Amazon Egypt (Souq) (Online),8/23/2025 22:25,Online,Online,730
-137,1,Shopping,Jumia (Online),11/7/2024 23:27,Online,Online,1325
-138,1,Food & Dining,Domino's Pizza – Downtown,9/6/2024 20:17,Downtown,Cairo,195
-139,1,Entertainment,PlayStation Store (Online),5/25/2025 21:12,Online,Online,670
-140,1,Education,Cairo University Bookshop,11/3/2024 14:38,Giza (CU Campus),Giza,75
-141,1,Shopping,iStore Egypt – Heliopolis,4/2/2025 15:23,Heliopolis,Cairo,2100
-142,1,Shopping,Jumia (Online),12/1/2024 22:03,Online,Online,1690
-143,1,Entertainment,Steam (Online),10/9/2024 1:06,Online,Online,420
-144,1,Food & Dining,Domino's Pizza – Downtown,1/3/2025 20:28,Downtown,Cairo,200
-145,1,Entertainment,PlayStation Store (Online),4/24/2025 1:07,Online,Online,530
-146,1,Food & Dining,Pizza Hut – Downtown,7/25/2025 21:40,Downtown,Cairo,175
-147,1,Entertainment,Steam (Online),11/16/2024 0:15,Online,Online,430
-148,1,Food & Dining,Pizza Hut – Downtown,10/25/2024 21:50,Downtown,Cairo,180
-149,1,Food & Dining,Starbucks – Zamalek,2/18/2025 10:58,Zamalek,Cairo,80
-150,1,Food & Dining,Starbucks – Zamalek,1/24/2025 9:36,Zamalek,Cairo,80
+Transaction_ID,User_ID,Category,Store_Name,Day,Month,Year,Name_of_day,Hour,Minute,Neighborhood,City,Amount_EGP,Type_spending
+1,1,Dining,Mall Food Court,1,7,2023,Saturday,14,0,6th of October,Giza,325,Cash
+2,1,Utilities,Vodafone Cash,1,7,2023,Saturday,17,45,6th of October,Giza,120,Credit
+3,1,Transport,Shell,1,7,2023,Saturday,12,30,Mohandessin,Giza,92,Cash
+4,1,Coffee,Costa Coffee,2,7,2023,Sunday,15,15,Mohandessin,Giza,89,E-Wallet
+5,1,Coffee,Beano's Coffee,2,7,2023,Sunday,15,30,6th of October,Cairo,44,E-Wallet
+6,1,Utilities,Vodafone Cash,2,7,2023,Sunday,10,0,6th of October,Cairo,252,E-Wallet
+7,1,Entertainment,VOX Cinema,2,7,2023,Sunday,21,45,6th of October,Giza,371,Credit
+8,1,Utilities,Vodafone Cash,2,7,2023,Sunday,19,15,Zamalek,Cairo,213,E-Wallet
+9,1,Dining,Mall Food Court,3,7,2023,Monday,21,30,Smart Village,Cairo,438,Cash
+10,1,Pharmacy,Seif Pharmacy,3,7,2023,Monday,11,30,Smart Village,Giza,89,Cash
+11,1,Dining,Zooba,3,7,2023,Monday,15,15,Zamalek,Cairo,427,Credit
+12,1,Groceries,Metro Market,3,7,2023,Monday,12,0,Mohandessin,Cairo,1689,Cash
+13,1,Shopping,Noon,3,7,2023,Monday,21,0,Smart Village,Giza,1435,Credit
+14,1,Groceries,Metro Market,4,7,2023,Tuesday,22,30,Smart Village,Giza,1661,Credit
+15,1,Pharmacy,Seif Pharmacy,4,7,2023,Tuesday,17,45,Zamalek,Giza,106,E-Wallet
+16,1,Transport,Shell,4,7,2023,Tuesday,12,15,Mohandessin,Giza,69,Cash
+17,1,Groceries,Metro Market,4,7,2023,Tuesday,7,30,Smart Village,Giza,1842,Credit
+18,1,Pharmacy,Seif Pharmacy,4,7,2023,Tuesday,10,0,6th of October,Cairo,179,E-Wallet
+19,1,Dining,Zooba,5,7,2023,Wednesday,9,30,Mohandessin,Giza,405,Credit
+20,1,Coffee,Costa Coffee,5,7,2023,Wednesday,10,45,Mohandessin,Cairo,82,E-Wallet
+21,1,Entertainment,VOX Cinema,5,7,2023,Wednesday,13,15,Smart Village,Giza,185,Credit
+22,1,Lunch,Company Cafeteria,5,7,2023,Wednesday,19,45,6th of October,Giza,118,E-Wallet
+23,1,Lunch,Company Cafeteria,5,7,2023,Wednesday,17,0,Smart Village,Giza,113,Credit
+24,1,Coffee,Costa Coffee,6,7,2023,Thursday,9,0,Mohandessin,Giza,76,Cash
+25,1,Pharmacy,Seif Pharmacy,6,7,2023,Thursday,17,30,Zamalek,Giza,211,E-Wallet
+26,1,Coffee,Costa Coffee,6,7,2023,Thursday,22,30,Smart Village,Cairo,90,Credit
+27,1,Pharmacy,El-Ezaby Pharmacy,6,7,2023,Thursday,21,30,Zamalek,Cairo,202,Credit
+28,1,Entertainment,Mall of Arabia,6,7,2023,Thursday,11,0,Smart Village,Giza,201,Credit
+29,1,Transport,Uber,7,7,2023,Friday,7,0,Mohandessin,Giza,50,E-Wallet
+30,1,Groceries,Carrefour,7,7,2023,Friday,19,30,Zamalek,Giza,1604,Credit
+31,1,Pharmacy,Seif Pharmacy,7,7,2023,Friday,18,45,Mohandessin,Giza,452,Credit
+32,1,Utilities,Fawry,8,7,2023,Saturday,18,45,6th of October,Cairo,248,Credit
+33,1,Pharmacy,Seif Pharmacy,8,7,2023,Saturday,19,45,Zamalek,Cairo,332,Cash
+34,1,Lunch,TBS,8,7,2023,Saturday,8,0,Zamalek,Giza,96,E-Wallet
+35,1,Lunch,Company Cafeteria,9,7,2023,Sunday,13,15,Zamalek,Giza,103,E-Wallet
+36,1,Groceries,Metro Market,9,7,2023,Sunday,9,0,Mohandessin,Cairo,1516,Credit
+37,1,Entertainment,Mall of Arabia,9,7,2023,Sunday,18,15,Smart Village,Cairo,264,Credit
+38,1,Groceries,Metro Market,9,7,2023,Sunday,14,30,Mohandessin,Cairo,725,Credit
+39,1,Lunch,Zooba,10,7,2023,Monday,21,0,Mohandessin,Giza,113,Cash
+40,1,Transport,Shell,10,7,2023,Monday,19,15,Zamalek,Cairo,116,Cash
+41,1,Shopping,Noon,10,7,2023,Monday,9,30,6th of October,Giza,1524,Cash
+42,1,Transport,Shell,10,7,2023,Monday,9,15,Zamalek,Cairo,119,E-Wallet
+43,1,Coffee,Costa Coffee,10,7,2023,Monday,16,15,6th of October,Giza,75,Credit
+44,1,Groceries,Metro Market,11,7,2023,Tuesday,20,30,6th of October,Giza,1073,Credit
+45,1,Lunch,Company Cafeteria,11,7,2023,Tuesday,13,15,Zamalek,Cairo,105,Credit
+46,1,Dining,Mall Food Court,11,7,2023,Tuesday,10,30,Smart Village,Giza,263,Cash
+47,1,Lunch,Zooba,12,7,2023,Wednesday,12,15,Mohandessin,Giza,115,Cash
+48,1,Lunch,Company Cafeteria,12,7,2023,Wednesday,22,15,Smart Village,Giza,149,E-Wallet
+49,1,Shopping,Jumia,12,7,2023,Wednesday,17,15,6th of October,Giza,1743,E-Wallet
+50,1,Dining,Mall Food Court,12,7,2023,Wednesday,13,0,Zamalek,Giza,362,Credit
+51,1,Dining,Zooba,13,7,2023,Thursday,10,30,Smart Village,Giza,457,E-Wallet
+52,1,Dining,Zooba,13,7,2023,Thursday,19,15,Smart Village,Giza,285,Credit
+53,1,Utilities,Vodafone Cash,13,7,2023,Thursday,19,0,Mohandessin,Giza,377,E-Wallet
+54,1,Lunch,TBS,13,7,2023,Thursday,10,0,Mohandessin,Giza,136,Cash
+55,1,Entertainment,Mall of Arabia,14,7,2023,Friday,12,15,Mohandessin,Giza,239,E-Wallet
+56,1,Shopping,B.Tech,14,7,2023,Friday,17,45,Mohandessin,Giza,1241,Credit
+57,1,Utilities,Fawry,14,7,2023,Friday,8,30,6th of October,Giza,215,Cash
+58,1,Entertainment,Mall of Arabia,15,7,2023,Saturday,10,30,Zamalek,Giza,206,Cash
+59,1,Dining,Mall Food Court,15,7,2023,Saturday,10,30,Mohandessin,Cairo,241,E-Wallet
+60,1,Lunch,TBS,15,7,2023,Saturday,20,30,Smart Village,Giza,137,Cash
+61,1,Dining,Mall Food Court,15,7,2023,Saturday,14,15,Zamalek,Cairo,472,Cash
+62,1,Entertainment,Mall of Arabia,15,7,2023,Saturday,13,0,Mohandessin,Giza,222,Credit
+63,1,Entertainment,Mall of Arabia,16,7,2023,Sunday,15,45,6th of October,Giza,356,Cash
+64,1,Groceries,Seoudi Market,16,7,2023,Sunday,15,0,Smart Village,Giza,486,Cash
+65,1,Transport,Shell,17,7,2023,Monday,22,15,Zamalek,Cairo,78,Cash
+66,1,Shopping,Noon,17,7,2023,Monday,19,45,6th of October,Cairo,1408,Credit
+67,1,Utilities,Fawry,17,7,2023,Monday,17,15,Smart Village,Cairo,206,Cash
+68,1,Pharmacy,Seif Pharmacy,18,7,2023,Tuesday,13,45,Zamalek,Cairo,418,Credit
+69,1,Transport,Careem,18,7,2023,Tuesday,19,0,Mohandessin,Giza,117,E-Wallet
+70,1,Coffee,Costa Coffee,18,7,2023,Tuesday,22,0,Zamalek,Giza,66,Credit
+71,1,Shopping,Diwan Bookstore,18,7,2023,Tuesday,21,0,6th of October,Cairo,849,E-Wallet
+72,1,Groceries,Carrefour,18,7,2023,Tuesday,18,15,Smart Village,Cairo,1320,Cash
+73,1,Pharmacy,El-Ezaby Pharmacy,19,7,2023,Wednesday,7,30,Zamalek,Giza,460,Credit
+74,1,Dining,Zooba,19,7,2023,Wednesday,22,30,Mohandessin,Giza,305,Cash
+75,1,Pharmacy,Seif Pharmacy,19,7,2023,Wednesday,7,0,Mohandessin,Giza,88,Cash
+76,1,Lunch,Zooba,19,7,2023,Wednesday,19,15,Zamalek,Giza,70,E-Wallet
+77,1,Transport,Shell,19,7,2023,Wednesday,9,30,6th of October,Giza,84,E-Wallet
+78,1,Entertainment,Mall of Arabia,20,7,2023,Thursday,8,45,Mohandessin,Giza,393,Credit
+79,1,Coffee,Costa Coffee,20,7,2023,Thursday,11,0,6th of October,Cairo,68,E-Wallet
+80,1,Entertainment,Mall of Arabia,20,7,2023,Thursday,15,45,Smart Village,Cairo,157,Credit
+81,1,Lunch,Zooba,21,7,2023,Friday,22,30,Mohandessin,Cairo,148,E-Wallet
+82,1,Utilities,Fawry,21,7,2023,Friday,15,30,6th of October,Cairo,347,Cash
+83,1,Shopping,Noon,22,7,2023,Saturday,22,0,Zamalek,Cairo,1687,E-Wallet
+84,1,Transport,Shell,22,7,2023,Saturday,18,15,Smart Village,Cairo,109,E-Wallet
+85,1,Groceries,Carrefour,22,7,2023,Saturday,21,45,Smart Village,Giza,1323,Credit
+86,1,Entertainment,Mall of Arabia,22,7,2023,Saturday,15,30,Mohandessin,Cairo,248,Cash
+87,1,Transport,Careem,22,7,2023,Saturday,16,0,Mohandessin,Giza,84,E-Wallet
+88,1,Lunch,Zooba,23,7,2023,Sunday,22,30,Mohandessin,Cairo,146,E-Wallet
+89,1,Transport,Uber,23,7,2023,Sunday,11,30,Smart Village,Cairo,56,Credit
+90,1,Utilities,Fawry,23,7,2023,Sunday,17,15,Smart Village,Giza,369,Cash
+91,1,Groceries,Carrefour,23,7,2023,Sunday,21,0,Zamalek,Giza,252,Cash
+92,1,Entertainment,VOX Cinema,23,7,2023,Sunday,19,45,6th of October,Giza,289,Cash
+93,1,Dining,Abou El Sid,24,7,2023,Monday,18,30,Zamalek,Giza,228,Cash
+94,1,Pharmacy,El-Ezaby Pharmacy,24,7,2023,Monday,17,45,Zamalek,Giza,469,Cash
+95,1,Transport,Shell,24,7,2023,Monday,10,0,Smart Village,Cairo,65,Credit
+96,1,Transport,Careem,24,7,2023,Monday,13,45,Zamalek,Cairo,118,Credit
+97,1,Groceries,Seoudi Market,25,7,2023,Tuesday,10,0,6th of October,Giza,1523,Credit
+98,1,Lunch,Company Cafeteria,25,7,2023,Tuesday,11,0,Zamalek,Giza,92,Cash
+99,1,Groceries,Metro Market,26,7,2023,Wednesday,17,30,Mohandessin,Giza,1475,Credit
+100,1,Pharmacy,El-Ezaby Pharmacy,26,7,2023,Wednesday,14,45,Mohandessin,Giza,200,Credit
+101,1,Entertainment,Mall of Arabia,26,7,2023,Wednesday,7,0,Smart Village,Giza,194,Cash
+102,1,Shopping,Noon,26,7,2023,Wednesday,14,0,Smart Village,Giza,166,Cash
+103,1,Pharmacy,Seif Pharmacy,26,7,2023,Wednesday,13,30,6th of October,Cairo,354,Credit
+104,1,Pharmacy,Seif Pharmacy,27,7,2023,Thursday,22,30,6th of October,Cairo,129,Cash
+105,1,Utilities,Vodafone Cash,27,7,2023,Thursday,11,30,6th of October,Giza,165,E-Wallet
+106,1,Shopping,Noon,27,7,2023,Thursday,18,45,6th of October,Cairo,1884,E-Wallet
+107,1,Pharmacy,Seif Pharmacy,28,7,2023,Friday,7,45,6th of October,Cairo,112,Credit
+108,1,Lunch,TBS,28,7,2023,Friday,21,15,Mohandessin,Giza,121,E-Wallet
+109,1,Transport,Uber,29,7,2023,Saturday,7,45,6th of October,Cairo,67,Credit
+110,1,Groceries,Carrefour,29,7,2023,Saturday,17,15,Smart Village,Giza,1499,E-Wallet
+111,1,Coffee,Costa Coffee,29,7,2023,Saturday,21,0,Zamalek,Cairo,47,Cash
+112,1,Lunch,Company Cafeteria,29,7,2023,Saturday,10,15,Mohandessin,Cairo,85,Credit
+113,1,Shopping,Diwan Bookstore,29,7,2023,Saturday,13,15,Zamalek,Cairo,1216,Credit
+114,1,Coffee,Costa Coffee,30,7,2023,Sunday,7,45,6th of October,Giza,82,E-Wallet
+115,1,Transport,Shell,30,7,2023,Sunday,11,0,6th of October,Cairo,57,Cash
+116,1,Entertainment,Mall of Arabia,30,7,2023,Sunday,12,45,Mohandessin,Cairo,301,E-Wallet
+117,1,Coffee,Costa Coffee,30,7,2023,Sunday,11,45,6th of October,Cairo,47,Credit
+118,1,Lunch,Zooba,31,7,2023,Monday,12,0,Zamalek,Cairo,150,E-Wallet
+119,1,Groceries,Seoudi Market,31,7,2023,Monday,8,30,6th of October,Giza,1112,E-Wallet
+120,1,Transport,Careem,31,7,2023,Monday,13,0,6th of October,Cairo,98,Credit
+121,1,Pharmacy,El-Ezaby Pharmacy,31,7,2023,Monday,15,30,Smart Village,Cairo,360,E-Wallet
+122,1,Pharmacy,Seif Pharmacy,1,8,2023,Tuesday,20,0,Zamalek,Giza,178,Cash
+123,1,Dining,Mall Food Court,1,8,2023,Tuesday,9,0,Zamalek,Cairo,399,Cash
+124,1,Groceries,Metro Market,1,8,2023,Tuesday,7,0,Zamalek,Giza,927,E-Wallet
+125,1,Groceries,Metro Market,2,8,2023,Wednesday,10,45,Zamalek,Cairo,1655,Cash
+126,1,Entertainment,VOX Cinema,2,8,2023,Wednesday,7,15,Mohandessin,Cairo,359,E-Wallet
+127,1,Utilities,Vodafone Cash,2,8,2023,Wednesday,7,45,Smart Village,Giza,205,Cash
+128,1,Transport,Shell,2,8,2023,Wednesday,11,45,Smart Village,Cairo,59,Credit
+129,1,Entertainment,Mall of Arabia,3,8,2023,Thursday,16,45,Zamalek,Cairo,208,Credit
+130,1,Pharmacy,El-Ezaby Pharmacy,3,8,2023,Thursday,9,0,6th of October,Cairo,83,Cash
+131,1,Coffee,Beano's Coffee,3,8,2023,Thursday,13,45,Smart Village,Giza,50,Credit
+132,1,Entertainment,Mall of Arabia,4,8,2023,Friday,13,0,Zamalek,Cairo,280,Credit
+133,1,Entertainment,Mall of Arabia,4,8,2023,Friday,11,30,6th of October,Giza,192,E-Wallet
+134,1,Groceries,Carrefour,4,8,2023,Friday,16,0,6th of October,Cairo,378,Credit
+135,1,Coffee,Costa Coffee,4,8,2023,Friday,11,0,Mohandessin,Cairo,74,Credit
+136,1,Shopping,Jumia,4,8,2023,Friday,17,0,Smart Village,Cairo,1908,Cash
+137,1,Pharmacy,El-Ezaby Pharmacy,5,8,2023,Saturday,14,30,Mohandessin,Giza,443,Cash
+138,1,Entertainment,Mall of Arabia,5,8,2023,Saturday,7,45,6th of October,Giza,200,E-Wallet
+139,1,Dining,Abou El Sid,6,8,2023,Sunday,22,45,Zamalek,Cairo,328,E-Wallet
+140,1,Utilities,Fawry,6,8,2023,Sunday,17,30,Smart Village,Giza,265,Credit
+141,1,Dining,Zooba,6,8,2023,Sunday,11,15,Smart Village,Cairo,352,Cash
+142,1,Groceries,Carrefour,6,8,2023,Sunday,13,15,Mohandessin,Cairo,1750,Credit
+143,1,Transport,Shell,6,8,2023,Sunday,20,0,Smart Village,Cairo,99,Credit
+144,1,Groceries,Metro Market,7,8,2023,Monday,12,0,Smart Village,Cairo,581,Cash
+145,1,Groceries,Seoudi Market,7,8,2023,Monday,22,45,6th of October,Cairo,1271,Cash
+146,1,Coffee,Beano's Coffee,8,8,2023,Tuesday,12,0,Zamalek,Giza,67,Cash
+147,1,Transport,Careem,8,8,2023,Tuesday,8,0,Smart Village,Giza,78,E-Wallet
+148,1,Entertainment,VOX Cinema,8,8,2023,Tuesday,10,30,6th of October,Giza,210,Cash
+149,1,Transport,Shell,8,8,2023,Tuesday,16,15,Mohandessin,Cairo,68,Credit
+150,1,Utilities,Fawry,9,8,2023,Wednesday,20,45,Mohandessin,Giza,340,Credit
+151,1,Dining,Mall Food Court,9,8,2023,Wednesday,19,45,Mohandessin,Giza,381,Credit
+152,1,Transport,Shell,10,8,2023,Thursday,18,30,Zamalek,Cairo,92,E-Wallet
+153,1,Entertainment,VOX Cinema,10,8,2023,Thursday,17,30,Mohandessin,Cairo,289,Cash
+154,1,Transport,Shell,10,8,2023,Thursday,17,0,Smart Village,Giza,68,E-Wallet
+155,1,Lunch,Zooba,10,8,2023,Thursday,10,30,6th of October,Cairo,91,Cash
+156,1,Dining,Mall Food Court,10,8,2023,Thursday,7,0,Zamalek,Giza,343,Cash
+157,1,Transport,Shell,11,8,2023,Friday,9,15,6th of October,Giza,67,Cash
+158,1,Groceries,Carrefour,11,8,2023,Friday,16,30,Mohandessin,Giza,201,Cash
+159,1,Groceries,Carrefour,12,8,2023,Saturday,22,30,Mohandessin,Giza,933,E-Wallet
+160,1,Groceries,Metro Market,12,8,2023,Saturday,17,0,Smart Village,Cairo,1841,Cash
+161,1,Transport,Careem,13,8,2023,Sunday,19,0,Smart Village,Giza,96,Cash
+162,1,Transport,Shell,13,8,2023,Sunday,10,30,Smart Village,Cairo,63,E-Wallet
+163,1,Entertainment,VOX Cinema,13,8,2023,Sunday,7,45,Zamalek,Giza,267,Credit
+164,1,Transport,Uber,14,8,2023,Monday,16,30,Zamalek,Cairo,94,Credit
+165,1,Transport,Uber,14,8,2023,Monday,17,45,Zamalek,Cairo,56,Credit
+166,1,Utilities,Vodafone Cash,14,8,2023,Monday,18,15,Zamalek,Giza,278,Credit
+167,1,Shopping,Jumia,14,8,2023,Monday,20,15,6th of October,Giza,1500,Cash
+168,1,Entertainment,Mall of Arabia,15,8,2023,Tuesday,11,45,Smart Village,Cairo,349,Credit
+169,1,Lunch,Zooba,15,8,2023,Tuesday,16,45,Mohandessin,Cairo,123,Cash
+170,1,Utilities,Fawry,15,8,2023,Tuesday,17,15,6th of October,Giza,130,Cash
+171,1,Lunch,TBS,15,8,2023,Tuesday,12,0,Mohandessin,Cairo,142,Credit
+172,1,Groceries,Seoudi Market,16,8,2023,Wednesday,7,45,Mohandessin,Cairo,558,Credit
+173,1,Utilities,Vodafone Cash,16,8,2023,Wednesday,13,0,Mohandessin,Giza,326,Credit
+174,1,Shopping,B.Tech,16,8,2023,Wednesday,9,30,Zamalek,Giza,482,Cash
+175,1,Shopping,Jumia,16,8,2023,Wednesday,21,15,6th of October,Giza,1922,Credit
+176,1,Utilities,Vodafone Cash,16,8,2023,Wednesday,15,45,6th of October,Giza,297,Credit
+177,1,Entertainment,Mall of Arabia,17,8,2023,Thursday,20,0,Smart Village,Cairo,292,E-Wallet
+178,1,Transport,Uber,17,8,2023,Thursday,21,30,6th of October,Giza,102,Cash
+179,1,Groceries,Metro Market,17,8,2023,Thursday,16,45,Zamalek,Giza,918,Credit
+180,1,Lunch,Company Cafeteria,17,8,2023,Thursday,20,15,6th of October,Cairo,96,Credit
+181,1,Pharmacy,Seif Pharmacy,17,8,2023,Thursday,22,30,Zamalek,Cairo,422,Credit
+182,1,Lunch,Zooba,18,8,2023,Friday,12,15,6th of October,Cairo,79,E-Wallet
+183,1,Transport,Shell,18,8,2023,Friday,19,0,Zamalek,Cairo,114,E-Wallet
+184,1,Groceries,Carrefour,18,8,2023,Friday,7,15,Smart Village,Giza,1910,E-Wallet
+185,1,Dining,Abou El Sid,18,8,2023,Friday,18,0,Zamalek,Cairo,376,Credit
+186,1,Transport,Shell,18,8,2023,Friday,13,15,6th of October,Giza,66,E-Wallet
+187,1,Entertainment,Mall of Arabia,19,8,2023,Saturday,10,0,Zamalek,Cairo,321,Cash
+188,1,Transport,Careem,19,8,2023,Saturday,11,45,Smart Village,Giza,110,E-Wallet
+189,1,Dining,Abou El Sid,20,8,2023,Sunday,20,0,6th of October,Cairo,207,E-Wallet
+190,1,Groceries,Carrefour,20,8,2023,Sunday,12,15,Zamalek,Giza,1356,Credit
+191,1,Groceries,Seoudi Market,20,8,2023,Sunday,9,45,6th of October,Giza,704,Cash
+192,1,Utilities,Fawry,20,8,2023,Sunday,10,45,Smart Village,Cairo,328,Credit
+193,1,Coffee,Costa Coffee,21,8,2023,Monday,19,0,6th of October,Giza,56,Cash
+194,1,Groceries,Metro Market,21,8,2023,Monday,22,30,Zamalek,Giza,1837,Credit
+195,1,Utilities,Vodafone Cash,21,8,2023,Monday,10,45,6th of October,Giza,178,Cash
+196,1,Coffee,Beano's Coffee,21,8,2023,Monday,15,0,6th of October,Cairo,88,E-Wallet
+197,1,Lunch,Zooba,21,8,2023,Monday,12,45,6th of October,Giza,102,Credit
+198,1,Dining,Abou El Sid,22,8,2023,Tuesday,20,45,Zamalek,Cairo,256,E-Wallet
+199,1,Entertainment,VOX Cinema,22,8,2023,Tuesday,10,15,Zamalek,Giza,177,Credit
+200,1,Dining,Abou El Sid,22,8,2023,Tuesday,16,0,Mohandessin,Giza,295,Credit
+201,1,Pharmacy,Seif Pharmacy,22,8,2023,Tuesday,22,0,6th of October,Cairo,124,Credit
+202,1,Groceries,Seoudi Market,22,8,2023,Tuesday,14,0,Mohandessin,Giza,690,Cash
+203,1,Dining,Abou El Sid,23,8,2023,Wednesday,20,15,Mohandessin,Cairo,269,E-Wallet
+204,1,Transport,Uber,23,8,2023,Wednesday,10,45,Mohandessin,Giza,80,Credit
+205,1,Pharmacy,Seif Pharmacy,23,8,2023,Wednesday,22,45,6th of October,Giza,234,Credit
+206,1,Transport,Shell,23,8,2023,Wednesday,8,30,Smart Village,Cairo,104,Cash
+207,1,Pharmacy,Seif Pharmacy,24,8,2023,Thursday,9,0,Zamalek,Giza,217,Credit
+208,1,Groceries,Seoudi Market,24,8,2023,Thursday,22,45,Smart Village,Cairo,1496,E-Wallet
+209,1,Utilities,Fawry,24,8,2023,Thursday,20,45,Zamalek,Cairo,242,E-Wallet
+210,1,Groceries,Seoudi Market,24,8,2023,Thursday,17,45,Zamalek,Cairo,1332,Credit
+211,1,Lunch,TBS,24,8,2023,Thursday,15,45,Smart Village,Giza,77,Credit
+212,1,Groceries,Metro Market,25,8,2023,Friday,22,45,Mohandessin,Giza,306,E-Wallet
+213,1,Shopping,Noon,25,8,2023,Friday,15,45,Mohandessin,Cairo,1992,E-Wallet
+214,1,Dining,Zooba,25,8,2023,Friday,19,0,6th of October,Cairo,356,Credit
+215,1,Dining,Abou El Sid,25,8,2023,Friday,20,15,Smart Village,Cairo,220,Cash
+216,1,Coffee,Costa Coffee,26,8,2023,Saturday,20,30,Smart Village,Giza,84,Credit
+217,1,Lunch,Zooba,26,8,2023,Saturday,11,30,Smart Village,Giza,88,E-Wallet
+218,1,Shopping,Jumia,26,8,2023,Saturday,16,0,Mohandessin,Cairo,1977,E-Wallet
+219,1,Lunch,TBS,26,8,2023,Saturday,21,0,Zamalek,Cairo,91,E-Wallet
+220,1,Shopping,Diwan Bookstore,26,8,2023,Saturday,12,45,Smart Village,Giza,1473,Credit
+221,1,Shopping,B.Tech,27,8,2023,Sunday,7,45,6th of October,Cairo,659,E-Wallet
+222,1,Lunch,Company Cafeteria,27,8,2023,Sunday,21,45,Smart Village,Giza,126,E-Wallet
+223,1,Entertainment,Mall of Arabia,28,8,2023,Monday,7,0,Mohandessin,Cairo,238,Cash
+224,1,Pharmacy,Seif Pharmacy,28,8,2023,Monday,16,0,Zamalek,Cairo,485,E-Wallet
+225,1,Coffee,Beano's Coffee,28,8,2023,Monday,19,0,Mohandessin,Giza,58,E-Wallet
+226,1,Utilities,Fawry,28,8,2023,Monday,17,15,Mohandessin,Giza,201,E-Wallet
+227,1,Dining,Zooba,29,8,2023,Tuesday,21,0,6th of October,Giza,339,Cash
+228,1,Pharmacy,Seif Pharmacy,29,8,2023,Tuesday,7,15,Smart Village,Cairo,279,Credit
+229,1,Shopping,Diwan Bookstore,29,8,2023,Tuesday,16,15,6th of October,Cairo,666,Cash
+230,1,Entertainment,VOX Cinema,29,8,2023,Tuesday,21,30,Mohandessin,Giza,210,E-Wallet
+231,1,Transport,Uber,30,8,2023,Wednesday,18,30,Mohandessin,Cairo,97,Credit
+232,1,Pharmacy,El-Ezaby Pharmacy,30,8,2023,Wednesday,21,15,6th of October,Cairo,304,Credit
+233,1,Coffee,Beano's Coffee,30,8,2023,Wednesday,13,15,Zamalek,Giza,81,Cash
+234,1,Utilities,Vodafone Cash,30,8,2023,Wednesday,19,30,Mohandessin,Giza,304,Cash
+235,1,Lunch,Company Cafeteria,30,8,2023,Wednesday,11,15,Zamalek,Giza,100,Cash
+236,1,Dining,Abou El Sid,31,8,2023,Thursday,7,30,Smart Village,Giza,336,Credit
+237,1,Dining,Abou El Sid,31,8,2023,Thursday,18,45,Zamalek,Giza,214,E-Wallet
+238,1,Utilities,Fawry,31,8,2023,Thursday,7,30,Smart Village,Cairo,264,Credit
+239,1,Dining,Abou El Sid,31,8,2023,Thursday,14,45,Mohandessin,Giza,250,Credit
+240,1,Coffee,Costa Coffee,31,8,2023,Thursday,10,45,Zamalek,Cairo,41,Credit
