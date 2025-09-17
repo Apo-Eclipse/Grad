@@ -1,5 +1,4 @@
-from graphs import behaviour_analyst_super_agent
-from graphs.recommendation_sub_graph import parallel_tavily_search
+from graphs import behaviour_analyst_super_agent,recommendation_agent_sub_graph
 import io
 import sys
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
@@ -20,13 +19,14 @@ def main():
     #     print(f"Explanation: {res['explanation']}")
     #     print("-" * 20)
     
-    out_results = parallel_tavily_search("Stocks , artificial intelligence, technology")
-    for query, result in out_results.items():
-        search_result = result.get('results', [])
-        for i in range(len(search_result)):
-            print("_______result___________________________"*5)
-            print(search_result[i].get("content", ""))
-            print("_______result___________________________"*5)
+    out_results = recommendation_agent_sub_graph.invoke({"insights":"latest news in investing in real estate in Egypt in 2025"})
+    print(out_results['report'])
+    # for query, result in out_results.items():
+    #     search_result = result.get('results', [])
+    #     for i in range(len(search_result)):
+    #         print("_______result___________________________"*5)
+    #         print(search_result[i].get("content", ""))
+    #         print("_______result___________________________"*5)
 
 if __name__ == "__main__":
     main()

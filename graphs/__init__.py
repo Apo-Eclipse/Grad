@@ -1,3 +1,4 @@
 from .presentation_sub_graph import presentation_super_agent
 from .behaviour_analyst_sub_graph import behaviour_analyst_super_agent
 from .database_sub_graph import database_agent_super_agent
+from .recommendation_sub_graph import recommendation_agent_sub_graph
