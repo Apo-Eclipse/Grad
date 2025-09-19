@@ -1,15 +1,10 @@
-from urllib import response
-from agents import NewsWriter
-from agents import Scrapper
+from agents import NewsWriter, Scrapper
+from graphs.presentation_sub_graph import presentation_super_agent
 from tools.web_search import tavily_search
 from langgraph.graph import StateGraph, END, START
-from typing import Dict, Literal,TypedDict, Annotated, List
-from langgraph.types import Command
-from operator import add
-from graphs.presentation_sub_graph import presentation_super_agent
-import requests
-import ast
+from typing import Dict,TypedDict, List
 from bs4 import BeautifulSoup
+import requests
 
 class recommendation_graph_state(TypedDict):
     insights: str
@@ -33,7 +28,6 @@ def get_inner_text_from_url(url):
 
 def scrapper(state: recommendation_graph_state):
     results = state.get("results","empty")
-    # convert string to dict
     if results == "empty":
         return {"report":"No results found"}
     results = state["results"]
@@ -48,23 +42,15 @@ def scrapper(state: recommendation_graph_state):
     return {"report":report}
 
 def parallel_tavily_search(state: recommendation_graph_state):    
-    # Get search queries from LLM
     insights = state.get("insights", "empty")
     queries_struct = NewsWriter.invoke({"insights": insights})
     queries = queries_struct.search_queries
-    # print(queries)
-    # print("__________________________"*10)
-    # Run parallel searches for each query
     results_list = tavily_search.batch(queries)
     results = dict(zip(queries, results_list))
     d = {}
     for query, result in results.items():
         search_result = result.get('results', [])
         d[query] = [item.get('url', '') for item in search_result]
-        # for i in range(len(search_result)):
-        #     print("_______result___________________________"*5)
-        #     print(search_result[i].get("content", ""))
-        #     print("_______result___________________________"*5)
     return {"results":d}
 
 builder = StateGraph(recommendation_graph_state)

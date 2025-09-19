@@ -10,6 +10,7 @@ class DatabaseAgentState(TypedDict):
     result: dict         
 
 def database_agent(state: DatabaseAgentState):
+    print("===> Database Agent Invoked <===")
     step_text = state.get("request", "")
     try:
         out = DatabaseAgent.invoke({"request": step_text})
