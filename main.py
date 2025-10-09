@@ -102,7 +102,7 @@ def run_recommendation_agent():
     #         print("_______result___________________________"*5)
 
 def main():
-    run_behaviour_analysis()
+    run_trend_analysis()
     return
 
 if __name__ == "__main__":
