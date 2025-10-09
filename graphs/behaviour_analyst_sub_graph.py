@@ -115,9 +115,9 @@ def run_step(step):
     try:
         explanation = ex_out.explanation
         data_acquired.append(explanation)
-        print("explanation: ", explanation)
+        ex_out += "\n\n" + "The explanation was: " + str(explanation) + "\n"
     except Exception:
-        print("Could not get explanation")
+        ex_out += "\n\n" + "Could not get explanation"
     return data_to_written,data_acquired
 
 builder = StateGraph(BehaviourAnalystState)

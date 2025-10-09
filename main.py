@@ -1,3 +1,5 @@
+from dotenv import load_dotenv
+load_dotenv()
 from IPython.display import Image, display, Markdown
 from graphs.trend_analysis_sub_graph import news_super_agent
 from graphs import behaviour_analyst_super_agent,recommendation_agent_sub_graph
@@ -70,14 +72,14 @@ def run_trend_analysis():
     print("-------------------------------------------------------------------------------------")
     
 def run_behaviour_analysis():
-    tables = process_queries()
-    explanations = process_tables(tables)
-    print("****************************Tables******************************************") 
-    for table in tables:
-        print(table)
-    print("****************************Explanations***************************************")
-    for explanation in explanations:
-        print(explanation)
+    # tables = process_queries()
+    # explanations = process_tables(tables)
+    # print("****************************Tables******************************************") 
+    # for table in tables:
+    #     print(table)
+    # print("****************************Explanations***************************************")
+    # for explanation in explanations:
+    #     print(explanation)
     final_state = behaviour_analyst_super_agent.invoke({
         "request": "i want analysis to my spending during month 7 in 2023"
         , "data_acquired": [], "analysis": "no analysis done yet"
