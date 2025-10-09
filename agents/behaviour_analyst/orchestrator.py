@@ -17,8 +17,9 @@ system_prompt = """
     The query planner agent outlines clear and simple steps for another database agent to create SQL-style queries that retrieve insights about a **single user's** behavior and spending patterns.
     The analyser agent analyzes the data retrieved by the database agent and provides insights based on the queries outlined by the query planner.
     Decide where to route this:
+    - If their is specific questions or analysis to be done on the data -> return query_planner
     - If the analyser agent ask or recommends for additional data -> return query_planner
-    - If the analysis agent not been called-> return analyser
+    - If the analyser agent not been called-> return analyser
     - If the task is complete and all data gathered -> return end
     Formate:
     {{
@@ -31,6 +32,7 @@ user_prompt = """
     Data acquired: {data_acquired}
     analysis done: {analysis} 
     first request: {request}
+    user: {user}
     message sended from {sender}: {message}
     Based on the above information, decide the next step for the task.
 """
@@ -40,4 +42,4 @@ prompt = ChatPromptTemplate.from_messages([
     ("user", user_prompt)
 ])
 
-Behaviour_analyser_orchestrator = prompt | gemini_llm.with_structured_output(orchestratorOutput)
+Behaviour_analyser_orchestrator = prompt | azure_llm.with_structured_output(orchestratorOutput)

@@ -4,20 +4,16 @@ from typing import TypedDict
 import pandas as pd
 import sqlite3
 import json
-
+import time
 class DatabaseAgentState(TypedDict):
     request: str         
     result: dict         
 
 def database_agent(state: DatabaseAgentState):
-    print("===> Database Agent Invoked <===")
     step_text = state.get("request", "")
     try:
-        out = DatabaseAgent.invoke({"request": step_text})
-        parsed = json.loads(out.final_output)
-        if not isinstance(parsed, dict) or "query" not in parsed:
-            return {"result": {"step": step_text, "query": None, "data": "Invalid response"}}
-        query = parsed["query"]
+        out = DatabaseAgent.invoke({"request": step_text, "user": "1"})
+        query = out.query
         results = []
         with sqlite3.connect("D:/projects/Multi-Agent System/data/database.db") as conn:
             try:
@@ -25,8 +21,7 @@ def database_agent(state: DatabaseAgentState):
                 results = df.to_dict(orient="records")
             except Exception as e:
                 results = f"Error Executing Query: {str(e)}"
-
-        return {"result": {"step": parsed.get("step", step_text), "query": query, "data": results}}
+        return {"result": {"step": step_text, "query": query, "data": results}}
     except Exception as e:
         return {"result": {"step": step_text, "query": None, "data": f"Agent Error: {str(e)}"}}
 

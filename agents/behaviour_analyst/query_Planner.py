@@ -31,64 +31,110 @@ system_prompt = """
     - **Frequency-based insights** (most frequent store, most visited location, etc.).  
     6. Use metrics like **mean, mode, min, max** when helpful.  
     7. Only propose steps that could be derived from the **data and metadata** available (no external knowledge).  
-    8. Ensure all steps could be done with **SQL-like operations**.  
-    9. Give a message summarizing what you have done to the orchestrator.
-
-    ### There are already data acquired from the database:
-    {data_acquired}
-
+    8. Ensure all steps could be done with **SQL-like operations**.
+    9. Don't use steps such as "Find all transactions made by the user .." to avoid redundancy.
+    10. Give a message summarizing what you have done to the orchestrator.
+    
+    
     ### Output Format
     Respond in the following JSON format expressing the output as a list of steps: 
     Example:
     "message": "A concise summary of the steps outlined in the output as a confirmation to the orchestrator."
     "output": [
-        "Retrieve the user's personal information such as name and gender",
-        "Find the top 5 categories where the user spends the most",
-        "Identify the category with the highest spending per hour",
-        "Determine the most frequent store visited by the user per each hour",
-        "Calculate the average spending per day",
+        "Step 1 ...",
+        "Step 2 ...",
         ...
     ]
 """
 
 metadata = """
-        Tables:
-        - user_table(
-            User_ID           → Unique identifier for each user,
-            Name              → User's full name,
-            Age               → User's age in years,
-            Gender            → User's gender,
-            Job_Title         → Current job title,
-            Employment_Status → Employment type (e.g., Full-time, Part-time, Unemployed),
-            Education         → Highest level of education completed,
-            Marital_Status    → User's marital status,
-            Address           → Residential address (includes neighborhood/city),
-            Income_EGP        → Monthly income in Egyptian Pounds
-        )
+------------------------------------------------------------
+1. user_table
+------------------------------------------------------------
+Purpose: Stores demographic and socioeconomic information for each user.
 
-        - transactions_table(
-            Transaction_ID → Unique identifier for each transaction,
-            User_ID        → Foreign key referencing user_table(ID),
-            Category       → Spending category (e.g., Groceries, Transport),
-            Store_Name     → Name of the store or service provider,
-            Day            → Day of the month when the transaction occurred,
-            Month          → Month of the year when the transaction occurred,
-            Year           → Year of the transaction,
-            Name_of_day    → Name of the weekday (e.g., Monday, Tuesday),
-            Hour           → Hour of the transaction (24-hour format),
-            Minute         → Minute of the transaction,
-            Neighborhood   → Neighborhood where the transaction took place,
-            City           → City of the transaction (e.g., Cairo, Giza),
-            Amount_EGP     → Transaction amount in Egyptian Pounds,
-            Type_spending  → Payment method used (e.g., Cash, Credit, E-Wallet)
-        )
+Columns:
+- User_ID (INT, PK, AUTO_INCREMENT): Unique identifier for each user.
+- Name (VARCHAR(100)): User's full name.
+- Age (INT): User's age in years.
+- Gender (ENUM('Male','Female','Other')): Gender of the user.
+- Job_Title (VARCHAR(100)): Current job title.
+- Employment_Status (ENUM('Full-time','Part-time','Unemployed','Freelancer','Student')): Employment type.
+- Education (VARCHAR(100)): Highest level of education completed.
+- Marital_Status (ENUM('Single','Married','Divorced','Widowed')): Marital status.
+- Address (VARCHAR(200)): Residential address (includes neighborhood and city).
+- Income_EGP (DECIMAL(10,2)): Monthly income in Egyptian Pounds.
+
+------------------------------------------------------------
+2. transactions_table
+------------------------------------------------------------
+Purpose: Stores detailed records of every financial transaction for users.
+
+Columns:
+- Transaction_ID (INT, PK, AUTO_INCREMENT): Unique transaction identifier.
+- User_ID (INT, FK → user_table.User_ID): Linked user.
+- Category (VARCHAR(50)): Spending category (e.g., Groceries, Transport, Coffee).
+- Store_Name (VARCHAR(100)): Vendor or service provider name.
+- Day (TINYINT): Day of the month when the transaction occurred.
+- Month (TINYINT): Month of the year when the transaction occurred.
+- Year (SMALLINT): Year of the transaction.
+- Name_of_day (ENUM('Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday')): Weekday name.
+- Hour (TINYINT): Hour of the transaction (24-hour format).
+- Minute (TINYINT): Minute of the transaction.
+- Neighborhood (VARCHAR(100)): Neighborhood of the transaction.
+- City (VARCHAR(100)): City of the transaction (e.g., Cairo, Giza).
+- Amount_EGP (DECIMAL(10,2)): Transaction amount in Egyptian Pounds.
+- Type_spending (ENUM('Cash','Credit','Debit','E-Wallet','Bank Transfer')): Payment method.
+
+------------------------------------------------------------
+3. budget_table
+------------------------------------------------------------
+Purpose: Tracks spending limits and monitoring for each user and category.
+
+Columns:
+- user_id (INT, FK → user_table.User_ID): Linked user.
+- budget_name (VARCHAR(100)): Descriptive name for the budget (e.g., 'Groceries Budget Sep 2025').
+- priority_level (ENUM('low','mid','high')): Importance of this budget.
+- limit (DECIMAL(10,2)): Planned or allowed budget cap.
+- description (TEXT): Short status text describing spending performance or targets.
+
+------------------------------------------------------------
+4. goals_table
+------------------------------------------------------------
+Purpose: Tracks long-term financial goals and progress for each user.
+
+Columns:
+- user_id (INT, FK → user_table.User_ID): Linked user.
+- goal_name (VARCHAR(100)): Goal title (e.g., 'Emergency Fund').
+- target_date (DATE): Date by which the user wants to reach the goal.
+- target_saving (DECIMAL(10,2)): Total savings target in EGP.
+- current (DECIMAL(10,2)): Current amount saved.
+- objective (TEXT): Description of the goal.
+- query_saving (VARCHAR(255)): Optional computed formula or query for dynamic savings tracking.
+
+------------------------------------------------------------
+Relationships:
+- user_table (1) ───< transactions_table (many)
+- user_table (1) ───< budget_table (many)
+- user_table (1) ───< goals_table (many)
+
+------------------------------------------------------------
+Indexes and Keys:
+- PK: user_table.User_ID, transactions_table.Transaction_ID
+- FK: transactions_table.User_ID, budget_table.user_id, goals_table.user_id
+
+------------------------------------------------------------
+Notes:
+- All monetary values are stored in Egyptian Pounds (EGP).
+- Date and time fields enable fine-grained temporal analysis.
+- The schema supports both behavioral analytics and personalized financial storytelling.
 """
 
 prompt = ChatPromptTemplate.from_messages([
     ("system", system_prompt),
-    ("human", metadata),
-    ("human", "The request is: {request}"),
-    ("human", "orchestrator's message: {message}"),
+    ("user", metadata),
+    ("user", "The request is: {request}, user ID is: {user}"),
+    ("user", "orchestrator's message: {message}"),
 ])
 
-Query_planner = prompt | gemini_llm.with_structured_output(query_plannerOutput)
+Query_planner = prompt | azure_llm.with_structured_output(query_plannerOutput)

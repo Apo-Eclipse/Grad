@@ -1,3 +1,5 @@
+from IPython.display import Image, display, Markdown
+from graphs.trend_analysis_sub_graph import news_super_agent
 from graphs import behaviour_analyst_super_agent,recommendation_agent_sub_graph
 from agents import Explainer_agent
 import pandas as pd
@@ -23,44 +25,83 @@ def process_tables(tables):
     for table in tables:
         explanation = Explainer_agent.invoke({"request": table})
         explanations.append(explanation.explanation)
-    return explanations
+    return explanations  
     
-def main():
-    # behaviour analyst agent output
+def run_trend_analysis():
+        # from graphs import presentation_super_agent,behaviour_analyst_super_agent, database_agent_super_agent
+
+    # sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+
+    # out_results = parallel_tavily_search("Stocks , artificial intelligence, technology")
+    # for query, result in out_results.items():
+    #     search_result = result.get('results', [])
+    #     for i in range(len(search_result)):
+    #         print("result"*5)
+    #         print(search_result[i].get("content", ""))
+    #         print("result"*5)
+
+
+    #-----------------------------------------------------------------------------------------
+    input_dict_developer = {
+        "user_info": {
+            "name": "Karim",
+            "interests": "I'm a backend developer working with Python and cloud services. I'm interested in AI, specifically large language models, open-source projects, and new cloud-native technologies.",
+            "user_keywords": "LLMs, Kubernetes, Python, OpenAI, Llama",
+            "summary_style": "Detailed, technical breakdown. Don't shy away from jargon.",
+            "time_period": "daily"
+        },
+        "user_persona": None,
+        "keywords_info": None,
+        "keywords_facts": None,
+        "theme_analysis": None,
+        "final_report": None,
+    }
+
+    output = news_super_agent.invoke(input_dict_developer)
+    long_summary = output["final_report"].get("long_summary", "")
+    concise_summary = output["final_report"].get("concise_summary", "")
+    title = output["final_report"].get("title", "No title generated")
+    print("-------------------------------------------------------------------------------------")
+    print("title: \n", title)
+    print("-------------------------------------------------------------------------------------")
+    print("\n\nLong Summary:\n", long_summary)
+    print("-------------------------------------------------------------------------------------")
+    print("\n\nConcise Summary:\n", concise_summary)
+    print("-------------------------------------------------------------------------------------")
+    
+def run_behaviour_analysis():
     tables = process_queries()
     explanations = process_tables(tables)
+    print("****************************Tables******************************************") 
+    for table in tables:
+        print(table)
+    print("****************************Explanations***************************************")
+    for explanation in explanations:
+        print(explanation)
     final_state = behaviour_analyst_super_agent.invoke({
-        "request": "Analyze the spending behavior of user 1 and try to investigate more the acquired data"
-        , "data_acquired": explanations, "analysis": "no analysis done yet"
-        , "final_output": "no output yet", "message": "no message yet", "sender": "user"
-    })
-    print("\n=== Behaviour Analyst Final State ===")
-    print(final_state)
+        "request": "i want analysis to my spending during month 7 in 2023"
+        , "data_acquired": [], "analysis": "no analysis done yet"
+        , "final_output": "no output yet", "message": "no message yet", "sender": "user", "user": "1"
+    }, {"recursion_limit": 500})
     print("\n=== Behaviour Analyst Analysis ===")
     print(final_state['analysis'])
-    # print("\n=== Behaviour Analyst Steps ===")
-    # for i, step in enumerate(final_state.get("steps", []), 1):
-    #     print(f"{i}. {step}")
+    print("\n=== Behaviour data ===")
+    print(final_state['data_acquired'])
 
-    # print("\n=== Database Agent Results ===")
-    # for i, res in enumerate(final_state.get("results", []), 1):
-    #     print(f"{i}. {res['step']}")
-    #     print(f"Table: {res['table']}")
-    #     print(f"Query: {res['query']}")
-    #     print(f"Explanation: {res['explanation']}")
-    #     print("-" * 20)
+def run_recommendation_agent():
     
-    
-    
-    # # recommendation agent output
-    # out_results = recommendation_agent_sub_graph.invoke({"insights":"latest news in investing in real estate in Egypt in 2025"})
-    # print(out_results['report'])
-    # # for query, result in out_results.items():
-    # #     search_result = result.get('results', [])
-    # #     for i in range(len(search_result)):
-    # #         print("_______result___________________________"*5)
-    # #         print(search_result[i].get("content", ""))
-    # #         print("_______result___________________________"*5)
+    out_results = recommendation_agent_sub_graph.invoke({"insights":"latest news in investing in real estate in Egypt in 2025"})
+    print(out_results['report'])
+    # for query, result in out_results.items():
+    #     search_result = result.get('results', [])
+    #     for i in range(len(search_result)):
+    #         print("_______result___________________________"*5)
+    #         print(search_result[i].get("content", ""))
+    #         print("_______result___________________________"*5)
+
+def main():
+    run_behaviour_analysis()
+    return
 
 if __name__ == "__main__":
     main()
