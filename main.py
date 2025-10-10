@@ -10,7 +10,7 @@ import json
 import io
 import sys
 
-sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', line_buffering=True)
 
 
 # def process_queries():
@@ -82,7 +82,7 @@ def run_behaviour_analysis():
     # for explanation in explanations:
     #     print(explanation)
     final_state = asyncio.run(behaviour_analyst_super_agent.ainvoke({
-        "request": "where did i spend the most money in month 9 in 2025"
+        "request": "what was my total spending in rent in month 8 and 9 in 2025"
         , "data_acquired": [], "analysis": "no analysis done yet"
         , "final_output": "no output yet", "message": "no message yet", "sender": "user", "user": "1"
         },

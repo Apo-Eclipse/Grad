@@ -175,8 +175,8 @@ async def explainer(state: BehaviourAnalystState) -> dict:
             past_explanation, problem = "No Past Explanation", "No Problems because there is no past explainantion"
         
         # Build the input dictionary
-        step = db_result["step"]
-        table = db_result["data"]
+        step = db_result.get("step", "no step provided")
+        table = db_result.get("data", "no data provided")
         request_text = f"The request was: {step}\n\nThe result was: {table}\n"
         
         ainvoke_payload = {
@@ -257,7 +257,7 @@ async def validation(state: BehaviourAnalystState) -> dict:
     clean_data_acquired = list(all_explanations - failed_explanations)
 
     message = f"Validation complete. {len(db_results_for_correction)} items failed and will be corrected."
-    print(message)
+    # print(message)
     add_to_logs("validation", "explainer/orchestrator", message)
     
     # Update the state for the next step in the graph
@@ -314,7 +314,7 @@ def decision_for_validation(state: BehaviourAnalystState):
     """Return the next node's name based on a probabilistic decision:
     15% chance to return 'audit', otherwise 'pass'."""
     import random
-    if random.random() < 0.99:
+    if random.random() < 0.75:
         return "audit"
     return "pass"
 
