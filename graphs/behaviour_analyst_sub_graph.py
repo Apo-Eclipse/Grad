@@ -222,12 +222,14 @@ async def validation(state: BehaviourAnalystState) -> dict:
     """
     print("===> (Node) Validation Invoked <===")
     tasks_to_validate = state.get("validation_tasks", [])
+    user_query = state.get("request", "")
     
     if not tasks_to_validate:
         return {"sender": "validation", "message": "No tasks to validate."}
         
     validation_coroutines = [
         ValidationAgent.ainvoke({
+            "user_query": user_query,
             "query_result": (task["db_result"]["data"]),
             "explanation": task["explanation"]
         }) for task in tasks_to_validate
@@ -314,7 +316,7 @@ def decision_for_validation(state: BehaviourAnalystState):
     """Return the next node's name based on a probabilistic decision:
     15% chance to return 'audit', otherwise 'pass'."""
     import random
-    if random.random() < 0.75:
+    if random.random() < 0.95:
         return "audit"
     return "pass"
 

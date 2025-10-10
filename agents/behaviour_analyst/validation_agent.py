@@ -115,11 +115,21 @@ Notes:
 - The schema supports both behavioral analytics and personalized financial storytelling.
 """
 
+user_prompt = """
+Please validate the following:
+User Query: {user_query}
+
+Query Result: {query_result}
+
+Explanation: {explanation}
+
+
+"""
 # 3. Create the Prompt Template
 validation_prompt = ChatPromptTemplate.from_messages([
     ("system", validation_system_prompt),
     # The user message will contain the data to be validated
-    ("user", "Please validate the following:\n\nQuery Result:\n{query_result}\n\nExplanation:\n`{explanation}`")
+    ("user", user_prompt)
 ])
 
 # 4. Build the final agent chain using LangChain Expression Language (LCEL)
