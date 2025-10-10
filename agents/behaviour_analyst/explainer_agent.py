@@ -55,10 +55,8 @@ You should respond with:
     ranging from 1,112 to 5,237 Egyptian Pounds. 
     At 11:00, entertainment became the leading category with 742 Egyptian Pounds. 
     This shows that groceries dominate the early morning hours, with entertainment taking over later."
-"""
-
-
-meta_data = metadata = """
+    
+# this is the schema of all the tables:
 ------------------------------------------------------------
 1. user_table
 ------------------------------------------------------------
@@ -139,11 +137,23 @@ Notes:
 - All monetary values are stored in Egyptian Pounds (EGP).
 - Date and time fields enable fine-grained temporal analysis.
 - The schema supports both behavioral analytics and personalized financial storytelling.
+
+IF THERE IS A PREVIOUS EXPLAINATION UPDATE IT BY READING THE PROBLEMS SECTION OF THE EXPLAINATION OF THERE IS NO PREVIOUS EXPLAINATION
+CREATE ONE FROM SCRATCH
+"""
+
+user_prompt = """
+USER REQUEST: {request}
+
+PREVIOUS ANALYSIS: {previous_analysis}
+
+PROBLEMS IN PREVIOUS ANALYSIS: {problems}
+
+
 """
 prompt = ChatPromptTemplate.from_messages([
     ("system", system_prompt),
-    ("system", meta_data),
-    ("user", "{request}")
+    ("user", user_prompt)
 ])
 
 Explainer_agent = prompt | azure_llm.with_structured_output(ExplainerAgentOutput)

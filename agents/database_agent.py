@@ -1,11 +1,6 @@
-from typing import TypedDict
-from LLMs.gemini_models import gemini_llm
 from LLMs.azure_models import azure_llm
 from langchain_core.prompts import ChatPromptTemplate
 from pydantic import Field, BaseModel
-import sqlite3
-
-conn = sqlite3.connect("D:/projects/Multi-Agent System/data/database.db")
 
 class DatabaseAgentOutput(BaseModel):
     query: str = Field(..., description="The corresponding SQL query")
@@ -129,12 +124,14 @@ Notes:
 - All monetary values are stored in Egyptian Pounds (EGP).
 - Date and time fields enable fine-grained temporal analysis.
 - The schema supports both behavioral analytics and personalized financial storytelling.
+
+request: {request}/n
+user_id: {user}
 """
 
 prompt = ChatPromptTemplate.from_messages([
     ("user", system_prompt),
-    ("user", metadata),
-    ("user", "{request}, user_id: {user}"),
+    ("user", metadata)
 ])
 
 DatabaseAgent = prompt | azure_llm.with_structured_output(DatabaseAgentOutput)

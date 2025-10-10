@@ -111,13 +111,16 @@ Notes:
 - All monetary values are stored in Egyptian Pounds (EGP).
 - Date and time fields enable fine-grained temporal analysis.
 - The schema supports both behavioral analytics and personalized financial storytelling.
+
+Acquired Data till now: {data_acquired}/n
+Previous Analysis: {previous_analysis}/n
+user request: {user_request}
+
+if there is new info in the Acquired Data till now update the previous analysis with it, DON'T RETURN THE SAME PREVIOUS ANALYSIS AS IT IS.
 """
 analyser_prompt = ChatPromptTemplate.from_messages([
     ("user", system_prompt),
     ("user", metadata),
-    ("user", "Acquired Data till now: {data_acquired}"),
-    ("user", "Previous Analysis: {previous_analysis}"),
-    ("user", "user request: {user_request}"),
 ])
 
 Analyser = analyser_prompt | azure_llm.with_structured_output(AnalyserOutput)

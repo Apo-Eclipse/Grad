@@ -21,7 +21,7 @@ system_prompt = """
     - If the analyser agent ask or recommends for additional data -> return query_planner
     - If the analyser agent not been called-> return analyser
     - If the task is complete and all data gathered -> return end
-    Formate:
+    Format:
     {{
         "next_step": "the agent that should handle the next step",
         "message": "Any additional messages or instructions to the next agent"

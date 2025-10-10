@@ -5,29 +5,30 @@ from graphs.trend_analysis_sub_graph import news_super_agent
 from graphs import behaviour_analyst_super_agent,recommendation_agent_sub_graph
 from agents import Explainer_agent
 import pandas as pd
-import sqlite3
+import asyncio
 import json
 import io
 import sys
+
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 
 
-def process_queries():
-    queries_to_run = json.load(open('queries_to_run.json', 'r', encoding='utf-8'))
-    conn = sqlite3.connect('./data/database.db')
-    tables = []
-    for query in queries_to_run:
-        table = pd.read_sql_query(queries_to_run[query], conn)
-        tables.append("Query: " + query + "\nTable:\n" + table.to_string(index=False))
-    conn.close()
-    return tables
+# def process_queries():
+#     queries_to_run = json.load(open('queries_to_run.json', 'r', encoding='utf-8'))
+#     conn = sqlite3.connect('./data/database.db')
+#     tables = []
+#     for query in queries_to_run:
+#         table = pd.read_sql_query(queries_to_run[query], conn)
+#         tables.append("Query: " + query + "\nTable:\n" + table.to_string(index=False))
+#     conn.close()
+#     return tables
 
-def process_tables(tables):
-    explanations = []
-    for table in tables:
-        explanation = Explainer_agent.invoke({"request": table})
-        explanations.append(explanation.explanation)
-    return explanations  
+# def process_tables(tables):
+#     explanations = []
+#     for table in tables:
+#         explanation = Explainer_agent.invoke({"request": table})
+#         explanations.append(explanation.explanation)
+#     return explanations  
     
 def run_trend_analysis():
         # from graphs import presentation_super_agent,behaviour_analyst_super_agent, database_agent_super_agent
@@ -80,11 +81,14 @@ def run_behaviour_analysis():
     # print("****************************Explanations***************************************")
     # for explanation in explanations:
     #     print(explanation)
-    final_state = behaviour_analyst_super_agent.invoke({
-        "request": "i want analysis to my spending during month 7 in 2023"
+    final_state = asyncio.run(behaviour_analyst_super_agent.ainvoke({
+        "request": "where did i spend the most money in month 9 in 2025"
         , "data_acquired": [], "analysis": "no analysis done yet"
         , "final_output": "no output yet", "message": "no message yet", "sender": "user", "user": "1"
-    }, {"recursion_limit": 500})
+        },
+        {"recursion_limit": 500}
+    ))
+    
     print("\n=== Behaviour Analyst Analysis ===")
     print(final_state['analysis'])
     print("\n=== Behaviour data ===")
@@ -102,7 +106,7 @@ def run_recommendation_agent():
     #         print("_______result___________________________"*5)
 
 def main():
-    run_trend_analysis()
+    run_behaviour_analysis()
     return
 
 if __name__ == "__main__":

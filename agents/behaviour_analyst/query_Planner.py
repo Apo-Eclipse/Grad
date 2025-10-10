@@ -128,13 +128,15 @@ Notes:
 - All monetary values are stored in Egyptian Pounds (EGP).
 - Date and time fields enable fine-grained temporal analysis.
 - The schema supports both behavioral analytics and personalized financial storytelling.
+
+The request is: {request}, user ID is: {user}
+
+orchestrator's message: {message}
 """
 
 prompt = ChatPromptTemplate.from_messages([
     ("system", system_prompt),
     ("user", metadata),
-    ("user", "The request is: {request}, user ID is: {user}"),
-    ("user", "orchestrator's message: {message}"),
 ])
 
 Query_planner = prompt | azure_llm.with_structured_output(query_plannerOutput)

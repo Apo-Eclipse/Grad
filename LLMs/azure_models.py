@@ -9,3 +9,11 @@ azure_llm = AzureChatOpenAI(
     api_key=os.getenv("AZURE_OPENAI_API_KEY"),
     max_retries=2,
 )
+
+large_azure_llm = AzureChatOpenAI(
+    azure_deployment=os.getenv("LARGE_AZURE_OPENAI_DEPLOYMENT_NAME"),
+    openai_api_version=os.getenv("LARGE_AZURE_OPENAI_API_VERSION"),
+    azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
+    api_key=os.getenv("AZURE_OPENAI_API_KEY"),
+    max_retries=2,
+)
