@@ -98,7 +98,7 @@ def query_planner(state: BehaviourAnalystState) -> dict:
     Output = Query_planner.invoke({
         "request": state.get("request", ""),
         "message": message,
-        "data_acquired": state.get("data_acquired", []),
+        "steps": state.get("steps", "no completed steps yet"),
         "user": state.get("user", "")
     })
     

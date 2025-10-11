@@ -82,7 +82,7 @@ def run_behaviour_analysis():
     # for explanation in explanations:
     #     print(explanation)
     final_state = asyncio.run(behaviour_analyst_super_agent.ainvoke({
-        "request": "is my spending increasing or decreasing over time?"
+        "request": "where did i spend the most in months 8 and 9 in 2025?"
         , "data_acquired": [], "analysis": "no analysis done yet"
         , "final_output": "no output yet", "message": "no message yet", "sender": "user", "user": "1"
         },

@@ -1,6 +1,6 @@
 from typing import TypedDict
-from LLMs.gemini_models import gemini_llm
-from LLMs.azure_models import azure_llm
+from LLMs.ollama_llm import gpt_oss
+from LLMs.azure_models import large_azure_llm, gpt_oss_llm
 from langchain_core.prompts import ChatPromptTemplate
 from pydantic import Field, BaseModel
 
@@ -9,28 +9,29 @@ class AnalyserOutput(BaseModel):
     message : str = Field(..., description="Any additional message or insights from the analysis to the orchestrator.")
     
 system_prompt = """
-    You are the analyser Agent.
-    Your task is to analyze the spending behavior of a user based on text explain tables data acquired from previous queries.
-    You have to return a summary of the analysis and any insights you can derive from the data.
-    
-    ### Rules
-    1. Focus on the user's spending patterns, habits, and any anomalies you can identify.
-    2. Use the data acquired to provide a comprehensive analysis.
-    3. Ensure your analysis is clear, concise, and actionable.
-    4. If the data is insufficient, indicate what additional information would be helpful.
-    5. Try to understand user's behavior in terms of time, location, store, and category.
-    6. If their needed any further analysis, please indicate that in the message field.
-    7. Give message to the orchestrator telling them if you need more data or not and what you have done.
-    8. Provide your response in the following JSON format:
-    {{
-        "message": "<Any additional message or insights>"
-        "output": "<Your analysis here>",
-    }}
-    9. You have to request more data if needed for better analysis such as more analysis on specific category or store or location or time such as filter by specific store, location.
-    10. Revise your analysis based on the new data acquired to rewrite your output.
-    11. Do not request more analysis in the output field, only in the message field.
-"""
-metadata = """ 
+You are a Senior Financial Analyst Agent.
+Your mission is to synthesize all available user transaction data into a deep, insightful narrative. You must explain the user's financial behavior, identify key patterns, spot anomalies, and decide if more specific data is needed to complete the picture.
+
+### Analytical Framework (How to think)
+1.  **Synthesize, Don't Just List:** Do not simply restate the data. Connect the dots between different data points. For example, if a user spends a lot in the 'Food' category, cross-reference it with 'Location' and 'Time' data to see if it's due to expensive lunches near a workplace.
+2.  **Identify Patterns & Habits:** Look for recurring behaviors. Are there consistent high-spending days? Is there a favorite store or restaurant?
+3.  **Spot Anomalies & Outliers:** Find transactions that deviate from the norm (e.g., an unusually large purchase, spending in a new city). Hypothesize the reason for these outliers.
+4.  **Provide Actionable Insights:** Your analysis should empower the user. Suggest potential areas for budgeting or highlight habits they might not be aware of.
+
+### Interaction & Revision Logic
+-   **Revise, Don't Repeat:** Use the `previous_analysis` as your starting point. Your task is to integrate the `newly_acquired_data` to refine, deepen, or update your findings. Your `output` must be a new, more comprehensive analysis.
+-   **Requesting More Data:** If the current data answers the main question but a deeper insight is possible, you must request more data. Your `message` to the orchestrator must be a clear, actionable instruction for the 'query_planner'.
+    -   **Good Request:** "To understand the high 'Transport' spending, I need a breakdown of transactions by 'Store_Name' within that category."
+    -   **Bad Request:** "I need more data."
+
+### Strict Output Format
+You MUST respond with a single, valid JSON object. Do not add any text outside the JSON structure.
+{{
+    "output": "<Your comprehensive, synthesized analysis narrative goes here.>",
+    "message": "<Your concise message to the orchestrator. Either confirm completion or request specific new data.>"
+}}
+
+### Database Schema
 ------------------------------------------------------------
 1. user_table
 ------------------------------------------------------------
@@ -107,20 +108,20 @@ Indexes and Keys:
 - FK: transactions_table.User_ID, budget_table.user_id, goals_table.user_id
 
 ------------------------------------------------------------
-Notes:
-- All monetary values are stored in Egyptian Pounds (EGP).
-- Date and time fields enable fine-grained temporal analysis.
-- The schema supports both behavioral analytics and personalized financial storytelling.
+"""
 
-Acquired Data till now: {data_acquired}/n
-Previous Analysis: {previous_analysis}/n
-user request: {user_request}
+# This user prompt template cleanly presents all the context for the agent to evaluate.
+user_prompt = """
+### Task Context
+- User Request: "{user_request}"
+- Previous Analysis: {previous_analysis}
+- Newly Acquired Data: {data_acquired}
 
-if there is new info in the Acquired Data till now update the previous analysis with it, DON'T RETURN THE SAME PREVIOUS ANALYSIS AS IT IS.
+Based on all the provided information, perform your analysis and generate the JSON response.
 """
 analyser_prompt = ChatPromptTemplate.from_messages([
     ("user", system_prompt),
-    ("user", metadata),
+    ("user", user_prompt),
 ])
 
-Analyser = analyser_prompt | azure_llm.with_structured_output(AnalyserOutput)
+Analyser = analyser_prompt | large_azure_llm.with_structured_output(AnalyserOutput, method="function_calling")

@@ -1,11 +1,10 @@
 from typing import Literal,TypedDict
-from LLMs.gemini_models import gemini_llm
-from LLMs.azure_models import azure_llm
+from LLMs.ollama_llm import gpt_oss
+from LLMs.azure_models import azure_llm, gpt_oss_llm
 from langgraph.graph import StateGraph, END
 from typing import Dict, Any, List, Union
 from langchain_core.prompts import ChatPromptTemplate
 from pydantic import Field, BaseModel
-from LLMs.ollama_llm import ollama_llm
 
 class query_plannerOutput(BaseModel):
     output: List[str] = Field(
@@ -15,39 +14,26 @@ class query_plannerOutput(BaseModel):
     message: str = Field("", description="A concise summary of the steps outlined in the output.")
     
 system_prompt = """
-    You are the Query Planner Agent.  
-    Your task is to outline clear and simple steps for another database agent to create SQL-style queries that retrieve insights about a **single user's** behavior and spending patterns.  
-    ### Rules
-    1. Each step must represent **one query** that can be executed by a database agent.  
-    2. Focus only on **one user** at a time.  
-    3. Respond with **text only** (no code, SQL, or programming syntax).  
-    4. Concentrate on the **4 core aspects**:  
-    - Time  
-    - Location  
-    - Store  
-    - Category  
-    5. Provide insights based on **two dimensions**:  
-    - **Spending-based insights** (highest total amount, averages, min/max, etc.)  
-    - **Frequency-based insights** (most frequent store, most visited location, etc.).  
-    6. Use metrics like **mean, mode, min, max** when helpful.  
-    7. Only propose steps that could be derived from the **data and metadata** available (no external knowledge).  
-    8. Ensure all steps could be done with **SQL-like operations**.
-    9. Don't use steps such as "Find all transactions made by the user .." to avoid redundancy.
-    10. Give a message summarizing what you have done to the orchestrator.
-    
-    
-    ### Output Format
-    Respond in the following JSON format expressing the output as a list of steps: 
-    Example:
-    "message": "A concise summary of the steps outlined in the output as a confirmation to the orchestrator."
-    "output": [
-        "Step 1 ...",
-        "Step 2 ...",
-        ...
-    ]
-"""
+    You are the Query Planner Agent.
+    Your mission is to generate a step-by-step, text-only plan for a database agent.
+    Each step must define a single, specific query to uncover insights about a single user's spending.
 
-metadata = """
+    ### Directives
+    
+    #### 1. Output Description
+    - **List of Steps:** Each step must correspond to a single analytical query.
+    - **Text Only:** Describe the query's goal in plain text. Do not write SQL code.
+    - **Summary Message:** Conclude with a one-sentence message to the orchestrator summarizing your plan.
+
+    #### 2. Content Focus
+    - **Scope:** The entire plan must focus on a single user.
+    - **Core Aspects:** Limit your analysis to **Time**, **Location**, **Store**, and **Category**.
+    - **Dimensions:** For each aspect, generate steps for both **spending-based** insights (total, average, max spend) and **frequency-based** insights (visit counts).
+
+    #### 3. Query Requirements
+    - **No Raw Data:** Every step must request an **aggregated insight** (e.g., `SUM`, `AVG`, `COUNT`, `MAX`). Do not ask for raw transaction lists.
+    - **Be Specific:** Avoid vague steps like "Analyze spending." Instead, specify the exact metric and grouping, such as "Calculate the total amount spent per store."
+    
 ------------------------------------------------------------
 1. user_table
 ------------------------------------------------------------
@@ -124,19 +110,34 @@ Indexes and Keys:
 - FK: transactions_table.User_ID, budget_table.user_id, goals_table.user_id
 
 ------------------------------------------------------------
+
+    ### Output Format
+    Respond in the following JSON format expressing the output as a list of steps: 
+    Example:
+    "message": "A concise summary of the steps outlined in the output as a confirmation to the orchestrator."
+    "output": [
+        "Step 1 ...",
+        "Step 2 ...",
+        ...
+    ]
+    
 Notes:
 - All monetary values are stored in Egyptian Pounds (EGP).
 - Date and time fields enable fine-grained temporal analysis.
 - The schema supports both behavioral analytics and personalized financial storytelling.
+"""
 
+user_input = """
 The request is: {request}, user ID is: {user}
+
+Completed Steps: {steps}
 
 orchestrator's message: {message}
 """
 
 prompt = ChatPromptTemplate.from_messages([
     ("system", system_prompt),
-    ("user", metadata),
+    ("user", user_input),
 ])
 
-Query_planner = prompt | azure_llm.with_structured_output(query_plannerOutput)
+Query_planner = prompt | gpt_oss_llm.with_structured_output(query_plannerOutput)

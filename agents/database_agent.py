@@ -1,4 +1,4 @@
-from LLMs.azure_models import azure_llm
+from LLMs.azure_models import azure_llm, gpt_oss_llm
 from langchain_core.prompts import ChatPromptTemplate
 from pydantic import Field, BaseModel
 
@@ -134,4 +134,4 @@ prompt = ChatPromptTemplate.from_messages([
     ("user", metadata)
 ])
 
-DatabaseAgent = prompt | azure_llm.with_structured_output(DatabaseAgentOutput)
+DatabaseAgent = prompt | gpt_oss_llm.with_structured_output(DatabaseAgentOutput)
