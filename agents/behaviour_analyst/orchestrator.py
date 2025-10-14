@@ -4,7 +4,6 @@ from langgraph.graph import StateGraph, END
 from typing import Dict, Any
 from langchain_core.prompts import ChatPromptTemplate
 from pydantic import Field, BaseModel
-from LLMs.ollama_llm import gpt_oss
 from langchain.output_parsers import PydanticOutputParser, OutputFixingParser
 
 
@@ -45,17 +44,14 @@ You MUST respond with a single, valid JSON object:
     "message": "A clear, concise message or instruction for the next step."
 }}
 """
-# 2.  **Assess Data Sufficiency:**
-#     - **Condition:** If the current `data_acquired` is insufficient to fully answer the `user_request`.
-#     - **Action:** Route to `query_planner`. Your message must specify what information is still missing.
-# This user prompt template cleanly presents the state for the agent to evaluate.
+
 user_prompt = """
 Current Task State:
 - User Request: {request}
 - Data Acquired: {data_acquired}
 - Analysis Done: {analysis}
-- Last Message From: '{sender}'
-- Last Message Content: "{message}"
+- messages from the workflow:
+{message}
 
 Based on the current state, decide the next step.
 """

@@ -82,21 +82,21 @@ def run_behaviour_analysis():
     # for explanation in explanations:
     #     print(explanation)
     final_state = asyncio.run(behaviour_analyst_super_agent.ainvoke({
-        "request": "where did i spend the most in months 8 and 9 in 2025?"
+        "request": "i want geographical analysis of my spending"
         , "data_acquired": [], "analysis": "no analysis done yet"
-        , "final_output": "no output yet", "message": "no message yet", "sender": "user", "user": "1"
+        , "final_output": "no output yet", "message": "no message yet", "sender": "user", "user": "2"
         },
         {"recursion_limit": 500}
     ))
     
     print("\n=== Behaviour Analyst Analysis ===")
     print(final_state['analysis'])
-    print("\n=== Behaviour data ===")
-    print(final_state['data_acquired'])
+    # print("\n=== Behaviour data ===")
+    # print(final_state['data_acquired'])
 
 def run_recommendation_agent():
     
-    out_results = recommendation_agent_sub_graph.invoke({"insights":"latest news in investing in real estate in Egypt in 2025"})
+    out_results = recommendation_agent_sub_graph.invoke({"insights":"where did i spend the most in months 8 and 9 in 2025?"})
     print(out_results['report'])
     # for query, result in out_results.items():
     #     search_result = result.get('results', [])
