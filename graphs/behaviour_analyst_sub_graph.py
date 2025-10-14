@@ -57,8 +57,8 @@ def analyser(state: BehaviourAnalystState) -> dict:
     message = Output.message
     print("Analysis: ", analysis)
     add_to_logs("analyser", "orchestrator", message)
-    
-    return {"analysis": analysis, "message": message, "sender": "analyser"}
+
+    return {"analysis": analysis, "message": "Analyser: " + message, "sender": "analyser"}
 
 
 def orchestrator(state: BehaviourAnalystState) -> dict:
@@ -67,7 +67,6 @@ def orchestrator(state: BehaviourAnalystState) -> dict:
     based on the overall state.
     """
     message = state.get("message", [])
-    
     
     print("===> (Node) Orchestrator Invoked <===")
     Output = Behaviour_analyser_orchestrator.invoke({
@@ -78,11 +77,9 @@ def orchestrator(state: BehaviourAnalystState) -> dict:
         "sender": state.get("sender", ""),
         "user": state.get("user", "")
     })
-    
     next_step = Output.next_step
     message = Output.message
-    
-    print(f"Orchestrator decision: '{next_step}'")
+    print(f"Orchestrator message : {message}")
     add_to_logs("orchestrator", next_step, message)
     
     return {"message": message, "sender": "orchestrator", "next_step": next_step}
@@ -105,8 +102,6 @@ def query_planner(state: BehaviourAnalystState) -> dict:
     message = Output.message
     steps_output = Output.output
     
-    print(steps_output)
-    
     # Ensure steps are in list format
     if isinstance(steps_output, str):
         try:
@@ -118,7 +113,7 @@ def query_planner(state: BehaviourAnalystState) -> dict:
         
     print(f"Planned {len(steps)} DB queries.")
     add_to_logs("query_planner", "db_agent", message)
-    
+        
     return {"steps": steps, "sender": "query_planner", "message": message}
 
 
@@ -140,10 +135,14 @@ async def db_agent(state: BehaviourAnalystState) -> dict:
     # Process results to extract the necessary data payload
     processed_results = [db_state.get("result", {}) for db_state in results]
     
-    print(f"Executed {len(processed_results)} DB queries in parallel.")
-    add_to_logs("db_agent", "explainer", "Completed all database queries.")
     
-    return {"db_results": processed_results, "sender": "db_agent"}
+    curr_message = f"Executed {len(processed_results)} DB queries in parallel."
+    print(curr_message)
+    add_to_logs("db_agent", "explainer", curr_message)
+
+
+    message = state.get("sender", "") + ": " + state.get("message", "")
+    return {"db_results": processed_results, "sender": "db_agent", "message": message+ "\n" + "Database agent: "+ curr_message}
 
 
 async def explainer(state: BehaviourAnalystState) -> dict:
@@ -156,13 +155,12 @@ async def explainer(state: BehaviourAnalystState) -> dict:
 
     # IMPORTANT: Get existing valid data to append to it
     data_acquired = state.get("data_acquired", []).copy()
-
+    
     if not db_results_to_explain:
         return { "sender": "explainer", "message": "No new database results to explain." }
     
     # 1. Fetch the entire list of feedback from the state.
     validation_feedback = state.get("validation_results", [])
-    
     tasks = []
     for db_result, feedback in itertools.zip_longest(
         db_results_to_explain,
@@ -187,31 +185,37 @@ async def explainer(state: BehaviourAnalystState) -> dict:
         
         # 4. Create the task with the correct, simple syntax.
         tasks.append(Explainer_agent.ainvoke(ainvoke_payload))
-
-    ex_outputs = await asyncio.gather(*tasks)
+        
+    # Use return_exceptions=True so a single LLM failure won't crash the whole graph
+    ex_outputs = await asyncio.gather(*tasks, return_exceptions=True)
     
     new_validation_tasks = []
-    # Loop through the results that were just processed
+    # Loop through the results that were just processed; handle exceptions per-task
     for db_result, ex_out in zip(db_results_to_explain, ex_outputs):
         explanation = getattr(ex_out, 'explanation', "Could not get an explanation.")
-        data_acquired.append(explanation)
         
-        # Create a dictionary containing the full original db_result and the new explanation
+        if isinstance(ex_out, Exception):
+            explanation = f"Could not generate explanation"
+        data_acquired.append(explanation)
         validation_pair = {
-            "db_result": db_result, # Pass the entire original object
+            "db_result": db_result, 
             "explanation": explanation
         }
         new_validation_tasks.append(validation_pair)
             
-    message = f"Generated {len(db_results_to_explain)} new explanations."
-    print(message)
-    add_to_logs("explainer", "validation/orchestrator", message)
+    curr_message = f"Generated {len(db_results_to_explain)} new explanations."
+
+    print(curr_message)
+
+    add_to_logs("explainer", "validation/orchestrator", curr_message)
+    
+    message = state.get("message", "")
     
     return {
         "data_acquired": data_acquired, # This now contains both old valid and new explanations
         "validation_tasks": new_validation_tasks,
         "sender": "explainer",
-        "message": message
+        "message": message + "\n" + "Explainer: " + curr_message
     }
 
 
@@ -255,20 +259,22 @@ async def validation(state: BehaviourAnalystState) -> dict:
     # The data_acquired list should now only contain explanations that have passed validation
     # We find this by taking the set difference
     all_explanations = set(state.get("data_acquired", []))
-    failed_explanations = {task["explanation"] for task, res in zip(tasks_to_validate, validation_results) if not res.valid}
+    failed_explanations = set(task["explanation"] for task, res in zip(tasks_to_validate, validation_results) if not res.valid)
     clean_data_acquired = list(all_explanations - failed_explanations)
-
-    message = f"Validation complete. {len(db_results_for_correction)} items failed and will be corrected."
-    # print(message)
-    add_to_logs("validation", "explainer/orchestrator", message)
     
+    message = state.get("message", "")
+    validation = f"Validation complete. {len(db_results_for_correction)} items failed and will be corrected."
+    
+    # print(message)
+    add_to_logs("validation", "explainer/orchestrator", validation)
+
     # Update the state for the next step in the graph
     return {
         "data_acquired": clean_data_acquired,
         "db_results": db_results_for_correction, # This list will be sent back to the explainer
         "validation_results": past_explanations_and_reasoning,
         "sender": "validation",
-        "message": message
+        "message": message + "\n" + "Validation: " + validation
     }
     
 

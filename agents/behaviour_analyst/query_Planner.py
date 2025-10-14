@@ -1,6 +1,6 @@
 from typing import Literal,TypedDict
 from LLMs.gemini_models import gemini_llm
-from LLMs.azure_models import azure_llm
+from LLMs.azure_models import azure_llm, gpt_oss_llm
 from langgraph.graph import StateGraph, END
 from typing import Dict, Any, List, Union
 from langchain_core.prompts import ChatPromptTemplate
@@ -15,28 +15,38 @@ class query_plannerOutput(BaseModel):
     message: str = Field("", description="A concise summary of the steps outlined in the output.")
     
 system_prompt = """
-    You are the Query Planner Agent.
-    Your mission is to generate a step-by-step, text-only plan for a database agent.
-    Each step must define a single, specific query to uncover insights about a single user's spending.
+You are the Query Planner Agent. Produce a numbered list of ≤6 text-only steps, each defining a single aggregated query for one user.
 
-    ### Directives
-    
-    #### 1. Output Description
-    - **List of Steps:** Each step must correspond to a single analytical query.
-    - **Text Only:** Describe the query's goal in plain text. Do not write SQL code.
-    - **Summary Message:** Conclude with a one-sentence message to the orchestrator summarizing your plan.
+Follow these rules:
+1. Clarify Objective
+    • Accept “user_id” and “request” as inputs.
+    • Define exactly which metric (SUM, AVG, COUNT, MAX), which grouping (time, city, store, category), and which time window you’re querying.
+2. Data Landscape & Cleaning
+    • Schema is known; ignore raw rows—only aggregated outputs.
+    • Ensure filters and normalization (e.g., date formats) are clear.
+3. One Lens at a Time
+    • Choose exactly one dimension per step (time, store, location, category).
+    • Cap results at ≤24 rows; order logically (top/bottom N or chronological).
+4. Pair & Compare
+    • Return paired metrics (e.g., total spend AND visit count).
+    • For trend queries, compare current vs prior period.
+5. Highlight Extremes
+    • Include top-N or bottom-N analyses to surface key drivers.
+6. Flag Data Gaps
+    • Note potential empty or low-volume outcomes explicitly.
 
-    #### 2. Content Focus
-    - **Scope:** The entire plan must focus on a single user.
-    - **Core Aspects:** Limit your analysis to **Time**, **Location**, **Store**, and **Category**.
-    - **Dimensions:** For each aspect, generate steps for both **spending-based** insights (total, average, max spend) and **frequency-based** insights (visit counts).
+Output Format (JSON):
+{{
+  "output": [ "Step 1 description", ... ],
+  "message": "One-sentence summary of coverage and any gaps"
+}}
 
-    #### 3. Query Requirements
-    - **No Raw Data:** Every step must request an **aggregated insight** (e.g., `SUM`, `AVG`, `COUNT`, `MAX`). Do not ask for raw transaction lists.
-    - **Be Specific:** Avoid vague steps like "Analyze spending." Instead, specify the exact metric and grouping, such as "Calculate the total amount spent per store."
-"""
+User input will provide:
+- Request: {request}
+- User ID: {user}
+- Completed Steps: {steps}
 
-metadata = """
+#### Database Schema
 PostgreSQL Database Metadata (with Column Descriptions)
 
 Engine: PostgreSQL 18.0
@@ -58,72 +68,73 @@ Columns:
 - first_name (text, not null) — Given name.
 - last_name (text, not null) — Family name.
 - job_title (text, not null) — Current job title or role.
-- address (text, not null) — Mailing or residential address (free text).
+- address (text, not null) — Mailing or residential address.
 - birthday (date, not null) — Date of birth (YYYY-MM-DD).
 - gender (gender_type) — Gender value from public.gender_type.
-- employment_status (employment_categories) — Employment state from public.employment_categories.
-- education_level (edu_level) — Highest education level from public.edu_level.
+- employment_status (employment_categories) — Employment state.
+- education_level (edu_level) — Highest education level.
 
 BUDGET (public.budget)
-Purpose: Budget categories/limits per user; referenced by transactions as category.
+Purpose: Budget categories/limits per user.
 Columns:
-- budget_id (bigint, PK, default seq public.budget_budget_id_seq) — Surrogate identifier for the budget.
-- user_id (bigint, FK → users.user_id, NOT VALID) — Owner user of this budget.
-- budget_name (text, not null) — Human-readable budget/category name.
-- description (text) — Additional notes or purpose of the budget.
-- total_limit (numeric(12,2)) — Spending cap for this budget (amount in account currency).
-- priority_level (priority_level_enum) — Priority for the budget (High/Mid/Low).
+- budget_id (bigint, PK)
+- user_id (bigint, FK → users.user_id)
+- budget_name (text, not null)
+- description (text)
+- total_limit (numeric(12,2))
+- priority_level (priority_level_enum)
 
 GOALS (public.goals)
 Purpose: Target financial goals per user.
 Columns:
-- goal_id (bigint, PK, default seq public.goals_goal_id_seq) — Surrogate identifier for the goal.
-- goal_name (text, not null) — Name/label of the goal.
-- description (text) — Notes or details about the goal.
-- target (numeric(12,2)) — Target amount to reach (account currency).
-- user_id (bigint, FK → users.user_id, NOT VALID) — Owner user for this goal.
+- goal_id (bigint, PK)
+- goal_name (text, not null)
+- target (numeric(12,2))
+- user_id (bigint, FK → users.user_id)
 
 INCOME (public.income)
 Purpose: Income streams and attributes per user.
 Columns:
-- income_id (bigint, PK, default seq public.income_income_id_seq) — Surrogate identifier for the income row.
-- user_id (bigint, FK → users.user_id, NOT VALID) — Owner user for this income.
-- type_income (text, not null) — Type/source of income (e.g., salary, bonus, freelance).
-- amount (numeric(12,2)) — Income amount per period (account currency).
-- period (text) — Recurrence period descriptor (e.g., monthly, weekly, one-off).
-- description (text) — Free-text notes for the income entry.
+- income_id (bigint, PK)
+- user_id (bigint, FK → users.user_id)
+- type_income (text, not null)
+- amount (numeric(12,2))
+- period (text)
 
 TRANSACTIONS (public.transactions)
 Purpose: Individual monetary transactions.
 Columns:
-- transaction_id (bigint, PK, default seq public.transactions_transaction_id_seq) — Surrogate identifier for the transaction.
-- date (date, not null) — Transaction posting/occurred date (YYYY-MM-DD).
-- amount (numeric(12,2), not null) — Transaction amount (account currency; positive for spend unless business rules differ).
-- time (time without time zone) — Transaction time of day if available (HH:MM:SS).
-- store_name (text) — Merchant or payee name.
-- city (text) — Merchant location or free-text place string.
-- neighbourhood (text) — Free-form neighbourhood or district name.
-- type_spending (text) — Free-form subcategory/type (e.g., groceries, transport).
-- user_id (bigint, FK → users.user_id, NOT VALID) — User associated with this transaction.
-- category_id (bigint, FK → budget.budget_id, default seq public.transactions_category_id_seq, NOT VALID) — Budget/category reference for this transaction (should not auto-increment; consider removing default).
+- transaction_id (bigint, PK)
+- date (date, not null)
+- amount (numeric(12,2), not null)
+- time (time without time zone)
+- store_name (text)
+- city (text)
+- neighbourhood (text)
+- type_spending (text)
+- user_id (bigint, FK → users.user_id)
+- category_id (bigint, FK → budget.budget_id)
 
-RELATIONSHIPS
---------------
+Relationships:
 users (1) → (N) budget via budget.user_id
 users (1) → (N) goals via goals.user_id
 users (1) → (N) income via income.user_id
 users (1) → (N) transactions via transactions.user_id
-budget (1) → (N) transactions via transactions.category_id → budget.budget_id
+budget (1) → (N) transactions via transactions.category_id
 
+"""
+
+user_prompt = """
 The request is: {request}, user ID is: {user}
 
+Completed Steps: {steps}
+
 orchestrator's message: {message}
-old steps taken: {steps}
 """
 
 prompt = ChatPromptTemplate.from_messages([
     ("system", system_prompt),
-    ("user", metadata),
+    ("user", user_prompt),
 ])
 
-Query_planner = prompt | azure_llm.with_structured_output(query_plannerOutput)
+Query_planner = prompt | gpt_oss_llm.with_structured_output(query_plannerOutput)

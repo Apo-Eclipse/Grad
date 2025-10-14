@@ -17,3 +17,12 @@ large_azure_llm = AzureChatOpenAI(
     api_key=os.getenv("AZURE_OPENAI_API_KEY"),
     max_retries=4,
 )
+
+gpt_oss_llm = AzureChatOpenAI(
+    azure_deployment=os.getenv("GPT_OSS_DEPLOYMENT_NAME"),
+    openai_api_version=os.getenv("AZURE_OPENAI_API_VERSION"),
+    azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
+    api_key=os.getenv("AZURE_OPENAI_API_KEY"),
+    timeout=15,
+    max_retries=3,
+)

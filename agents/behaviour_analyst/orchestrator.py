@@ -1,10 +1,12 @@
 from typing import Literal,TypedDict
-from LLMs.azure_models import large_azure_llm 
+from LLMs.azure_models import large_azure_llm, gpt_oss_llm
 from langgraph.graph import StateGraph, END
 from typing import Dict, Any
 from langchain_core.prompts import ChatPromptTemplate
 from pydantic import Field, BaseModel
-from LLMs.ollama_llm import ollama_llm
+from langchain.output_parsers import PydanticOutputParser, OutputFixingParser
+
+
 
 class orchestratorOutput(BaseModel):
     message: str = Field(..., description="The message from the agent. (ok if there is no problem and error if there is)")
@@ -27,15 +29,11 @@ You will receive the following context:
     - **Condition:** If the `sender` is 'analyser' AND its `message` clearly states that more information or data is required to proceed.
     - **Action:** Immediately route to `query_planner`. Your message to the planner should be based on the analyser's specific request.
 
-2.  **Assess Data Sufficiency:**
-    - **Condition:** If the current `data_acquired` is insufficient to fully answer the `user_request`.
-    - **Action:** Route to `query_planner`. Your message must specify what information is still missing.
-
-3.  **Assess Analysis Quality:**
+2.  **Assess Analysis Quality:**
     - **Condition:** If the `data_acquired` IS sufficient, but the `analysis` is incomplete, inaccurate, or does not address the `user_request`.
     - **Action:** Route to `analyser`. Your message must provide specific feedback for improvement.
 
-4.  **Determine Task Completion:**
+3.  **Determine Task Completion:**
     - **Condition:** If the data is sufficient AND the analysis is high-quality and directly answers the `user_request`.
     - **Action:** Route to `end`. Your message should be a final confirmation.
 
@@ -47,14 +45,13 @@ You MUST respond with a single, valid JSON object:
 }}
 """
 
-# This user prompt template cleanly presents the state for the agent to evaluate.
 user_prompt = """
 Current Task State:
 - User Request: {request}
 - Data Acquired: {data_acquired}
 - Analysis Done: {analysis}
-- Last Message From: '{sender}'
-- Last Message Content: "{message}"
+- messages from the workflow:
+{message}
 
 Based on the current state, decide the next step.
 """
@@ -64,4 +61,4 @@ prompt = ChatPromptTemplate.from_messages([
     ("user", user_prompt)
 ])
 
-Behaviour_analyser_orchestrator = prompt | large_azure_llm.with_structured_output(orchestratorOutput, method="function_calling")
+Behaviour_analyser_orchestrator = prompt | gpt_oss_llm.with_structured_output(orchestratorOutput)

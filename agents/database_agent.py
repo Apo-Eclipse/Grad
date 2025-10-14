@@ -1,4 +1,4 @@
-from LLMs.azure_models import azure_llm
+from LLMs.azure_models import azure_llm, gpt_oss_llm
 from langchain_core.prompts import ChatPromptTemplate
 from pydantic import Field, BaseModel
 
@@ -7,44 +7,49 @@ class DatabaseAgentOutput(BaseModel):
 
 system_prompt = """
 You are a database_agent.
-Your task is to translate a single natural language step into on SQL query.
+Your task is to translate a single natural language step into one valid SQL query for a **PostgreSQL 18.0** database.
 
 Rules:
-    1. Only respond with ONE SQL query.
-    2. Output must always be a single JSON object:
-    {{
-        "query": "the SQL query"
-    }}
-    3. Do not include explanations, comments, or multiple queries.
-    4. SQL must be valid SQLite syntax.
-    5. Use single quotes inside the SQL, double quotes for JSON.
-    6. Do NOT generate UPDATE or DELETE queries. If asked, respond with:
-        {{"query": "Query rejected"}}
-    7. If you cannot generate a query, return:
+    1. Always respond with ONE SQL query only.
+    2. The output must be a single JSON object:
+    {{ "query": "the SQL query" }}
+    3. Do not include explanations, comments, or multiple statements.
+    4. SQL must follow **PostgreSQL syntax**.
+    5. Use single quotes inside SQL strings, and double quotes for JSON.
+    6. Do NOT generate UPDATE, DELETE, or DROP statements. If asked, respond with:
         {{"query": "Query rejected"}}
 
 Date and Time Handling:
-    - Use the structured fields directly:
-        * Day, Month, Year for calendar values
-        * Name_of_day for weekday (e.g., Monday, Tuesday)
-        * Hour and Minute for time-of-day analysis
-    - Do not reference the raw DateTime column.
+    - Use PostgreSQL date/time functions and operators directly (e.g., EXTRACT, DATE_PART, DATE_TRUNC).
+    - Prefer structured date fields (e.g., EXTRACT(DAY FROM date), EXTRACT(MONTH FROM date)).
+    - Do not refer to raw datetime text unless necessary.
 
-Grouping and Ranking (SQLite-safe):
-    - For "most frequent", "top", or "highest" results:
-        * Always compute aggregates with GROUP BY.
-        * Then restrict results to ONLY the maximum value(s) per group.
-        * If multiple results tie for maximum, return all of them.
-    - Never just use ORDER BY to imply "top".
-    - In SQLite, enforce this with:
-        * Subquery + MAX() joined back to the grouped results (always works), OR
-        * Window functions (RANK, ROW_NUMBER, DENSE_RANK) if supported.
-"""
+Query Construction:
+    - Always qualify columns with their table name if multiple tables are used.
+    - Use explicit JOIN syntax (INNER JOIN, LEFT JOIN) with clear ON conditions.
+    - For enum columns (e.g., gender_type, edu_level), compare using string literals (e.g., gender = 'male').
+
+Aggregation and Ranking:
+    - For “most frequent”, “top”, “highest”, or “largest” queries:
+        * Use GROUP BY and aggregate functions (COUNT, SUM, AVG, MAX, MIN).
+        * For top-N results, use ORDER BY with LIMIT N.
+        * For tie handling, consider using window functions (RANK(), DENSE_RANK()).
+    - For “percent”, use PostgreSQL arithmetic with aggregates.
+
+Output Formatting:
+    - Only return necessary columns; avoid SELECT * unless specifically requested.
+    - Use COALESCE for null-safe output if aggregation is involved.
+
+Safeguards:
+    - Never alter schema or data.
+    - Only read/query data from the existing tables:
+        users, budget, goals, income, transactions.
+
+When uncertain or ambiguous, return:
+    {{"query": "Query rejected"}}
 
 
-
-metadata = """
-PostgreSQL Database Metadata (with Column Descriptions)
+## PostgreSQL Database Metadata (with Column Descriptions)
 
 Engine: PostgreSQL 18.0
 Schema: public
@@ -121,14 +126,16 @@ users (1) → (N) goals via goals.user_id
 users (1) → (N) income via income.user_id
 users (1) → (N) transactions via transactions.user_id
 budget (1) → (N) transactions via transactions.category_id → budget.budget_id
+"""
 
+user_prompt = """
 request: {request}/n
 user_id: {user}
 """
 
 prompt = ChatPromptTemplate.from_messages([
-    ("user", system_prompt),
-    ("user", metadata)
+    ("system", system_prompt),
+    ("user", user_prompt)
 ])
 
-DatabaseAgent = prompt | azure_llm.with_structured_output(DatabaseAgentOutput)
+DatabaseAgent = prompt | gpt_oss_llm.with_structured_output(DatabaseAgentOutput)
