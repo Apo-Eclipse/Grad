@@ -1,0 +1,229 @@
+Multi‑Agent System — System Description
+
+Last updated: 2025-10-16
+
+Overview
+This repository implements a modular, LLM-powered multi-agent system built on LangGraph. It orchestrates specialized agents to analyze user financial behavior, plan and execute database queries, explain and validate results, generate presentations, discover news and recommendations, and produce trend reports. The system is designed for iterative, feedback-driven analysis with parallel data acquisition, strict validation, and user-facing output.
+
+Top-level components
+- Behaviour Analyst Super Agent (graphs/behaviour_analyst_sub_graph.py)
+	Orchestrates the core workflow: planning data needs, querying the database, explaining results, validating explanations, and synthesizing an analysis that answers the user’s request.
+
+- Personal Assistant (planned)
+	A planned, user-facing coordination agent. It will:
+	- Own the conversation with the user (clarify goals, collect constraints like time ranges or categories, confirm progress).
+	- Translate user intents into actionable tasks for downstream agents (Behaviour Analyst, Recommendation, Presentation, Trend Analysis).
+	- Route follow-up questions to the right agent, track context across turns, and summarize outcomes back to the user.
+	- Maintain lightweight session memory (e.g., preferred user_id, timeframe, interests) and pass it to other agents as needed.
+	This agent will not execute analysis itself but will improve UX, intent capture, and multi-agent coordination.
+
+- Database Agent Subgraph (graphs/database_sub_graph.py)
+	Translates a single natural-language step into SQL using an LLM, executes it against PostgreSQL via asyncpg, and returns structured results.
+
+- Presentation Super Agent (graphs/presentation_sub_graph.py)
+	Turns insights into either a narrative report (Writer) or interactive visualization (Visualizer) and can combine them into final HTML/CSS/JS output.
+
+- Recommendation Subgraph (graphs/recommendation_sub_graph.py)
+	Generates web search queries from insights, runs parallel searches (Tavily), scrapes each URL, and summarizes relevant information.
+
+- Trend Analysis Subgraph (graphs/trend_analysis_sub_graph.py)
+	Builds a personalized tech news report: extract persona → select keywords → retrieve facts (Safron API) → analyze themes → write final summaries.
+
+- Chat UI (chatbot_app.py)
+	Streamlit chat interface that runs the Behaviour Analyst flow and streams agent steps grouped by bubbles.
+
+- Entry helpers (main.py)
+	Convenience runners for behaviour analysis, recommendation, and trend analysis.
+
+LLM backends (LLMs/)
+- Azure OpenAI (azure_models.py):
+	- azure_llm: general chat
+	- large_azure_llm: larger model for analysis and validation
+	- gpt_oss_llm: smaller/oss-tuned model for structured outputs and routing
+- Google Gemini (gemini_models.py): gemini_llm for fast structured generation
+- Ollama (ollama_llm.py): local model option (wired but not central to main flows)
+
+Tools and config
+- Web search (tools/web_search.py): TavilySearch client using TAVILY_API_KEY
+- Settings (helpers/config.py): pydantic BaseSettings loading .env
+- Logs: agent handoffs appended to data/logs.csv
+
+Primary workflow: Behaviour Analyst
+State (BehaviourAnalystState)
+- request: user request text
+- analysis: evolving narrative analysis
+- message: communication across nodes
+- user: user id
+- sender: last agent name
+- steps: list of planned DB steps (text)
+- db_results: list of results from DB subgraph ({ step, query, data })
+- data_acquired: list of validated natural-language explanations
+- validation_tasks: [{ db_result, explanation }] bundles for validation
+- validation_results: [(past_explanation, problem)] feedback used for correction
+- next_step: routing instruction from the orchestrator
+
+Nodes and flow
+1) orchestrator
+	 - Central router (LLM: gpt_oss_llm) decides next_step using current request, analysis, data_acquired, last message/sender.
+	 - Routing:
+		 • "query_planner" → plan data needs
+		 • "analyser" → refine or complete analysis
+		 • "end" → stop when analysis is sufficient
+	 - Logs decisions to data/logs.csv
+
+2) query_planner
+	 - Produces ≤6 clear, aggregated query steps for a single user (LLM: gpt_oss_llm). Each step targets one lens (time, store, city, category) and defines metrics, grouping, filters, and time window.
+	 - Output: steps (List[str]) + summary message
+
+3) db_agent (async, parallel)
+	 - For each planned step, invokes the Database Agent Subgraph concurrently using asyncio.gather.
+	 - Aggregates results into db_results = [{ step, query, data }].
+	 - Appends status to message; logs to CSV.
+
+4) explainer (async)
+	 - For each db_result, generates a natural-language explanation (Explainer_agent.ainvoke) using any validation feedback from previous iterations to correct errors.
+	 - Appends explanations to data_acquired and prepares validation_tasks = [{ db_result, explanation }].
+
+5) validation (async)
+	 - Validates each explanation against its db_result (ValidationAgent.ainvoke with strict rules: no omissions, no hallucinations).
+	 - Splits:
+		 • Passed explanations → kept in data_acquired
+		 • Failed → db_results set to items needing correction and validation_results holds (past_explanation, reasoning)
+	 - Conditional routing:
+		 • If any failures → back to explainer for correction
+		 • Else → return to orchestrator
+	 - Note: A 95% probabilistic branch from explainer goes to validation (“audit”) to keep quality high; 5% goes straight to orchestrator (“pass”).
+
+6) analyser
+	 - Synthesizes a coherent, revised analysis narrative from current data_acquired and previous_analysis (LLM: large_azure_llm).
+	 - If more data is needed, the message explicitly instructs the planner what to fetch next, which drives orchestrator → query_planner.
+
+Convergence
+The loop continues (plan → query → explain → validate → analyze) until the orchestrator deems the analysis high quality and directly answering the request, then routes to end. The Streamlit app shows live bubbles for each node (“===> Node Invoked <===”).
+
+Database Agent Subgraph (graphs/database_sub_graph.py)
+Purpose
+- Translate a single step into SQL and execute it against PostgreSQL.
+
+How it works
+1) DatabaseAgent (agents/database_agent.py)
+	 - System prompt constrains outputs to a single JSON object {"query": "..."} and disallows mutating statements.
+	 - Uses gpt_oss_llm (Azure) with structured output.
+2) Execution
+	 - asyncpg.connect with env vars:
+		 • DB_USER, DB_PASSWORD, DB_NAME
+	 - Runs the generated query; returns rows as a list of dicts. Errors are caught and returned in data.
+
+Presentation Super Agent (graphs/presentation_sub_graph.py)
+Purpose
+- Convert insights into either a narrative (Writer) or visualization (Visualizer) and eventually a combined final_work (HTML/CSS/JS).
+
+State (PresentationState)
+- insights, visualization, report, final_work, send_by, message, next_step
+
+Flow
+1) Orchestrator (gemini_llm)
+	 - Decides next_step: Visualizer, Writer, or end. Produces/updates final_work and message.
+2) Visualizer (gemini_llm)
+	 - Generates a styled, interactive HTML/CSS/JS dashboard/template based on insights.
+3) Writer (gemini_llm)
+	 - Produces a readable narrative report from insights.
+4) Loop continues until orchestrator signals end.
+
+Recommendation Subgraph (graphs/recommendation_sub_graph.py)
+Purpose
+- Generate search queries from insights, fetch results in parallel, scrape pages, and summarize relevant info.
+
+Flow
+1) parallel_tavily_search
+	 - NewsWriter (Azure LLM) generates search queries; TavilySearch.batch executes them.
+	 - Extracts URLs per query into results dict.
+2) scrapper
+	 - Downloads each URL, extracts inner text (BeautifulSoup), then Scrapper (Azure LLM) summarizes content relevant to the original query.
+3) The graph currently ends after scrapper, optionally pluggable into the Presentation graph in future.
+
+Trend Analysis Subgraph (graphs/trend_analysis_sub_graph.py)
+Purpose
+- Build a personalized tech news report for a user.
+
+Flow
+1) Extract_Persona → persona_chain (azure_llm)
+	 - Produces ProfileNotesResponse: personality, major/minor categories, 3–6 keywords, time_period, concise_summaries.
+2) Find_Keywords
+	 - get_keywords_for_categories (Safron keywords API), merges with user keywords.
+3) Retrieve_Facts
+	 - fetch_facts_for_keywords calls Safron AI Keyword Facts API for each keyword; retries on failure; filters citations to only referenced ones.
+4) Create_Themes → analysis_chain (azure_llm)
+	 - Synthesizes 5–7 themes with titles, relevance scores, key points, and supporting keywords.
+5) Create_Report → writer_chain (azure_llm)
+	 - Produces SummaryResponse: long_summary, concise_summary, title.
+
+Chat UI (chatbot_app.py)
+- Streamlit app titled “Behaviour Analyst Chatbot”.
+- Groups stdout into bubbles per agent section (lines between “===> … Invoked <===”).
+- Accepts a prompt, invokes behaviour_analyst_super_agent with a recursion_limit of 500, and renders:
+	• Final Analysis (analysis)
+	• Data Insights (validated explanations from data_acquired)
+- Sidebar allows setting user_id, toggling debug mode, and clearing chat history.
+- Windows event loop guard ensures compatibility with grpc.aio and Streamlit on Windows.
+
+Routing, concurrency, and validation highlights
+- Orchestrators (Behaviour and Presentation) are LLM-driven routers emitting next_step.
+- Query planning produces bounded, structured steps; DB calls run concurrently with asyncio.gather.
+- Explanations are validated strictly; failed items loop back with past explanation + reason to improve grounding.
+- Probabilistic audits ensure quality even when not strictly required by the loop state.
+
+Data sources and schema
+- PostgreSQL (18.0) with tables: users, budget, goals, income, transactions; relations are embedded in prompts to guide SQL generation.
+- Web: Tavily search results and HTML pages (BeautifulSoup).
+- Safron public APIs for trending keywords and keyword facts.
+
+Configuration
+- Environment variables (via .env) used by LLMs and tools:
+	• AZURE_OPENAI_* (deployments, endpoint, keys)
+	• LARGE_AZURE_OPENAI_* (for larger Azure model)
+	• GPT_OSS_DEPLOYMENT_NAME (for OSS-tuned Azure model)
+	• GEMINI_API_KEY
+	• TAVILY_API_KEY
+	• DB_USER, DB_PASSWORD, DB_NAME (PostgreSQL)
+- helpers/config.py exposes get_setting() (pydantic BaseSettings) to load these.
+
+Entry points and typical runs
+- Streamlit UI: chatbot_app.py (primary for Behaviour Analyst)
+- Scripted examples: main.py → run_behaviour_analysis(), run_trend_analysis(), run_recommendation_agent()
+
+Error handling and limits
+- Database execution errors are caught and returned in db_result.data with an error message.
+- Safron API calls include retries with backoff and exception logging.
+- Orchestrators and validators use structured outputs to reduce parsing errors; timeouts and retry counts are set in LLM clients.
+
+Extensibility notes
+- To add a new data source:
+	1) Implement a subgraph (or node) that produces normalized { step, query/input, data } outputs.
+	2) Integrate via orchestrator routing or as part of query_planner’s steps, then feed results into explainer/validation.
+- To add a new presentation format:
+	1) Create a node akin to Visualizer or Writer and extend Presentation Orchestrator routing.
+- To change models:
+	1) Update LLM bindings in LLMs/*.py and adjust prompts for structured outputs accordingly.
+
+File map (selected)
+- graphs/
+	• behaviour_analyst_sub_graph.py → Core analysis loop
+	• database_sub_graph.py → SQL generation + execution per step
+	• presentation_sub_graph.py → Visualization/Report orchestration
+	• recommendation_sub_graph.py → Web search + scrape summarize
+	• trend_analysis_sub_graph.py → Persona → Keywords → Facts → Themes → Report
+- agents/
+	• behaviour_analyst/* → Orchestrator, Analyser, Query Planner, Validation Agent
+	• database_agent.py → DatabaseAgent prompt and structured output
+	• presentation_super_agent/* → Orchestrator, Visualizer, Writer
+	• Recommendation_agent/* → query generator (NewsWriter), Scrapper
+	• trend_analysis_agent/* → persona, keywords, facts, themes, report chains
+- tools/web_search.py → Tavily client
+- chatbot_app.py → Streamlit chat UI for Behaviour Analyst
+- main.py → example runners
+- data/logs.csv → conversation/flow logs (sender, receiver, message)
+
+In short
+The system plans what data it needs, queries a database in parallel, explains and validates those results, and iterates until it produces a high-confidence analysis. It can then turn insights into readable reports and visual dashboards, augment with live web information, and generate personalized trend summaries—all driven by LLM-based routers and structured-output agents.
+

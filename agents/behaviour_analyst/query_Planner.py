@@ -1,135 +1,72 @@
-from typing import Literal,TypedDict
-from LLMs.gemini_models import gemini_llm
-from LLMs.azure_models import azure_llm, gpt_oss_llm
-from langgraph.graph import StateGraph, END
-from typing import Dict, Any, List, Union
+from typing import List
+from LLMs.azure_models import gpt_oss_llm
 from langchain_core.prompts import ChatPromptTemplate
 from pydantic import Field, BaseModel
-from LLMs.ollama_llm import ollama_llm
 
 class query_plannerOutput(BaseModel):
     output: List[str] = Field(
-        ..., 
-        description="A list of clear and simple steps for another database agent to create SQL-style queries that retrieve insights about a single user's behavior and spending patterns."
+        ...,
+        description="A list (≤6) of clear, text-only steps for another database agent to create aggregated SQL queries about a single user's behavior."
     )
-    message: str = Field("", description="A concise summary of the steps outlined in the output.")
-    
-system_prompt = """
-You are the Query Planner Agent. Produce a numbered list of ≤6 text-only steps, each defining a single aggregated query for one user.
+    message: str = Field(
+        "",
+        description="One concise sentence summarizing what the steps cover and any notable gaps."
+    )
 
-Follow these rules:
-1. Clarify Objective
-    • Accept “user_id” and “request” as inputs.
-    • Define exactly which metric (SUM, AVG, COUNT, MAX), which grouping (time, city, store, category), and which time window you’re querying.
-2. Data Landscape & Cleaning
-    • Schema is known; ignore raw rows—only aggregated outputs.
-    • Ensure filters and normalization (e.g., date formats) are clear.
-3. One Lens at a Time
-    • Choose exactly one dimension per step (time, store, location, category).
-    • Cap results at ≤24 rows; order logically (top/bottom N or chronological).
-4. Pair & Compare
-    • Return paired metrics (e.g., total spend AND visit count).
-    • For trend queries, compare current vs prior period.
-5. Highlight Extremes
-    • Include top-N or bottom-N analyses to surface key drivers.
-6. Flag Data Gaps
-    • Note potential empty or low-volume outcomes explicitly.
+system_prompt = r"""
+You are the Query Planner Agent.
+Produce a numbered list of ≤6 short, text-only steps. Each step must describe ONE aggregated query for ONE user_id.
 
-Output Format (JSON):
+What a step MUST include (plain language, no SQL):
+  • Metric: one aggregate (SUM | COUNT | AVG | MAX | MIN)
+  • Dimension: choose exactly ONE lens (time | store_name | city | budget/category | type_spending)
+  • Time window: explicit (e.g., current month, last 90 days, last 6 months)
+  • Filters: must include user_id={user}, and any request-specific filters
+  • Output size: limit results to ≤24 rows (e.g., “top 10”, “last 6 months”)
+  • Ordering: logical order (chronological or top/bottom by metric)
+
+General rules:
+  1) Aggregations only (no raw row listings).
+  2) One lens per step (no mixing multiple dimensions in one step).
+  3) Avoid duplicates: consider {steps} (already completed) and do not repeat them.
+  4) Prefer comparisons when helpful (e.g., current vs prior period).
+  5) If the request is vague, cover a compact baseline plan (trend, top category, overspend vs limit).
+  6) If the user request cannot be planned from available fields, return a single step:
+       "Query rejected"
+
+Output JSON format:
 {{
-  "output": [ "Step 1 description", ... ],
-  "message": "One-sentence summary of coverage and any gaps"
+  "output": ["1) ...", "2) ..."],
+  "message": "..."
 }}
 
-User input will provide:
+Inputs provided to you:
 - Request: {request}
 - User ID: {user}
 - Completed Steps: {steps}
+- Orchestrator message (context): {message}
 
-#### Database Schema
-PostgreSQL Database Metadata (with Column Descriptions)
+Available schema (key fields only; PostgreSQL 18, schema public):
+- transactions(transaction_id, date, amount, time, store_name, city, neighbourhood, type_spending, user_id, budget_id, created_at)
+- budget(budget_id, user_id, budget_name, description, total_limit, priority_level_int, is_active, created_at, updated_at)
+- income(income_id, user_id, type_income, amount, period, description, created_at, updated_at)
+- goals(goal_id, goal_name, description, target, user_id, start_date, due_date, status, created_at, updated_at)
+- users(user_id, first_name, last_name, ...)
 
-Engine: PostgreSQL 18.0
-Schema: public
-
-ENUM TYPES
------------
-public.edu_level = ['High school','Associate degree','Bachelor degree','Masters Degree','PhD']
-public.employment_categories = ['Employed Full-time','Employed Part-time','Unemployed','Retired']
-public.gender_type = ['male','female']
-public.priority_level_enum = ['High','Mid','Low']
-
-TABLES
--------
-USERS (public.users)
-Purpose: Master record for each user/person.
-Columns:
-- user_id (bigint, PK) — Surrogate identifier for the user.
-- first_name (text, not null) — Given name.
-- last_name (text, not null) — Family name.
-- job_title (text, not null) — Current job title or role.
-- address (text, not null) — Mailing or residential address.
-- birthday (date, not null) — Date of birth (YYYY-MM-DD).
-- gender (gender_type) — Gender value from public.gender_type.
-- employment_status (employment_categories) — Employment state.
-- education_level (edu_level) — Highest education level.
-
-BUDGET (public.budget)
-Purpose: Budget categories/limits per user.
-Columns:
-- budget_id (bigint, PK)
-- user_id (bigint, FK → users.user_id)
-- budget_name (text, not null)
-- description (text)
-- total_limit (numeric(12,2))
-- priority_level (priority_level_enum)
-
-GOALS (public.goals)
-Purpose: Target financial goals per user.
-Columns:
-- goal_id (bigint, PK)
-- goal_name (text, not null)
-- target (numeric(12,2))
-- user_id (bigint, FK → users.user_id)
-
-INCOME (public.income)
-Purpose: Income streams and attributes per user.
-Columns:
-- income_id (bigint, PK)
-- user_id (bigint, FK → users.user_id)
-- type_income (text, not null)
-- amount (numeric(12,2))
-- period (text)
-
-TRANSACTIONS (public.transactions)
-Purpose: Individual monetary transactions.
-Columns:
-- transaction_id (bigint, PK)
-- date (date, not null)
-- amount (numeric(12,2), not null)
-- time (time without time zone)
-- store_name (text)
-- city (text)
-- neighbourhood (text)
-- type_spending (text)
-- user_id (bigint, FK → users.user_id)
-- category_id (bigint, FK → budget.budget_id)
-
-Relationships:
-users (1) → (N) budget via budget.user_id
-users (1) → (N) goals via goals.user_id
-users (1) → (N) income via income.user_id
-users (1) → (N) transactions via transactions.user_id
-budget (1) → (N) transactions via transactions.category_id
-
+Notes:
+- “budget/category” refers to transactions.budget_id → budget.budget_name.
+- Timestamps are WITHOUT time zone; use simple date windows like “current month” or “last 90 days”.
+- Keep steps short and implementation-ready for a downstream SQL generator.
+- Do NOT emit SQL. Only plain-language step descriptions.
 """
 
 user_prompt = """
-The request is: {request}, user ID is: {user}
+Request: {request}
+User ID: {user}
 
 Completed Steps: {steps}
 
-orchestrator's message: {message}
+Orchestrator context: {message}
 """
 
 prompt = ChatPromptTemplate.from_messages([
