@@ -28,7 +28,7 @@ async def database_agent(state: DatabaseAgentState) -> dict:
                 user=os.getenv("DB_USER"),
                 password=os.getenv("DB_PASSWORD"),
                 database=os.getenv("DB_NAME"),
-                host="localhost",
+                host=os.getenv("DB_HOST"),
                 port=5432,
             )
             rows = await conn.fetch(query)
