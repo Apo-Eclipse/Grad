@@ -5,7 +5,6 @@ from typing import Dict, Any
 from langchain_core.prompts import ChatPromptTemplate
 from pydantic import Field, BaseModel
 from LLMs.azure_models import azure_llm
-from LLMs.ollama_llm import ollama_llm
 
 
 
