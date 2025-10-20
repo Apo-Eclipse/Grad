@@ -19,7 +19,7 @@ class BehaviourAnalystState(TypedDict):
     request: str
     analysis: str
     message: str
-    user: str
+    user_id: int
     sender: str
     validation_tasks: List[dict]
     data_acquired: List[str]
@@ -58,7 +58,7 @@ def analyser(state: BehaviourAnalystState) -> dict:
     print("Analysis: ", analysis)
     add_to_logs("analyser", "orchestrator", message)
 
-    return {"analysis": analysis, "message": "Analyser: " + message, "sender": "analyser"}
+    return {"analysis": analysis, "message": "Analyser: " + message, "sender": "analyser", "user_id": state.get("user_id", "")}
 
 
 def orchestrator(state: BehaviourAnalystState) -> dict:
@@ -69,20 +69,21 @@ def orchestrator(state: BehaviourAnalystState) -> dict:
     message = state.get("message", [])
     
     print("===> (Node) Orchestrator Invoked <===")
+    print(state)
     Output = Behaviour_analyser_orchestrator.invoke({
         "request": state.get("request", ""),
         "analysis": state.get("analysis", ""),
         "message": message,
         "data_acquired": state.get("data_acquired", []),
         "sender": state.get("sender", ""),
-        "user": state.get("user", "")
+        "user_id": state.get("user_id", "")
     })
     next_step = Output.next_step
     message = Output.message
     print(f"Orchestrator message : {message}")
     add_to_logs("orchestrator", next_step, message)
     
-    return {"message": message, "sender": "orchestrator", "next_step": next_step}
+    return {"message": message, "sender": "orchestrator", "next_step": next_step, "user_id": state.get("user_id", "")}
 
 
 def query_planner(state: BehaviourAnalystState) -> dict:
@@ -96,7 +97,7 @@ def query_planner(state: BehaviourAnalystState) -> dict:
         "request": state.get("request", ""),
         "message": message,
         "steps": state.get("steps", "no completed steps yet"),
-        "user": state.get("user", "")
+        "user": state.get("user_id", "")
     })
     
     message = Output.message
@@ -113,8 +114,8 @@ def query_planner(state: BehaviourAnalystState) -> dict:
         
     print(f"Planned {len(steps)} DB queries.")
     add_to_logs("query_planner", "db_agent", message)
-        
-    return {"steps": steps, "sender": "query_planner", "message": message}
+
+    return {"steps": steps, "sender": "query_planner", "message": message, "user_id": state.get("user_id", "")}
 
 
 async def db_agent(state: BehaviourAnalystState) -> dict:
@@ -122,12 +123,13 @@ async def db_agent(state: BehaviourAnalystState) -> dict:
     Async node that executes all planned database queries in parallel.
     """
     print("===> (Node) Database Agent Invoked <===")
+    print(state)
     steps = state.get("steps", [])
     if not steps:
         return {"db_results": [], "sender": "db_agent"}
 
     # Create a list of async tasks for the database agent subgraph
-    tasks = [database_agent_super_agent.ainvoke({"request": step}) for step in steps]
+    tasks = [database_agent_super_agent.ainvoke({"request": step, "user_id": state.get("user_id")}) for step in steps]
     
     # Execute all tasks concurrently
     results = await asyncio.gather(*tasks)
@@ -142,7 +144,7 @@ async def db_agent(state: BehaviourAnalystState) -> dict:
 
 
     message = state.get("sender", "") + ": " + state.get("message", "")
-    return {"db_results": processed_results, "sender": "db_agent", "message": message+ "\n" + "Database agent: "+ curr_message}
+    return {"db_results": processed_results, "sender": "db_agent", "message": message+ "\n" + "Database agent: "+ curr_message, "user_id": state.get("user_id", "")}
 
 
 async def explainer(state: BehaviourAnalystState) -> dict:
@@ -215,7 +217,8 @@ async def explainer(state: BehaviourAnalystState) -> dict:
         "data_acquired": data_acquired, # This now contains both old valid and new explanations
         "validation_tasks": new_validation_tasks,
         "sender": "explainer",
-        "message": message + "\n" + "Explainer: " + curr_message
+        "message": message + "\n" + "Explainer: " + curr_message,
+        "user_id": state.get("user_id", "")
     }
 
 
@@ -274,7 +277,8 @@ async def validation(state: BehaviourAnalystState) -> dict:
         "db_results": db_results_for_correction, # This list will be sent back to the explainer
         "validation_results": past_explanations_and_reasoning,
         "sender": "validation",
-        "message": message + "\n" + "Validation: " + validation
+        "message": message + "\n" + "Validation: " + validation,
+        "user_id": state.get("user_id", "")
     }
     
 

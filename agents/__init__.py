@@ -13,3 +13,6 @@ from .Recommendation_agent.news_finder import NewsWriter
 from .Recommendation_agent.scrapper import Scrapper
 
 from .database_agent import DatabaseAgent
+
+from .personal_assistant.assistant import PersonalAssistant
+from .personal_assistant.memory_manager import ConversationMemory, MemoryStore, UserProfile

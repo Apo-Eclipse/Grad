@@ -2,7 +2,7 @@ from dotenv import load_dotenv
 load_dotenv()
 from IPython.display import Image, display, Markdown
 from graphs.trend_analysis_sub_graph import news_super_agent
-from graphs import behaviour_analyst_super_agent,recommendation_agent_sub_graph
+from graphs import behaviour_analyst_super_agent, recommendation_agent_sub_graph, main_orchestrator_graph
 from agents import Explainer_agent
 import pandas as pd
 import asyncio
@@ -106,8 +106,66 @@ def run_recommendation_agent():
     #         print("_______result___________________________"*5)
 
 def main():
-    run_behaviour_analysis()
-    return
+    """Interactive conversation loop with PersonalAssistant orchestrator."""
+    user_id = 3
+    user_name = "Mariam"
+    
+    print("\n" + "="*80)
+    print(f"👋 Welcome {user_name}! Chat with PersonalAssistant (type 'exit' to quit)")
+    print("="*80 + "\n")
+    
+    # Conversation state
+    state = {
+        "user_id": user_id,
+        "user_name": user_name,
+        "user_message": "",
+        "next_step": "",
+        "agent_result": {},
+        "routing_decision": "",
+        "routing_message": "",
+        "message": "",
+        "has_data": False,
+        "data": None,
+        "is_awaiting_data": False
+    }
+    
+    while True:
+        user_input = input(f"\n{user_name}: ").strip()
+        
+        if user_input.lower() in ['exit', 'quit', 'bye']:
+            print(f"\n👋 Goodbye {user_name}!")
+            break
+        
+        if not user_input:
+            continue
+        
+        # Update state with new message
+        state["user_message"] = user_input
+        state["agent_result"] = {}
+        state["message"] = ""
+        state["has_data"] = False
+        state["data"] = None
+        state["is_awaiting_data"] = False
+        
+        # Invoke the orchestrator asynchronously
+        result = asyncio.run(main_orchestrator_graph.ainvoke(state))
+        
+        # Display response based on data availability
+        if result.get("has_data", False):
+            # Tabular data exists - display message and data
+            print(f"\n🤖 Assistant: {result.get('message', 'Here are your results:')}")
+            
+            # Display data as formatted table
+            if result.get('data'):
+                import pandas as pd
+                df = pd.DataFrame(result.get('data'))
+                print(f"\n{df.to_string(index=False)}")
+        else:
+            # No tabular data - just display the message
+            print(f"\n🤖 Assistant: {result.get('message', 'No response generated')}")
+        
+        # Update state for next iteration
+        state = result
 
 if __name__ == "__main__":
     main()
