@@ -201,9 +201,8 @@ builder.add_node("database_agent", database_agent_node)
 builder.add_node("behaviour_analyst", behaviour_analyst_node)
 builder.add_node("personal_assistant_response", personal_assistant_response)
 
+
 builder.add_edge(START, "personal_assistant_orchestrator")
-
-
 builder.add_conditional_edges(
     "personal_assistant_orchestrator",
     route_to_next_step,
