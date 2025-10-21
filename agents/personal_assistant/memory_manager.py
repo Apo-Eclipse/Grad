@@ -319,12 +319,10 @@ class ConversationMemory:
         """Generate a summary of recent conversation context."""
         if not self.conversation_history:
             return "No previous conversations."
-
         summary = "Recent conversation context:\n"
-        for i, turn in enumerate(self.conversation_history[-5:], 1):  # Last 5 turns
+        for i, turn in enumerate(self.conversation_history[-5:], 1): # Last 5 turns
             summary += f"\n{i}. User: {turn.user_message[:100]}...\n"
             summary += f"   Assistant: {turn.assistant_response[:100]}...\n"
-
         return summary
 
     def get_full_history(self) -> str:

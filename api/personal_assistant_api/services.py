@@ -101,11 +101,6 @@ class BehaviourAnalystService:
                 "user_id": user_id,
                 "user_name": user_name,
                 "user_message": query,
-                "next_step": "conversation",  # Will be set by personal_assistant_orchestrator
-                "agent_result": {},
-                "routing_decision": "",
-                "routing_message": "",
-                "is_awaiting_data": False,
             }
             
             logger.info(f"Starting orchestrator for request {request_id}: {query}")
@@ -126,6 +121,7 @@ class BehaviourAnalystService:
             processing_time = int((time.time() - start_time) * 1000)
             
             # Format the response from OrchestratorState
+            # Orchestrator in new contract returns {message|final_output, has_data, data}
             response = {
                 "request_id": request_id,
                 "status": "completed",
@@ -134,15 +130,17 @@ class BehaviourAnalystService:
                 "user_name": user_name,
                 "processing_time_ms": processing_time,
                 "completed_at": datetime.now().isoformat(),
-                "routing_decision": result.get("routing_decision", ""),
-                "routing_message": result.get("routing_message", ""),
-                "agent_result": result.get("agent_result", {}),
-                "is_awaiting_data": result.get("is_awaiting_data", False),
-                "raw_response": result
+                # Promote final_output/message for convenience
+                "final_output": result.get("final_output") or result.get("message", ""),
+                "data": result.get("data"),
+                "has_data": result.get("has_data", False),
+                "raw_response": result,
             }
             
             logger.info(f"Orchestrator completed for request {request_id} in {processing_time}ms")
-            logger.info(f"Routing: {response.get('routing_decision')}, Response: {response.get('final_response', '')[:100]}")
+            logger.info(
+                f"Completed: {processing_time}ms, has_data={response.get('has_data')}, preview='{(response.get('final_output') or '')[:100]}'"
+            )
             return response
             
         except Exception as e:

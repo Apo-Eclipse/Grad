@@ -14,10 +14,6 @@ from datetime import datetime
 
 
 class PersonalAssistant:
-    """
-    Personal Assistant Agent that maintains conversation memory and provides personalized responses.
-    Does NOT handle agent routing - that's managed by main_graph.py
-    """
 
     def __init__(self, user_id: str, user_name: str = "User"):
         """
@@ -50,21 +46,22 @@ class PersonalAssistant:
         self.user_profile = profile
 
         # System prompt for the assistant
-        self.system_prompt = """You are a helpful and empathetic Personal Assistant. Your role is to:
+        self.system_prompt = """
+        You are a helpful and empathetic Personal Assistant. Your role is to:
+        
+        1. **Engage Conversationally**: Have natural, friendly conversations with the user.
+        2. **Remember Context**: Reference previous conversations and preferences to provide personalized responses.
+        3. **Assist Proactively**: Anticipate user needs based on their patterns and preferences.
+        4. **Be Respectful**: Maintain professional boundaries while being warm and approachable.
+        5. **Provide Actionable Help**: Offer specific, practical advice when requested.
 
-1. **Engage Conversationally**: Have natural, friendly conversations with the user.
-2. **Remember Context**: Reference previous conversations and preferences to provide personalized responses.
-3. **Assist Proactively**: Anticipate user needs based on their patterns and preferences.
-4. **Be Respectful**: Maintain professional boundaries while being warm and approachable.
-5. **Provide Actionable Help**: Offer specific, practical advice when requested.
-
-Guidelines:
-- Keep responses concise but informative (2-3 paragraphs max unless asked otherwise).
-- If you don't know something, admit it and offer to help find information.
-- Use the user's name ({user_name}) occasionally to create a personal touch.
-- Remember and respect the user's stated preferences and constraints.
-- If the user provides new information about preferences, acknowledge that you'll remember it.
-"""
+        Guidelines:
+        - Keep responses concise but informative (2-3 paragraphs max unless asked otherwise).
+        - If you don't know something, admit it and offer to help find information.
+        - Use the user's name ({user_name}) occasionally to create a personal touch.
+        - Remember and respect the user's stated preferences and constraints.
+        - If the user provides new information about preferences, acknowledge that you'll remember it.
+        """
 
     def invoke(self, user_message: str, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
@@ -77,28 +74,39 @@ Guidelines:
         Returns:
             Dictionary with response and metadata
         """
+        
+        # get conversation history summary "last 5 turns"
         history_summary = self.conversation_memory.get_context_summary()
         
         # Check if we have analysis/data context to reflect on
-        agent_result = context.get("agent_result", "") if context else ""
+        analysis_summary = context.get("analysis", "") if context else ""
         routing_decision = context.get("routing_decision", "") if context else ""
         
         # Build context-aware prompts
-        if routing_decision == "behaviour_analyst" and agent_result:
+        if routing_decision == "behaviour_analyst":
             # Add analysis reflection to system prompt
-            analysis_summary = str(agent_result)[:300] if agent_result else "Analysis completed"
-            system_prompt = f"""You are a helpful and empathetic Personal Assistant. Your role is to:
+            print("1",analysis_summary)
+            analysis_summary = str(analysis_summary) if analysis_summary else "Analysis completed"
+            system_prompt = f"""
+            You are a helpful and empathetic Personal Assistant. Your role is to:
+            1. **Engage Conversationally**: Have natural, friendly conversations with the user.
+            2. **Remember Context**: Reference previous conversations and preferences to provide personalized responses.
+            3. **Assist Proactively**: Anticipate user needs based on their patterns and preferences.
+            4. **Be Respectful**: Maintain professional boundaries while being warm and approachable.
+            5. **Provide Actionable Help**: Offer specific, practical advice when requested.
+            6. **Reflect on Analysis**: Thoughtfully reflect on the provided analysis results to help the user understand their financial behavior.
+            7. **Interact Naturally**: Keep responses concise but informative (2-3 paragraphs max unless asked otherwise).
+            8. **Avoid Repetition**: Ensure your responses are fresh and avoid repeating previous statements.
+            9. **Use Numbers and Data**: you have to use numbers and data from the analysis to support your reflections.
+            10. Do not mention that you are an AI model or you are receiving data from other agents.
+            11. Do not respond with things that not requested from you.
+            12. Do not give information outside the scope of the analysis provided.
 
-1. **Engage Conversationally**: Have natural, friendly conversations with the user.
-2. **Remember Context**: Reference previous conversations and preferences to provide personalized responses.
-3. **Assist Proactively**: Anticipate user needs based on their patterns and preferences.
-4. **Be Respectful**: Maintain professional boundaries while being warm and approachable.
-5. **Provide Actionable Help**: Offer specific, practical advice when requested.
+            CURRENT ANALYSIS CONTEXT:
+            The user just received financial analysis. Reflect deeply on the insights provided and offer thoughtful commentary about what it means for their financial behavior and patterns. Help them understand the implications of the analysis.
 
-CURRENT ANALYSIS CONTEXT:
-The user just received financial analysis. Reflect deeply on the insights provided and offer thoughtful commentary about what it means for their financial behavior and patterns. Help them understand the implications of the analysis.
-
-Use the user's name ({self.user_name}) occasionally to create a personal touch."""
+            Use the user's name ({self.user_name}) occasionally to create a personal touch.
+            """
             
             human_prompt = f"Analysis result: {analysis_summary}\n\nUser said: {{user_message}}\n\nPlease provide thoughtful reflection on this analysis and what it means for them."
             
@@ -109,7 +117,6 @@ Use the user's name ({self.user_name}) occasionally to create a personal touch."
             
             formatted_prompt = prompt_template.format_prompt(user_message=user_message)
         else:
-            # Standard conversation prompt
             system_prompt = self.system_prompt
             human_prompt = "{context_summary}\n\nUser Preferences: {preferences}\n\nCurrent message: {user_message}"
             
@@ -124,8 +131,7 @@ Use the user's name ({self.user_name}) occasionally to create a personal touch."
                 preferences=str(self.user_profile.preferences) if self.user_profile.preferences else "No preferences recorded.",
                 user_message=user_message
             )
-
-        # Get response from LLM
+            
         llm_response = azure_llm.invoke(formatted_prompt)
         assistant_response = llm_response.content
 
@@ -155,13 +161,6 @@ Use the user's name ({self.user_name}) occasionally to create a personal touch."
             "timestamp": datetime.now().isoformat(),
             "memory_updated": True
         }
-
-    def ainvoke(self, user_message: str, context: Optional[Dict[str, Any]] = None):
-        """
-        Async version of invoke. Currently wraps the sync method.
-        Can be enhanced with async LLM calls in the future.
-        """
-        return self.invoke(user_message, context)
 
     def get_memory_summary(self) -> Dict[str, Any]:
         """Get a summary of the conversation memory and user profile."""
@@ -219,4 +218,4 @@ Use the user's name ({self.user_name}) occasionally to create a personal touch."
         Returns:
             Formatted conversation history string
         """
-        return self.conversation_memory.get_full_history()
+        return self.conversation_memory.get_full_history()  

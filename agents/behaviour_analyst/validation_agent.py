@@ -121,7 +121,7 @@ users (1) → (N) transactions via transactions.user_id
 budget (1) → (N) transactions via transactions.budget_id → budget.budget_id
 
 # --- End of database schema reference ---
-
+note : all money amounts are in EGP currency.
 """
 
 # 3. Create the Prompt Template

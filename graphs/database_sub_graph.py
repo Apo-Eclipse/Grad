@@ -11,29 +11,23 @@ class DatabaseAgentState(TypedDict):
     request: str
     result: dict
     user_id: object
+    edit: bool
 
 
-# --- ASYNC Node Definition ---
 async def database_agent(state: DatabaseAgentState) -> dict:
     """
     An asynchronous node that generates and executes a SQL query.
     """
-    # Compact debug to observe what's coming from main graph without dumping huge payloads
 
-    try:
-        print("[database_agent] keys:", list(state.keys()))
-        print("[database_agent] request:", state.get("request"))
-        print("[database_agent] user_id:", state.get("user") or state.get("user_id"))
-    except Exception:
-        pass
-
-    user = state.get("user") or state.get("user_id")
+    user = state.get("user_id")
     step_text = state.get("request", "")
-
-    out = await DatabaseAgent.ainvoke({"request": step_text, "user": user})
+    
+    print('--- Database Agent State ---')
+    print(user)
+    print(step_text)
+    out = await DatabaseAgent.ainvoke({"request": step_text, "user_id": user})
     query = out.query
     edit = out.edit
-
     if not edit:
         try:
             results = []
@@ -47,18 +41,18 @@ async def database_agent(state: DatabaseAgentState) -> dict:
                 )
                 rows = await conn.fetch(query)
                 if rows:
-                    df = pd.DataFrame(rows)
-                    results = df.to_dict(orient="records")
+                    # Convert asyncpg.Record -> dict to preserve column names
+                    results = [dict(r) for r in rows]
                 else:
                     results = []
                 await conn.close()
 
             except Exception as e:
                 results = f"Error Executing Query: {str(e)}"
-            return {"result": {"step": step_text, "query": query, "data": results}}
+            return {"result": {"step": step_text, "query": query, "data": results}, "edit": False}
 
         except Exception as e:
-            return {"result": {"step": step_text, "query": None, "data": f"Agent Error: {str(e)}"}}
+            return {"result": {"step": step_text, "query": None, "data": f"Agent Error: {str(e)}"}, "edit": False}
     else:
         try:
             conn = await asyncpg.connect(
@@ -70,9 +64,9 @@ async def database_agent(state: DatabaseAgentState) -> dict:
             )
             await conn.execute(query)
             await conn.close()
-            return {"result": {"step": step_text, "query": query, "data": "Edit Query Executed Successfully"}}
+            return {"result": {"step": step_text, "query": query, "data": "Edit Query Executed Successfully"}, "edit": True}
         except Exception as e:
-            return {"result": {"step": step_text, "query": query, "data": f"Error Executing Edit Query: {str(e)}"}}
+            return {"result": {"step": step_text, "query": query, "data": f"Error Executing Edit Query: {str(e)}"}, "edit": True}
 
 
 builder = StateGraph(DatabaseAgentState)

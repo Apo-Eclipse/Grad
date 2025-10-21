@@ -7,11 +7,11 @@ from agents import Explainer_agent
 import pandas as pd
 import asyncio
 import json
+import pandas as pd
 import io
 import sys
 
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', line_buffering=True)
-
 
 # def process_queries():
 #     queries_to_run = json.load(open('queries_to_run.json', 'r', encoding='utf-8'))
@@ -31,20 +31,6 @@ sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', line_bufferin
 #     return explanations  
     
 def run_trend_analysis():
-        # from graphs import presentation_super_agent,behaviour_analyst_super_agent, database_agent_super_agent
-
-    # sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
-
-    # out_results = parallel_tavily_search("Stocks , artificial intelligence, technology")
-    # for query, result in out_results.items():
-    #     search_result = result.get('results', [])
-    #     for i in range(len(search_result)):
-    #         print("result"*5)
-    #         print(search_result[i].get("content", ""))
-    #         print("result"*5)
-
-
-    #-----------------------------------------------------------------------------------------
     input_dict_developer = {
         "user_info": {
             "name": "Karim",
@@ -73,14 +59,6 @@ def run_trend_analysis():
     print("-------------------------------------------------------------------------------------")
     
 def run_behaviour_analysis():
-    # tables = process_queries()
-    # explanations = process_tables(tables)
-    # print("****************************Tables******************************************") 
-    # for table in tables:
-    #     print(table)
-    # print("****************************Explanations***************************************")
-    # for explanation in explanations:
-    #     print(explanation)
     final_state = asyncio.run(behaviour_analyst_super_agent.ainvoke({
         "request": "i want analysis for month 10 in 2025"
         , "data_acquired": [], "analysis": "no analysis done yet"
@@ -91,24 +69,16 @@ def run_behaviour_analysis():
     
     print("\n=== Behaviour Analyst Analysis ===")
     print(final_state['analysis'])
-    # print("\n=== Behaviour data ===")
-    # print(final_state['data_acquired'])
 
 def run_recommendation_agent():
-    
     out_results = recommendation_agent_sub_graph.invoke({"insights":"where did i spend the most in months 8 and 9 in 2025?"})
     print(out_results['report'])
-    # for query, result in out_results.items():
-    #     search_result = result.get('results', [])
-    #     for i in range(len(search_result)):
-    #         print("_______result___________________________"*5)
-    #         print(search_result[i].get("content", ""))
-    #         print("_______result___________________________"*5)
+
 
 def main():
     """Interactive conversation loop with PersonalAssistant orchestrator."""
     user_id = 3
-    user_name = "Mariam"
+    user_name = "user"
     
     print("\n" + "="*80)
     print(f"👋 Welcome {user_name}! Chat with PersonalAssistant (type 'exit' to quit)")
@@ -147,22 +117,18 @@ def main():
         state["data"] = None
         state["is_awaiting_data"] = False
         
-        # Invoke the orchestrator asynchronously
         result = asyncio.run(main_orchestrator_graph.ainvoke(state))
-        
+        has_data = result.get("has_data", False)
         # Display response based on data availability
-        if result.get("has_data", False):
+        if has_data:
             # Tabular data exists - display message and data
-            print(f"\n🤖 Assistant: {result.get('message', 'Here are your results:')}")
-            
-            # Display data as formatted table
+            print(f"\n🤖 Assistant: {result.get('final_output', 'Here are your results:')}")
+
             if result.get('data'):
-                import pandas as pd
                 df = pd.DataFrame(result.get('data'))
                 print(f"\n{df.to_string(index=False)}")
         else:
-            # No tabular data - just display the message
-            print(f"\n🤖 Assistant: {result.get('message', 'No response generated')}")
+            print(f"\n🤖 Assistant: {result.get('final_output', 'No response generated')}")
         
         # Update state for next iteration
         state = result

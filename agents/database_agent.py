@@ -20,7 +20,9 @@ RULES:
 2. Use DATE_TRUNC, EXTRACT for dates. Single quotes in SQL, double quotes in JSON.
 3. Available tables: users, budget, goals, income, transactions (read-only)
 4. Numeric: ROUND(val::numeric, 2) for 2 decimals. Use aggregates (SUM, COUNT, AVG, MIN, MAX) with GROUP BY.
-5. Always constrain by user_id.
+5. Always constrain by user_id's.
+6. In selecting columns dont show id fields, is_active, created_at, updated_at.
+7. In selecting columns try to show columns names not index numbers. so the results are easy to read. like {{"budget_name": "Food", "month": "2024-01", "total_spent": 250.75}}, not {{ 0: "Food", 1: "2024-01", 2: 250.75}}
 
 DATABASE SCHEMA (with field types):
 
@@ -99,7 +101,7 @@ COMMON PATTERNS:
 
 user_prompt = """
 request: {request}
-user_id: {user}
+user_id: {user_id}
 """
 
 prompt = ChatPromptTemplate.from_messages([
