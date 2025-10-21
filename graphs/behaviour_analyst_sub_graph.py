@@ -14,7 +14,6 @@ import itertools
 warnings.filterwarnings("ignore", message=".*missing ScriptRunContext.*")
 logging.getLogger().setLevel(logging.ERROR)
 
-
 class BehaviourAnalystState(TypedDict):
     request: str
     analysis: str
@@ -26,17 +25,7 @@ class BehaviourAnalystState(TypedDict):
     validation_results: List[tuple]
     steps: List[str]          # To hold the plan from the query_planner
     db_results: List[dict]  # To hold the results from the db_agent
-    next_step: str          # To control routing from the orchestrator
-
-
-def add_to_logs(sender, receiver, message):
-    """Appends a log entry to the CSV file."""
-    with open(r"D:\projects\Multi-Agent System\data\logs.csv", mode='a', newline='', encoding='utf-8') as file:
-        writer = csv.writer(file)
-        writer.writerow([sender, receiver, str(message)])
-
-
-# --- Graph Nodes ---
+    next_step: str          # To control routing from the orchestrator    
 
 def analyser(state: BehaviourAnalystState) -> dict:
     """Node that analyzes the current state and acquired data."""
@@ -55,11 +44,7 @@ def analyser(state: BehaviourAnalystState) -> dict:
     
     analysis = Output.output
     message = Output.message
-    print("Analysis: ", analysis)
-    add_to_logs("analyser", "orchestrator", message)
-
     return {"analysis": analysis, "message": "Analyser: " + message, "sender": "analyser", "user_id": state.get("user_id", "")}
-
 
 def orchestrator(state: BehaviourAnalystState) -> dict:
     """
@@ -69,7 +54,6 @@ def orchestrator(state: BehaviourAnalystState) -> dict:
     message = state.get("message", [])
     
     print("===> (Node) Orchestrator Invoked <===")
-    print(state)
     Output = Behaviour_analyser_orchestrator.invoke({
         "request": state.get("request", ""),
         "analysis": state.get("analysis", ""),
@@ -80,11 +64,7 @@ def orchestrator(state: BehaviourAnalystState) -> dict:
     })
     next_step = Output.next_step
     message = Output.message
-    print(f"Orchestrator message : {message}")
-    add_to_logs("orchestrator", next_step, message)
-    
     return {"message": message, "sender": "orchestrator", "next_step": next_step, "user_id": state.get("user_id", "")}
-
 
 def query_planner(state: BehaviourAnalystState) -> dict:
     """
@@ -113,17 +93,13 @@ def query_planner(state: BehaviourAnalystState) -> dict:
         steps = steps_output
         
     print(f"Planned {len(steps)} DB queries.")
-    add_to_logs("query_planner", "db_agent", message)
-
     return {"steps": steps, "sender": "query_planner", "message": message, "user_id": state.get("user_id", "")}
-
 
 async def db_agent(state: BehaviourAnalystState) -> dict:
     """
     Async node that executes all planned database queries in parallel.
     """
     print("===> (Node) Database Agent Invoked <===")
-    print(state)
     steps = state.get("steps", [])
     if not steps:
         return {"db_results": [], "sender": "db_agent"}
@@ -136,16 +112,10 @@ async def db_agent(state: BehaviourAnalystState) -> dict:
     
     # Process results to extract the necessary data payload
     processed_results = [db_state.get("result", {}) for db_state in results]
-    
-    
     curr_message = f"Executed {len(processed_results)} DB queries in parallel."
     print(curr_message)
-    add_to_logs("db_agent", "explainer", curr_message)
-
-
     message = state.get("sender", "") + ": " + state.get("message", "")
     return {"db_results": processed_results, "sender": "db_agent", "message": message+ "\n" + "Database agent: "+ curr_message, "user_id": state.get("user_id", "")}
-
 
 async def explainer(state: BehaviourAnalystState) -> dict:
     """
@@ -208,8 +178,6 @@ async def explainer(state: BehaviourAnalystState) -> dict:
     curr_message = f"Generated {len(db_results_to_explain)} new explanations."
 
     print(curr_message)
-
-    add_to_logs("explainer", "validation/orchestrator", curr_message)
     
     message = state.get("message", "")
     
@@ -220,7 +188,6 @@ async def explainer(state: BehaviourAnalystState) -> dict:
         "message": message + "\n" + "Explainer: " + curr_message,
         "user_id": state.get("user_id", "")
     }
-
 
 async def validation(state: BehaviourAnalystState) -> dict:
     """
@@ -267,9 +234,6 @@ async def validation(state: BehaviourAnalystState) -> dict:
     
     message = state.get("message", "")
     validation = f"Validation complete. {len(db_results_for_correction)} items failed and will be corrected."
-    
-    # print(message)
-    add_to_logs("validation", "explainer/orchestrator", validation)
 
     # Update the state for the next step in the graph
     return {
@@ -280,8 +244,6 @@ async def validation(state: BehaviourAnalystState) -> dict:
         "message": message + "\n" + "Validation: " + validation,
         "user_id": state.get("user_id", "")
     }
-    
-
 
 # --- Build the Graph ---
 
@@ -305,7 +267,6 @@ builder.add_edge("db_agent", "explainer")
 # builder.add_edge("explainer", "orchestrator")
 builder.add_edge("analyser", "orchestrator")
 
-
 # routing logic from the orchestrator
 def route_from_orchestrator(state: BehaviourAnalystState):
     """Return the next node's name based on the orchestrator's decision."""
@@ -320,7 +281,6 @@ builder.add_conditional_edges(
         "end": END
     }
 )
-
 
 def decision_for_validation(state: BehaviourAnalystState):
     """Return the next node's name based on a probabilistic decision:
@@ -339,7 +299,6 @@ builder.add_conditional_edges(
     }
 )
 
-
 def route_after_validation(state: BehaviourAnalystState):
     """If there are items to correct, go back to explainer. Otherwise, continue."""
     if state.get("db_results"): # This list now only contains items for correction
@@ -354,7 +313,5 @@ builder.add_conditional_edges(
     route_after_validation,
     {"correct": "explainer", "continue": "orchestrator"}
 )
-
-
 
 behaviour_analyst_super_agent = builder.compile()

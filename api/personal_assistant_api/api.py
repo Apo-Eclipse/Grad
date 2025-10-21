@@ -292,7 +292,34 @@ async def run_analysis_sync(request, payload: AnalysisRequestSchema):
                 error_message=result.get("error")
             )
         
-        return 200, result
+        # Build minimal client-facing response per new contract:
+        # - return only final_output if there's no data
+        # - return final_output and data if data exists
+        raw = result.get("raw_response", {}) if isinstance(result, dict) else {}
+        final_output = (
+            (raw.get("final_output") if isinstance(raw, dict) else None)
+            or result.get("final_output")
+            or (raw.get("message") if isinstance(raw, dict) else None)
+            or result.get("message")
+            or ""
+        )
+
+        data = None
+        if isinstance(raw, dict) and raw.get("data") is not None:
+            data = raw.get("data")
+        elif result.get("data") is not None:
+            data = result.get("data")
+
+        # Ensure serialization safety
+        final_output = make_json_serializable(final_output)
+        data = make_json_serializable(data) if data is not None else None
+
+        if data is None or (isinstance(data, list) and len(data) == 0):
+            client_response = {"final_output": final_output}
+        else:
+            client_response = {"final_output": final_output, "data": convert_decimals(data)}
+
+        return 200, client_response
     
     except Exception as e:
         logger.error(f"Error running personal assistant request: {str(e)}", exc_info=True)
