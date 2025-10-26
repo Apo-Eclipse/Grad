@@ -1,17 +1,12 @@
 from dotenv import load_dotenv
 load_dotenv()
-from IPython.display import Image, display, Markdown
-from graphs.trend_analysis_sub_graph import news_super_agent
-from graphs import behaviour_analyst_super_agent, recommendation_agent_sub_graph, main_orchestrator_graph
-from agents import Explainer_agent
-import pandas as pd
-import asyncio
+import requests
 import json
 import pandas as pd
-import io
+import asyncio
 import sys
 
-sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', line_buffering=True)
+API_BASE_URL = "http://localhost:8000/api"
 
 # def process_queries():
 #     queries_to_run = json.load(open('queries_to_run.json', 'r', encoding='utf-8'))
@@ -30,53 +25,67 @@ sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', line_bufferin
 #         explanations.append(explanation.explanation)
 #     return explanations  
     
-def run_trend_analysis():
-    input_dict_developer = {
-        "user_info": {
-            "name": "Karim",
-            "interests": "I'm a backend developer working with Python and cloud services. I'm interested in AI, specifically large language models, open-source projects, and new cloud-native technologies.",
-            "user_keywords": "LLMs, Kubernetes, Python, OpenAI, Llama",
-            "summary_style": "Detailed, technical breakdown. Don't shy away from jargon.",
-            "time_period": "daily"
-        },
-        "user_persona": None,
-        "keywords_info": None,
-        "keywords_facts": None,
-        "theme_analysis": None,
-        "final_report": None,
-    }
+def start_conversation(user_id, channel="web"):
+    """Start a new conversation via API."""
+    try:
+        response = requests.post(
+            f"{API_BASE_URL}/personal_assistant/conversations/start",
+            json={"user_id": user_id, "channel": channel}
+        )
+        if response.status_code == 200:
+            data = response.json()
+            return data
+        else:
+            print(f"Error starting conversation: {response.json()}")
+            return None
+    except Exception as e:
+        print(f"Connection error: {e}")
+        return None
 
-    output = news_super_agent.invoke(input_dict_developer)
-    long_summary = output["final_report"].get("long_summary", "")
-    concise_summary = output["final_report"].get("concise_summary", "")
-    title = output["final_report"].get("title", "No title generated")
-    print("-------------------------------------------------------------------------------------")
-    print("title: \n", title)
-    print("-------------------------------------------------------------------------------------")
-    print("\n\nLong Summary:\n", long_summary)
-    print("-------------------------------------------------------------------------------------")
-    print("\n\nConcise Summary:\n", concise_summary)
-    print("-------------------------------------------------------------------------------------")
-    
-def run_behaviour_analysis():
-    final_state = asyncio.run(behaviour_analyst_super_agent.ainvoke({
-        "request": "i want analysis for month 10 in 2025"
-        , "data_acquired": [], "analysis": "no analysis done yet"
-        , "final_output": "no output yet", "message": "no message yet", "sender": "user", "user": "2"
-        },
-        {"recursion_limit": 500}
-    ))
-    
-    print("\n=== Behaviour Analyst Analysis ===")
-    print(final_state['analysis'])
 
-def run_recommendation_agent():
-    out_results = recommendation_agent_sub_graph.invoke({"insights":"where did i spend the most in months 8 and 9 in 2025?"})
-    print(out_results['report'])
+def analyze_query(query, conversation_id=None, user_id=None):
+    """Send query to API for analysis."""
+    try:
+        payload = {"query": query}
+        if conversation_id:
+            payload["conversation_id"] = conversation_id
+        if user_id:
+            payload["user_id"] = user_id
+        response = requests.post(
+            f"{API_BASE_URL}/personal_assistant/analyze",
+            json=payload
+        )
+        if response.status_code == 200:
+            data = response.json()
+            return data
+        else:
+            print(f"Error analyzing query: {response.json()}")
+            return None
+    except Exception as e:
+        print(f"Connection error: {e}")
+        return None
+
+
+def get_messages(conversation_id):
+    """Get all messages from a conversation."""
+    try:
+        response = requests.get(
+            f"{API_BASE_URL}/database/messages",
+            params={"conversation_id": conversation_id}
+        )
+        if response.status_code == 200:
+            data = response.json()
+            return data
+        else:
+            print(f"Error fetching messages: {response.json()}")
+            return None
+    except Exception as e:
+        print(f"Connection error: {e}")
+        return None
 
 
 def main():
-    """Interactive conversation loop with PersonalAssistant orchestrator."""
+    """Interactive conversation with PersonalAssistant via REST API."""
     user_id = 3
     user_name = "user"
     
@@ -84,20 +93,14 @@ def main():
     print(f"👋 Welcome {user_name}! Chat with PersonalAssistant (type 'exit' to quit)")
     print("="*80 + "\n")
     
-    # Conversation state
-    state = {
-        "user_id": user_id,
-        "user_name": user_name,
-        "user_message": "",
-        "next_step": "",
-        "agent_result": {},
-        "routing_decision": "",
-        "routing_message": "",
-        "message": "",
-        "has_data": False,
-        "data": None,
-        "is_awaiting_data": False
-    }
+    # Start a new conversation
+    conversation_data = start_conversation(user_id=user_id, channel="web")
+    if not conversation_data:
+        print("Failed to start conversation. Make sure API is running at", API_BASE_URL)
+        return
+    
+    conversation_id = conversation_data.get("conversation_id")
+    print(f"✅ Conversation started (ID: {conversation_id})\n")
     
     while True:
         user_input = input(f"\n{user_name}: ").strip()
@@ -109,29 +112,31 @@ def main():
         if not user_input:
             continue
         
-        # Update state with new message
-        state["user_message"] = user_input
-        state["agent_result"] = {}
-        state["message"] = ""
-        state["has_data"] = False
-        state["data"] = None
-        state["is_awaiting_data"] = False
+        # Send query to API
+        result = analyze_query(
+            query=user_input,
+            conversation_id=conversation_id,
+            user_id=user_id
+        )
         
-        result = asyncio.run(main_orchestrator_graph.ainvoke(state))
-        has_data = result.get("has_data", False)
-        # Display response based on data availability
-        if has_data:
-            # Tabular data exists - display message and data
-            print(f"\n🤖 Assistant: {result.get('final_output', 'Here are your results:')}")
-
-            if result.get('data'):
-                df = pd.DataFrame(result.get('data'))
+        if not result:
+            continue
+        
+        # Display response
+        final_output = result.get("final_output", "")
+        data = result.get("data")
+        
+        print(f"\n🤖 Assistant: {final_output}")
+        
+        # Display data if available
+        if data:
+            if isinstance(data, list) and len(data) > 0:
+                df = pd.DataFrame(data)
                 print(f"\n{df.to_string(index=False)}")
-        else:
-            print(f"\n🤖 Assistant: {result.get('final_output', 'No response generated')}")
+            elif isinstance(data, dict):
+                print(f"\nData: {json.dumps(data, indent=2)}")
         
-        # Update state for next iteration
-        state = result
+        print(f"\n[Conversation ID: {conversation_id}]")
 
 if __name__ == "__main__":
     main()

@@ -1,242 +1,86 @@
-"""
-Service layer for interacting with the Personal Assistant orchestrator.
-"""
+"""Service layer for the Personal Assistant API."""
 import asyncio
 import sys
 import os
 import time
-import uuid
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional
 from datetime import datetime
 import logging
 
-# Add parent project to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
-
 logger = logging.getLogger(__name__)
 
 
-class BehaviourAnalystService:
-    """Service to interact with the Main Orchestrator Graph (PersonalAssistant routing)."""
-    
+class PersonalAssistantService:
     def __init__(self):
-        """Initialize the service and load the main orchestrator graph."""
         self.orchestrator = None
-        self._agent_initialization_failed = False
-        self._agent_error = None
-        self._initialize_agent()
+        self._init_error = None
+        self._initialize()
     
-    def _initialize_agent(self):
-        """
-        Initialize the main orchestrator graph.
-        
-        This is wrapped with error handling to allow the API server to start
-        even if agent initialization fails (e.g., due to async event loop issues).
-        """
+    def _initialize(self):
         try:
-            logger.info("Attempting to import main_orchestrator_graph...")
             from graphs.main_graph import main_orchestrator_graph
             self.orchestrator = main_orchestrator_graph
-            logger.info("✅ Main Orchestrator Graph initialized successfully")
-        except RuntimeError as e:
-            # Handle async event loop errors gracefully
-            if "no current event loop" in str(e).lower() or "no running event loop" in str(e).lower():
-                logger.warning(f"⚠️ Async event loop error during initialization (will retry on first use): {str(e)}")
-                self._agent_initialization_failed = True
-                self._agent_error = e
+            logger.info("Orchestrator initialized")
+        except ImportError as ie:
+            if "Discriminator" in str(ie):
+                logger.error(f"Pydantic version incompatibility: {ie}")
+                logger.error("Make sure Pydantic v2.x is installed")
             else:
-                logger.error(f"❌ Failed to initialize Main Orchestrator Graph: {str(e)}")
-                self._agent_initialization_failed = True
-                self._agent_error = e
-        except ImportError as e:
-            logger.error(f"❌ Import Error - Parent project not accessible: {str(e)}", exc_info=True)
-            logger.error(f"   Current sys.path: {sys.path}")
-            self._agent_initialization_failed = True
-            self._agent_error = e
+                logger.error(f"Failed to initialize orchestrator: {ie}")
+            self._init_error = ie
         except Exception as e:
-            logger.error(f"❌ Failed to initialize Main Orchestrator Graph: {str(e)}", exc_info=True)
-            self._agent_initialization_failed = True
-            self._agent_error = e
-            self._agent_initialization_failed = True
-            self._agent_error = e
+            logger.error(f"Failed to initialize orchestrator: {e}")
+            self._init_error = e
     
-    def generate_request_id(self) -> str:
-        """Generate a unique request ID."""
-        return f"analysis_{uuid.uuid4().hex[:12]}"
-    
-    async def run_analysis(
-        self,
-        query: str,
-        filters: Optional[Dict[str, Any]] = None,
-        metadata: Optional[Dict[str, Any]] = None,
-        request_id: Optional[str] = None
-    ) -> Dict[str, Any]:
-        """
-        Run analysis through the main orchestrator graph.
-        
-        Args:
-            query: The user's query/message
-            filters: Optional filters for analysis
-            metadata: Optional metadata about the request
-            request_id: Optional request ID (generated if not provided)
-            
-        Returns:
-            Dictionary containing orchestrator results
-        """
-        if not request_id:
-            request_id = self.generate_request_id()
+    async def run_analysis(self, query: str, filters: Optional[Dict] = None, metadata: Optional[Dict] = None) -> Dict[str, Any]:
         start_time = time.time()
         
         try:
-            # If orchestrator wasn't initialized at startup (e.g., due to transient import error), try again now
-            if self.orchestrator is None and self._agent_initialization_failed:
-                logger.info("Re-attempting orchestrator initialization on first use…")
-                self._initialize_agent()
+            if self.orchestrator is None:
+                if self._init_error:
+                    self._initialize()
                 if self.orchestrator is None:
-                    raise RuntimeError(f"Main Orchestrator not initialized: {self._agent_error}")
-            # Prepare the input for the orchestrator according to OrchestratorState
+                    raise RuntimeError("Orchestrator not initialized")
+            
             user_id = metadata.get("user_id", "3") if metadata else "3"
             user_name = metadata.get("user_name", "User") if metadata else "User"
+            conversation_id = metadata.get("conversation_id", "") if metadata else ""
+            
             orchestrator_input = {
                 "user_id": user_id,
+                "conversation_id": conversation_id,
                 "user_name": user_name,
                 "user_message": query,
             }
             
-            logger.info(f"Starting orchestrator for request {request_id}: {query}")
-            logger.info(f"Orchestrator input: user_id={user_id}, user_name={user_name}")
-            
-            # Run the orchestrator with higher recursion limit for LangGraph
-            config = {'recursion_limit': 500}
-            
             if hasattr(self.orchestrator, 'ainvoke'):
-                result = await self.orchestrator.ainvoke(orchestrator_input, config=config)
+                result = await self.orchestrator.ainvoke(orchestrator_input, config={'recursion_limit': 500})
             else:
-                # Fallback to sync invoke in thread pool
-                def sync_invoke():
-                    return self.orchestrator.invoke(orchestrator_input, config=config)
                 loop = asyncio.get_event_loop()
-                result = await loop.run_in_executor(None, sync_invoke)
+                result = await loop.run_in_executor(None, lambda: self.orchestrator.invoke(orchestrator_input, config={'recursion_limit': 500}))
             
             processing_time = int((time.time() - start_time) * 1000)
             
-            # Format the response from OrchestratorState
-            # Orchestrator in new contract returns {message|final_output, has_data, data}
-            response = {
-                "request_id": request_id,
+            return {
                 "status": "completed",
                 "query": query,
-                "user_id": user_id,
-                "user_name": user_name,
                 "processing_time_ms": processing_time,
-                "completed_at": datetime.now().isoformat(),
-                # Promote final_output/message for convenience
                 "final_output": result.get("final_output") or result.get("message", ""),
                 "data": result.get("data"),
                 "has_data": result.get("has_data", False),
-                "raw_response": result,
+                "agents_used": result.get("agents_used", ""),
             }
-            
-            logger.info(f"Orchestrator completed for request {request_id} in {processing_time}ms")
-            logger.info(
-                f"Completed: {processing_time}ms, has_data={response.get('has_data')}, preview='{(response.get('final_output') or '')[:100]}'"
-            )
-            return response
-            
         except Exception as e:
             processing_time = int((time.time() - start_time) * 1000)
-            logger.error(f"Orchestrator failed for request {request_id}: {str(e)}", exc_info=True)
-            
-            return {
-                "request_id": request_id,
-                "status": "failed",
-                "query": query,
-                "processing_time_ms": processing_time,
-                "error": str(e),
-                "completed_at": datetime.now().isoformat()
-            }
-    
-    async def run_bulk_analysis(
-        self,
-        queries: List[str],
-        filters: Optional[Dict[str, Any]] = None
-    ) -> Dict[str, Any]:
-        """
-        Run multiple queries through the orchestrator in parallel.
-        
-        Args:
-            queries: List of queries to process
-            filters: Optional filters for all queries
-            
-        Returns:
-            Dictionary containing bulk orchestrator results
-        """
-        batch_id = f"batch_{uuid.uuid4().hex[:12]}"
-        start_time = time.time()
-        
-        try:
-            logger.info(f"Starting bulk orchestrator batch {batch_id} with {len(queries)} queries")
-            
-            # Run all queries concurrently through the orchestrator
-            tasks = [
-                self.run_analysis(query, filters)
-                for query in queries
-            ]
-            
-            results = await asyncio.gather(*tasks, return_exceptions=True)
-            
-            # Handle exceptions in results
-            successful_results = []
-            failed_results = []
-            
-            for i, result in enumerate(results):
-                if isinstance(result, Exception):
-                    failed_results.append({
-                        "query": queries[i],
-                        "error": str(result)
-                    })
-                elif result.get("status") == "failed":
-                    failed_results.append(result)
-                else:
-                    successful_results.append(result)
-            
-            processing_time = int((time.time() - start_time) * 1000)
-            
-            response = {
-                "batch_id": batch_id,
-                "status": "completed",
-                "total_requests": len(queries),
-                "successful": len(successful_results),
-                "failed": len(failed_results),
-                "processing_time_ms": processing_time,
-                "completed_at": datetime.now().isoformat(),
-                "results": successful_results,
-                "errors": failed_results if failed_results else None
-            }
-            
-            logger.info(f"Bulk orchestrator completed for batch {batch_id}: {len(successful_results)}/{len(queries)} successful")
-            return response
-            
-        except Exception as e:
-            processing_time = int((time.time() - start_time) * 1000)
-            logger.error(f"Bulk orchestrator failed for batch {batch_id}: {str(e)}", exc_info=True)
-            
-            return {
-                "batch_id": batch_id,
-                "status": "failed",
-                "error": str(e),
-                "processing_time_ms": processing_time,
-                "completed_at": datetime.now().isoformat()
-            }
+            logger.error(f"Error: {e}", exc_info=True)
+            return {"status": "failed", "query": query, "error": str(e), "processing_time_ms": processing_time}
 
 
-# Global service instance
-_service_instance = None
+_service = None
 
-
-def get_analyst_service() -> BehaviourAnalystService:
-    """Get or create the global service instance."""
-    global _service_instance
-    if _service_instance is None:
-        _service_instance = BehaviourAnalystService()
-    return _service_instance
+def get_analyst_service() -> PersonalAssistantService:
+    global _service
+    if _service is None:
+        _service = PersonalAssistantService()
+    return _service

@@ -4,3 +4,4 @@ outdata/
 data/
 .env
 .github/
+.api/.env.example

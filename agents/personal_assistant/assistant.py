@@ -9,49 +9,44 @@ conversation memory and LLM interaction only.
 from typing import Dict, Any, Optional
 from langchain_core.prompts import ChatPromptTemplate
 from LLMs.azure_models import azure_llm
-from .memory_manager import ConversationMemory, MemoryStore, UserProfile
+from .memory_manager import ConversationMemory, UserProfile
 from datetime import datetime
 
 
 class PersonalAssistant:
 
-    def __init__(self, user_id: str, user_name: str = "User"):
+    def __init__(self, user_id: str, conversation_id: str, user_name: str = "User"):
         """
         Initialize the Personal Assistant.
 
         Args:
             user_id: Unique identifier for the user
+            conversation_id: The ID of the conversation to load
             user_name: Human-readable name of the user
         """
         self.user_id = user_id
         self.user_name = user_name
+        self.conversation_id = conversation_id
 
         # Initialize memory storage
-        self.memory_store = MemoryStore()
-        self.conversation_memory = ConversationMemory(
-            user_id=user_id,
-            max_turns=20,
-            memory_store=self.memory_store
-        )
+        self.conversation_memory = ConversationMemory(user_id=user_id)
+        
+        # Retrieve the conversation
+        self.conversation_memory.retrieve_conversation(conversation_id)
 
-        # Initialize or load user profile
-        profile = self.memory_store.get_user_profile(user_id)
-        if not profile:
-            profile = UserProfile(
-                user_id=user_id,
-                name=user_name,
-                preferences={}
-            )
-            self.memory_store.save_user_profile(profile)
-        self.user_profile = profile
+        # Initialize user profile
+        self.user_profile = UserProfile(
+            user_id=user_id,
+            name=user_name
+        )
 
         # System prompt for the assistant
         self.system_prompt = """
         You are a helpful and empathetic Personal Assistant. Your role is to:
         
         1. **Engage Conversationally**: Have natural, friendly conversations with the user.
-        2. **Remember Context**: Reference previous conversations and preferences to provide personalized responses.
-        3. **Assist Proactively**: Anticipate user needs based on their patterns and preferences.
+        2. **Remember Context**: Reference previous conversations to provide personalized responses.
+        3. **Assist Proactively**: Anticipate user needs based on their patterns.
         4. **Be Respectful**: Maintain professional boundaries while being warm and approachable.
         5. **Provide Actionable Help**: Offer specific, practical advice when requested.
 
@@ -59,8 +54,6 @@ class PersonalAssistant:
         - Keep responses concise but informative (2-3 paragraphs max unless asked otherwise).
         - If you don't know something, admit it and offer to help find information.
         - Use the user's name ({user_name}) occasionally to create a personal touch.
-        - Remember and respect the user's stated preferences and constraints.
-        - If the user provides new information about preferences, acknowledge that you'll remember it.
         """
 
     def invoke(self, user_message: str, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
@@ -75,6 +68,10 @@ class PersonalAssistant:
             Dictionary with response and metadata
         """
         
+        # Refresh conversation history from the database before each invoke
+        # This ensures we have the latest messages from previous interactions
+        self.conversation_memory.retrieve_conversation(self.conversation_id)
+        
         # get conversation history summary "last 5 turns"
         history_summary = self.conversation_memory.get_context_summary()
         
@@ -85,7 +82,6 @@ class PersonalAssistant:
         # Build context-aware prompts
         if routing_decision == "behaviour_analyst":
             # Add analysis reflection to system prompt
-            print("1",analysis_summary)
             analysis_summary = str(analysis_summary) if analysis_summary else "Analysis completed"
             system_prompt = f"""
             You are a helpful and empathetic Personal Assistant. Your role is to:
@@ -118,7 +114,7 @@ class PersonalAssistant:
             formatted_prompt = prompt_template.format_prompt(user_message=user_message)
         else:
             system_prompt = self.system_prompt
-            human_prompt = "{context_summary}\n\nUser Preferences: {preferences}\n\nCurrent message: {user_message}"
+            human_prompt = "{context_summary}\n\nCurrent message: {user_message}"
             
             prompt_template = ChatPromptTemplate.from_messages([
                 ("system", system_prompt),
@@ -128,32 +124,15 @@ class PersonalAssistant:
             formatted_prompt = prompt_template.format_prompt(
                 user_name=self.user_name,
                 context_summary=history_summary,
-                preferences=str(self.user_profile.preferences) if self.user_profile.preferences else "No preferences recorded.",
                 user_message=user_message
             )
             
         llm_response = azure_llm.invoke(formatted_prompt)
         assistant_response = llm_response.content
 
-        # Add to memory
-        self.conversation_memory.add_turn(
-            user_message=user_message,
-            assistant_response=assistant_response,
-            context=context or {},
-            metadata={
-                "model": "azure_llm",
-                "timestamp": datetime.now().isoformat()
-            }
-        )
-
-        # Update user profile
+        # Update user profile in memory
         self.user_profile.conversation_count += 1
         self.user_profile.last_interaction = datetime.now().isoformat()
-        self.memory_store.update_user_profile(
-            self.user_id,
-            conversation_count=self.user_profile.conversation_count,
-            last_interaction=self.user_profile.last_interaction
-        )
 
         return {
             "response": assistant_response,
@@ -169,44 +148,9 @@ class PersonalAssistant:
             "user_id": self.user_id,
             "user_name": self.user_name,
             "conversation_stats": stats,
-            "user_preferences": self.user_profile.preferences,
             "total_conversations": self.user_profile.conversation_count,
             "last_interaction": self.user_profile.last_interaction
         }
-
-    def set_preference(self, key: str, value: Any) -> bool:
-        """
-        Set or update a user preference.
-
-        Args:
-            key: The preference key
-            value: The preference value
-
-        Returns:
-            True if successful, False otherwise
-        """
-        self.user_profile.preferences[key] = value
-        return self.memory_store.update_user_profile(
-            self.user_id,
-            preferences=self.user_profile.preferences
-        )
-
-    def get_preference(self, key: str, default: Any = None) -> Any:
-        """
-        Retrieve a user preference.
-
-        Args:
-            key: The preference key
-            default: Default value if not found
-
-        Returns:
-            The preference value or default
-        """
-        return self.user_profile.preferences.get(key, default)
-
-    def clear_memory(self):
-        """Clear the conversation history."""
-        self.conversation_memory.clear_history()
 
     def get_conversation_history(self, limit: int = 10) -> str:
         """
@@ -218,4 +162,4 @@ class PersonalAssistant:
         Returns:
             Formatted conversation history string
         """
-        return self.conversation_memory.get_full_history()  
+        return self.conversation_memory.get_full_history()

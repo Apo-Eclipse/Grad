@@ -1,14 +1,12 @@
 import asyncio
 import ast
-import csv
 import logging
 import warnings
-from typing import TypedDict, List, Annotated
+from typing import TypedDict, List
+
 from agents import Explainer_agent, Analyser, Behaviour_analyser_orchestrator, Query_planner, ValidationAgent
 from graphs.database_sub_graph import database_agent_super_agent
 from langgraph.graph import StateGraph, END, START
-from operator import add
-import itertools 
 
 # --- Setup Logging and Warnings ---
 warnings.filterwarnings("ignore", message=".*missing ScriptRunContext.*")
@@ -54,6 +52,8 @@ def orchestrator(state: BehaviourAnalystState) -> dict:
     message = state.get("message", [])
     
     print("===> (Node) Orchestrator Invoked <===")
+    
+    print("request:", state.get("request", ""))
     Output = Behaviour_analyser_orchestrator.invoke({
         "request": state.get("request", ""),
         "analysis": state.get("analysis", ""),
@@ -108,10 +108,10 @@ async def db_agent(state: BehaviourAnalystState) -> dict:
     tasks = [database_agent_super_agent.ainvoke({"request": step, "user_id": state.get("user_id")}) for step in steps]
     
     # Execute all tasks concurrently
-    results = await asyncio.gather(*tasks)
+    results = await asyncio.gather(*tasks, return_exceptions=True)
     
     # Process results to extract the necessary data payload
-    processed_results = [db_state.get("result", {}) for db_state in results]
+    processed_results = [db_state.get("result", {}) if not isinstance(db_state, Exception) else {"error": str(db_state)} for db_state in results]
     curr_message = f"Executed {len(processed_results)} DB queries in parallel."
     print(curr_message)
     message = state.get("sender", "") + ": " + state.get("message", "")
@@ -131,49 +131,59 @@ async def explainer(state: BehaviourAnalystState) -> dict:
     if not db_results_to_explain:
         return { "sender": "explainer", "message": "No new database results to explain." }
     
-    # 1. Fetch the entire list of feedback from the state.
     validation_feedback = state.get("validation_results", [])
     tasks = []
-    for db_result, feedback in itertools.zip_longest(
-        db_results_to_explain,
-        validation_feedback
-    ):
-        # 3. Unpack the feedback tuple *inside* the loop for each item.
-        if feedback:   
+    items_for_llm = []
+    fallback_validation_tasks = []
+
+    for idx, db_result in enumerate(db_results_to_explain):
+        if not isinstance(db_result, dict) or not db_result:
+            continue
+
+        feedback = validation_feedback[idx] if idx < len(validation_feedback) else None
+        if feedback:
             past_explanation, problem = feedback
         else:
             past_explanation, problem = "No Past Explanation", "No Problems because there is no past explainantion"
-        
-        # Build the input dictionary
+
+        if db_result.get("error"):
+            explanation = f"Database error: {db_result['error']}"
+            data_acquired.append(explanation)
+            fallback_validation_tasks.append({
+                "db_result": db_result,
+                "explanation": explanation
+            })
+            continue
+
         step = db_result.get("step", "no step provided")
         table = db_result.get("data", "no data provided")
         request_text = f"The request was: {step}\n\nThe result was: {table}\n"
-        
+
         ainvoke_payload = {
             "request": request_text,
             "previous_analysis": past_explanation,
             "problems": problem
         }
-        
-        # 4. Create the task with the correct, simple syntax.
+
         tasks.append(Explainer_agent.ainvoke(ainvoke_payload))
+        items_for_llm.append((db_result, past_explanation, problem))
         
-    # Use return_exceptions=True so a single LLM failure won't crash the whole graph
-    ex_outputs = await asyncio.gather(*tasks, return_exceptions=True)
-    
-    new_validation_tasks = []
-    # Loop through the results that were just processed; handle exceptions per-task
-    for db_result, ex_out in zip(db_results_to_explain, ex_outputs):
-        explanation = getattr(ex_out, 'explanation', "Could not get an explanation.")
-        
+    ex_outputs = []
+    if tasks:
+        ex_outputs = await asyncio.gather(*tasks, return_exceptions=True)
+
+    new_validation_tasks = list(fallback_validation_tasks)
+    for (db_result, _, _), ex_out in zip(items_for_llm, ex_outputs):
         if isinstance(ex_out, Exception):
-            explanation = f"Could not generate explanation"
+            explanation = "Could not generate explanation"
+        else:
+            explanation = getattr(ex_out, "explanation", "Could not get an explanation.")
+
         data_acquired.append(explanation)
-        validation_pair = {
-            "db_result": db_result, 
+        new_validation_tasks.append({
+            "db_result": db_result,
             "explanation": explanation
-        }
-        new_validation_tasks.append(validation_pair)
+        })
             
     curr_message = f"Generated {len(db_results_to_explain)} new explanations."
 

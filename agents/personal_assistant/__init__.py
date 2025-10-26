@@ -10,11 +10,11 @@ The agent can:
 - Work with the orchestrator in main_graph.py for routing
 """
 
-from .memory_manager import ConversationMemory, MemoryStore
+from .memory_manager import ConversationMemory, UserProfile
 from .assistant import PersonalAssistant
 
 __all__ = [
     "ConversationMemory",
-    "MemoryStore",
+    "UserProfile",
     "PersonalAssistant",
 ]
