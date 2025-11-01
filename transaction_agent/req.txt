@@ -1,8 +1,0 @@
-# requirements.txt
-langchain-openai
-pydantic
-python-dotenv
-speechrecognition
-pydub
-openai
-streamlit

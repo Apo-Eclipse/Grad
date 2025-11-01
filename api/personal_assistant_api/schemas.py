@@ -1,13 +1,14 @@
 """Request and response schemas."""
-from typing import Optional, Any, Dict
-from pydantic import BaseModel, Field
 from datetime import datetime
+from typing import Any, Dict, Optional
+
+from pydantic import BaseModel, Field
 
 
 class AnalysisRequestSchema(BaseModel):
     query: str
     filters: Optional[Dict[str, Any]] = None
-    metadata: Optional[Dict[str, Any]] = None
+    metadata: Dict[str, Any] = Field(default_factory=dict)
     conversation_id: Optional[int] = None
     user_id: Optional[int] = None
 
@@ -21,12 +22,12 @@ class AnalysisResponseSchema(BaseModel):
 class AnalysisErrorSchema(BaseModel):
     error: str
     message: str
-    timestamp: datetime
+    timestamp: datetime = Field(default_factory=datetime.now)
 
 
 class ConversationStartSchema(BaseModel):
     user_id: int
-    channel: Optional[str] = "web"
+    channel: str = Field(default="web")
 
 
 class ConversationResponseSchema(BaseModel):
@@ -34,4 +35,3 @@ class ConversationResponseSchema(BaseModel):
     user_id: int
     channel: str
     started_at: datetime
-

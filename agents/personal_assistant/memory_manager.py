@@ -8,7 +8,19 @@ Stores conversation context in memory for the current session.
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 from dataclasses import dataclass, field
+import os
 import httpx
+
+
+def _resolve_api_base_url() -> str:
+    """Resolve API base URL using environment variables or internal defaults."""
+    port = (
+        os.getenv("PORT")
+        or os.getenv("APP_PORT")
+        or os.getenv("DEFAULT_PORT")
+        or "8080"
+    )
+    return f"http://127.0.0.1:{port}/api".rstrip("/")
 
 @dataclass
 class ConversationTurn:
@@ -36,7 +48,7 @@ class ConversationMemory:
     Uses REST API endpoints for storing messages in PostgreSQL.
     """
 
-    API_BASE_URL = "http://localhost:8000/api"
+    API_BASE_URL = os.getenv("API_BASE_URL", _resolve_api_base_url())
 
     def __init__(
         self,

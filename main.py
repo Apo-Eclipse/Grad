@@ -1,142 +1,269 @@
-from dotenv import load_dotenv
-load_dotenv()
-import requests
+from __future__ import annotations
+
 import json
+import os
+from datetime import datetime
+from typing import Dict, Iterable, Optional, Tuple
+
 import pandas as pd
-import asyncio
-import sys
+import requests
+from dotenv import load_dotenv
 
-API_BASE_URL = "http://localhost:8000/api"
+load_dotenv()
 
-# def process_queries():
-#     queries_to_run = json.load(open('queries_to_run.json', 'r', encoding='utf-8'))
-#     conn = sqlite3.connect('./data/database.db')
-#     tables = []
-#     for query in queries_to_run:
-#         table = pd.read_sql_query(queries_to_run[query], conn)
-#         tables.append("Query: " + query + "\nTable:\n" + table.to_string(index=False))
-#     conn.close()
-#     return tables
+API_BASE_URL = os.getenv("API_BASE_URL", "https://grad-pth6g.ondigitalocean.app/api").rstrip("/")
 
-# def process_tables(tables):
-#     explanations = []
-#     for table in tables:
-#         explanation = Explainer_agent.invoke({"request": table})
-#         explanations.append(explanation.explanation)
-#     return explanations  
-    
-def start_conversation(user_id, channel="web"):
-    """Start a new conversation via API."""
+EMPLOYMENT_OPTIONS: Dict[str, str] = {
+    "1": "Employed Full-time",
+    "2": "Employed Part-time",
+    "3": "Unemployed",
+    "4": "Retired",
+}
+
+EDUCATION_OPTIONS: Dict[str, str] = {
+    "1": "High school",
+    "2": "Associate degree",
+    "3": "Bachelor degree",
+    "4": "Masters Degree",
+    "5": "PhD",
+}
+
+GENDER_OPTIONS: Dict[str, str] = {
+    "1": "male",
+    "2": "female",
+}
+
+
+def request_json(
+    method: str,
+    path: str,
+    *,
+    params: Optional[Dict] = None,
+    json_body: Optional[Dict] = None,
+    timeout: int = 30,
+) -> Tuple[bool, Optional[Dict]]:
+    """Send an HTTP request and return (success, json_payload)."""
+    url = f"{API_BASE_URL}{path}"
     try:
-        response = requests.post(
-            f"{API_BASE_URL}/personal_assistant/conversations/start",
-            json={"user_id": user_id, "channel": channel}
+        response = requests.request(
+            method,
+            url,
+            params=params,
+            json=json_body,
+            timeout=timeout,
         )
-        if response.status_code == 200:
-            data = response.json()
-            return data
-        else:
-            print(f"Error starting conversation: {response.json()}")
-            return None
-    except Exception as e:
-        print(f"Connection error: {e}")
-        return None
+    except requests.RequestException as exc:
+        print(f"Connection error calling {url}: {exc}")
+        return False, None
 
+    if 200 <= response.status_code < 300:
+        if response.content:
+            try:
+                return True, response.json()
+            except ValueError:
+                return True, None
+        return True, None
 
-def analyze_query(query, conversation_id=None, user_id=None):
-    """Send query to API for analysis."""
     try:
-        payload = {"query": query}
-        if conversation_id:
-            payload["conversation_id"] = conversation_id
+        detail = response.json()
+    except ValueError:
+        detail = response.text
+    print(f"Error calling {path}: {detail}")
+    return False, None
+
+
+def start_conversation(user_id: int, channel: str = "web") -> Optional[Dict]:
+    success, data = request_json(
+        "POST",
+        "/personal_assistant/conversations/start",
+        json_body={"user_id": user_id, "channel": channel},
+    )
+    return data if success else None
+
+
+def analyze_query(query: str, conversation_id: Optional[int], user_id: Optional[int]) -> Optional[Dict]:
+    payload = {"query": query}
+    if conversation_id:
+        payload["conversation_id"] = conversation_id
+    if user_id:
+        payload["user_id"] = user_id
+
+    success, data = request_json("POST", "/personal_assistant/analyze", json_body=payload)
+    return data if success else None
+
+
+def get_user(user_id: int) -> Optional[Dict]:
+    success, data = request_json("GET", f"/database/users/{user_id}")
+    return data if success else None
+
+
+def prompt_required(prompt: str) -> str:
+    value = input(prompt).strip()
+    while not value:
+        print("This field is required.")
+        value = input(prompt).strip()
+    return value
+
+
+def prompt_enum(label: str, options: Dict[str, str]) -> Optional[str]:
+    print(f"\n{label}:")
+    for key, value in options.items():
+        print(f"  {key}. {value}")
+    selection = input("Choose an option (leave blank to skip): ").strip()
+    if not selection:
+        return None
+    if selection not in options:
+        print("Invalid choice. Leaving empty.")
+        return None
+    return options[selection]
+
+
+def prompt_date(prompt: str) -> str:
+    while True:
+        value = input(prompt).strip()
+        try:
+            return datetime.strptime(value, "%Y-%m-%d").strftime("%Y-%m-%d")
+        except ValueError:
+            print("Invalid format. Please use YYYY-MM-DD.")
+
+
+def upsert_user_via_api() -> Optional[int]:
+    """Collect user information and send it to the modify endpoint."""
+    print("\nLet's capture some personal details.")
+    user_id_raw = input("Enter a numeric user ID to use (e.g., 1001): ").strip()
+    if not user_id_raw.isdigit():
+        print("User ID must be numeric. Aborting user creation.")
+        return None
+    user_id = int(user_id_raw)
+
+    first_name = input("First name: ").strip() or "User"
+    last_name = input("Last name: ").strip() or "Guest"
+    job_title = prompt_required("Job title (required): ").strip()
+    address = prompt_required("Address (required): ").strip()
+    employment_status = prompt_enum("Employment status options", EMPLOYMENT_OPTIONS)
+    education_level = prompt_enum("Education level options", EDUCATION_OPTIONS)
+    birthday = prompt_date("Birthday (YYYY-MM-DD, required): ")
+    gender = prompt_enum("Gender options", GENDER_OPTIONS)
+
+    sql = """
+        INSERT INTO users (
+            user_id, first_name, last_name, job_title, address,
+            employment_status, education_level, birthday, gender, created_at, updated_at
+        )
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, NOW(), NOW())
+        ON CONFLICT (user_id) DO UPDATE SET
+            first_name = EXCLUDED.first_name,
+            last_name = EXCLUDED.last_name,
+            job_title = EXCLUDED.job_title,
+            address = EXCLUDED.address,
+            employment_status = EXCLUDED.employment_status,
+            education_level = EXCLUDED.education_level,
+            birthday = EXCLUDED.birthday,
+            gender = EXCLUDED.gender,
+            updated_at = NOW();
+    """
+
+    payload = {
+        "query": sql,
+        "params": [
+            user_id,
+            first_name,
+            last_name,
+            job_title,
+            address,
+            employment_status,
+            education_level,
+            birthday,
+            gender,
+        ],
+    }
+
+    success, data = request_json("POST", "/database/execute/modify", json_body=payload)
+    if success and data and data.get("success"):
+        print(f"User {user_id} saved successfully.")
+        return user_id
+    print(f"Failed to save user: {data}")
+    return None
+
+
+def choose_user() -> Tuple[int, Optional[Dict]]:
+    choice = input(
+        "\nDo you want to (1) use an existing user or (2) create/update a user? [1/2]: "
+    ).strip() or "1"
+
+    if choice == "2":
+        user_id = upsert_user_via_api()
         if user_id:
-            payload["user_id"] = user_id
-        response = requests.post(
-            f"{API_BASE_URL}/personal_assistant/analyze",
-            json=payload
-        )
-        if response.status_code == 200:
-            data = response.json()
-            return data
-        else:
-            print(f"Error analyzing query: {response.json()}")
-            return None
-    except Exception as e:
-        print(f"Connection error: {e}")
-        return None
+            return user_id, get_user(user_id)
+        return 0, None
+
+    user_id_raw = input("Enter existing user ID: ").strip()
+    if user_id_raw.isdigit():
+        user_id = int(user_id_raw)
+        return user_id, get_user(user_id)
+
+    print("Invalid user ID. Falling back to default user 3.")
+    return 3, get_user(3)
 
 
-def get_messages(conversation_id):
-    """Get all messages from a conversation."""
-    try:
-        response = requests.get(
-            f"{API_BASE_URL}/database/messages",
-            params={"conversation_id": conversation_id}
-        )
-        if response.status_code == 200:
-            data = response.json()
-            return data
-        else:
-            print(f"Error fetching messages: {response.json()}")
-            return None
-    except Exception as e:
-        print(f"Connection error: {e}")
-        return None
-
-
-def main():
-    """Interactive conversation with PersonalAssistant via REST API."""
-    user_id = 3
-    user_name = "user"
-    
-    print("\n" + "="*80)
-    print(f"👋 Welcome {user_name}! Chat with PersonalAssistant (type 'exit' to quit)")
-    print("="*80 + "\n")
-    
-    # Start a new conversation
-    conversation_data = start_conversation(user_id=user_id, channel="web")
-    if not conversation_data:
-        print("Failed to start conversation. Make sure API is running at", API_BASE_URL)
+def display_data(payload: Dict) -> None:
+    data = payload.get("data")
+    if not data:
         return
-    
-    conversation_id = conversation_data.get("conversation_id")
-    print(f"✅ Conversation started (ID: {conversation_id})\n")
-    
+    if isinstance(data, list) and data:
+        df = pd.DataFrame(data)
+        print(f"\n{df.to_string(index=False)}")
+    elif isinstance(data, dict):
+        print(f"\nData: {json.dumps(data, indent=2)}")
+
+
+def conversation_loop(user_id: int, user_name: str) -> None:
+    conversation = start_conversation(user_id=user_id, channel="web")
+    if not conversation:
+        print("Failed to start conversation. Make sure the API is reachable.")
+        return
+
+    conversation_id = conversation.get("conversation_id")
+    print(f"Conversation started (ID: {conversation_id})\n")
+
     while True:
         user_input = input(f"\n{user_name}: ").strip()
-        
-        if user_input.lower() in ['exit', 'quit', 'bye']:
-            print(f"\n👋 Goodbye {user_name}!")
+        if user_input.lower() in {"exit", "quit", "bye"}:
+            print(f"\nGoodbye {user_name}!")
             break
-        
         if not user_input:
             continue
-        
-        # Send query to API
-        result = analyze_query(
-            query=user_input,
-            conversation_id=conversation_id,
-            user_id=user_id
-        )
-        
+
+        result = analyze_query(user_input, conversation_id, user_id)
         if not result:
             continue
-        
-        # Display response
+
         final_output = result.get("final_output", "")
-        data = result.get("data")
-        
-        print(f"\n🤖 Assistant: {final_output}")
-        
-        # Display data if available
-        if data:
-            if isinstance(data, list) and len(data) > 0:
-                df = pd.DataFrame(data)
-                print(f"\n{df.to_string(index=False)}")
-            elif isinstance(data, dict):
-                print(f"\nData: {json.dumps(data, indent=2)}")
-        
+        print(f"\nAssistant: {final_output}")
+        display_data(result)
         print(f"\n[Conversation ID: {conversation_id}]")
+
+
+def main() -> None:
+    print("\n" + "=" * 80)
+    print("Personal Assistant CLI")
+    print("=" * 80)
+    print(f"Connecting to API at: {API_BASE_URL}")
+
+    user_id, profile = choose_user()
+    if not user_id:
+        print("Unable to determine a valid user ID. Exiting.")
+        return
+
+    user_name = (
+        f"{profile.get('first_name', '')} {profile.get('last_name', '')}".strip()
+        if profile
+        else f"User {user_id}"
+    ) or f"User {user_id}"
+
+    print(f"\nWelcome {user_name}! (type 'exit' to quit)\n")
+    conversation_loop(user_id, user_name)
+
 
 if __name__ == "__main__":
     main()

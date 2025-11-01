@@ -17,6 +17,43 @@ router = Router()
 analyst_service = get_analyst_service()
 
 
+def _insert_chat_message(
+    cursor,
+    *,
+    conversation_id,
+    sender_type,
+    source_agent,
+    content,
+    content_type="text",
+    language="en",
+    created_at,
+):
+    """Insert a single chat message row."""
+    cursor.execute(
+        """
+            INSERT INTO chat_messages (
+                conversation_id,
+                sender_type,
+                source_agent,
+                content,
+                content_type,
+                language,
+                created_at
+            )
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+        """,
+        [
+            conversation_id,
+            sender_type,
+            source_agent,
+            content,
+            content_type,
+            language,
+            created_at,
+        ],
+    )
+
+
 def _store_messages_sync(conversation_id, user_query, assistant_output, data, agents_used=None):
     """Synchronous database operation to store messages."""
     if agents_used is None:
@@ -25,38 +62,39 @@ def _store_messages_sync(conversation_id, user_query, assistant_output, data, ag
     try:
         with connection.cursor() as cursor:
             now = datetime.now()
-            
-            # Store user message
-            cursor.execute("""
-                INSERT INTO chat_messages (conversation_id, sender_type, source_agent, content, content_type, language, created_at)
-                VALUES (%s, %s, %s, %s, %s, %s, %s)
-            """, [conversation_id, "user", "User", user_query, "text", "en", now])
-            
-            # Store agent messages if they were used
-            if agents_used == "behaviour_analyst":
-                cursor.execute("""
-                    INSERT INTO chat_messages (conversation_id, sender_type, source_agent, content, content_type, language, created_at)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s)
-                """, [conversation_id, "assistant", "BehaviourAnalyst", assistant_output, "text", "en", now])
-            elif agents_used == "database_agent":
-                # For database agent, store both the result data and response
-                cursor.execute("""
-                    INSERT INTO chat_messages (conversation_id, sender_type, source_agent, content, content_type, language, created_at)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s)
-                """, [conversation_id, "assistant", "DatabaseAgent", assistant_output, "text", "en", now])
-            else:
-                # General conversation
-                cursor.execute("""
-                    INSERT INTO chat_messages (conversation_id, sender_type, source_agent, content, content_type, language, created_at)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s)
-                """, [conversation_id, "assistant", "PersonalAssistant", assistant_output, "text", "en", now])
-            
-            # If data exists, store it as a separate message (original behavior for data persistence)
+            _insert_chat_message(
+                cursor,
+                conversation_id=conversation_id,
+                sender_type="user",
+                source_agent="User",
+                content=user_query,
+                created_at=now,
+            )
+
+            agent_source_map = {
+                "behaviour_analyst": "BehaviourAnalyst",
+                "database_agent": "DatabaseAgent",
+            }
+            source_agent = agent_source_map.get(agents_used, "PersonalAssistant")
+            _insert_chat_message(
+                cursor,
+                conversation_id=conversation_id,
+                sender_type="assistant",
+                source_agent=source_agent,
+                content=assistant_output,
+                created_at=now,
+            )
+
             if data:
-                cursor.execute("""
-                    INSERT INTO chat_messages (conversation_id, sender_type, source_agent, content, content_type, language, created_at)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s)
-                """, [conversation_id, "assistant", "DatabaseAgent", json.dumps(data), "json", "en", now])
+                _insert_chat_message(
+                    cursor,
+                    conversation_id=conversation_id,
+                    sender_type="assistant",
+                    source_agent="DatabaseAgent",
+                    content=json.dumps(data),
+                    content_type="json",
+                    created_at=now,
+                )
             
             # Update conversation last_message_at
             cursor.execute("""
@@ -111,29 +149,30 @@ async def analyze(request, payload: AnalysisRequestSchema):
         logger.info(f"Analyzing: {payload.query}")
         
         # Prepare metadata with conversation_id included
-        metadata = payload.metadata or {}
-        metadata["conversation_id"] = payload.conversation_id
-        metadata["user_id"] = payload.user_id
+        metadata = {
+            **(payload.metadata or {}),
+            "conversation_id": payload.conversation_id,
+            "user_id": payload.user_id,
+        }
         
-        result = await analyst_service.run_analysis(query=payload.query, filters=payload.filters, metadata=metadata)
+        result = await analyst_service.run_analysis(
+            query=payload.query,
+            filters=payload.filters,
+            metadata=metadata,
+        )
         
-        # Extract final_output, data, and agents_used from result
         final_output = result.get("final_output") or result.get("message") or ""
         data = result.get("data")
         agents_used = result.get("agents_used", "")
-        
-        # Get conversation_id
         conversation_id = payload.conversation_id
         
-        # Always store messages if conversation_id exists
         if conversation_id:
-            # Use sync_to_async to run database operations in thread pool
             await sync_to_async(_store_messages_sync)(
                 conversation_id=conversation_id,
                 user_query=payload.query,
                 assistant_output=final_output,
                 data=data,
-                agents_used=agents_used
+                agents_used=agents_used,
             )
         
         response = {"final_output": final_output}

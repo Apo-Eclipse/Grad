@@ -1,11 +1,42 @@
 import asyncio
-import httpx
-import os
-from typing import TypedDict
-from langgraph.graph import StateGraph, END, START
-from agents import DatabaseAgent
+from typing import TypedDict, List
 
-API_BASE_URL = "http://localhost:8000/api"
+from django.db import connection
+from langgraph.graph import StateGraph, END, START
+
+from agents import DatabaseAgent
+from api.personal_assistant_api.db_retrieval import dictfetchall
+
+
+def _prepare_select_sql(query: str, *, limit: int = 100) -> str:
+    cleaned = (query or "").strip()
+    upper = cleaned.upper()
+    if not upper.startswith(("SELECT", "WITH")):
+        raise ValueError("Only SELECT queries are allowed for data retrieval.")
+    if "LIMIT" not in upper:
+        cleaned = cleaned.rstrip(";") + f" LIMIT {limit}"
+    return cleaned
+
+
+def _execute_select_query(query: str) -> List[dict]:
+    normalized_query = _prepare_select_sql(query)
+    with connection.cursor() as cursor:
+        cursor.execute(normalized_query)
+        return dictfetchall(cursor)
+
+
+def _execute_modify_query(query: str) -> str:
+    cleaned = (query or "").strip()
+    upper = cleaned.upper()
+    if not upper.startswith(("INSERT", "UPDATE", "DELETE")):
+        raise ValueError(
+            "Only INSERT, UPDATE, or DELETE queries are allowed for modifications."
+        )
+    with connection.cursor() as cursor:
+        cursor.execute(cleaned)
+        rows_affected = cursor.rowcount
+    connection.commit()
+    return f"Write operation successful. Rows affected: {rows_affected}"
 
 
 class DatabaseAgentState(TypedDict):
@@ -25,44 +56,16 @@ async def execute_single_query(request: str, user_id: object) -> dict:
         query = out.query
         edit = out.edit
         if not edit:
-            # SELECT query
+            # SELECT query handled directly via Django connection
             try:
-                async with httpx.AsyncClient(timeout=10.0) as client:
-                    response = await client.post(
-                        f"{API_BASE_URL}/database/execute/select",
-                        json={"query": query, "params": []},
-                    )
-                    if response.status_code == 200:
-                        data = response.json()
-                        if data.get("success"):
-                            results = data.get("data", [])
-                        else:
-                            results = []
-                    else:
-                        results = []
-                
+                results = await asyncio.to_thread(_execute_select_query, query)
                 return {"step": request, "query": query, "data": results, "edit": False}
             except Exception as e:
-                print("Error during SELECT query execution:", str(e))  # Debug log for SELECT errors
-                return {"step": request, "query": query, "data": f"API Error: {str(e)}", "edit": False}
+                return {"step": request, "query": query, "data": f"Database error: {str(e)}", "edit": False}
         else:
-            # WRITE query (INSERT, UPDATE, DELETE)
             try:
-                async with httpx.AsyncClient(timeout=10) as client:
-                    response = await client.post(
-                        f"{API_BASE_URL}/database/execute/modify",
-                        json={"query": query, "params": []},
-                    )
-                    print("Database API response for WRITE query:", response.json())  # Debug log for WRITE response
-                    if response.status_code == 200:
-                        data = response.json()
-                        if data.get("success"):
-                            message = f"Write operation successful. Rows affected: {data.get('rows_affected', 0)}"
-                        else:
-                            message = f"Write operation failed: {data.get('error', 'Unknown error')}"
-                    else:
-                        message = f"API error: HTTP {response.status_code}"
-                
+                message = await asyncio.to_thread(_execute_modify_query, query)
+                return {"step": request, "query": query, "data": message, "edit": True}
             except Exception as e:
                 return {"step": request, "query": query, "data": f"Error Executing Edit Query: {str(e)}", "edit": True}
     
