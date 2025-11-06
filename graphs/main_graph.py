@@ -43,7 +43,7 @@ class OrchestratorState(TypedDict):
     agents_used: str  # Track which agent was called: 'database_agent', 'behaviour_analyst', etc.
 
 
-# Single PersonalAssistant instance (for single user/conversation)
+# Single PersonalAssistant instance (reused within a conversation)
 personal_assistant = None
 
 
@@ -55,14 +55,25 @@ def personal_assistant_orchestrator(state: OrchestratorState) -> dict:
     user_id = state.get("user_id", "default")
     user_name = state.get("user_name", "User")
     
-    # Create or reuse single PersonalAssistant instance
-    if personal_assistant is None:
+    needs_new_instance = (
+        personal_assistant is None
+        or personal_assistant.user_id != user_id
+        or personal_assistant.conversation_id != conversation_id
+    )
+
+    if needs_new_instance:
         personal_assistant = PersonalAssistant(
             user_id=user_id,
             conversation_id=conversation_id,
             user_name=user_name
         )
-    
+
+    # Refresh context for existing instance (user might have renamed, etc.)
+    personal_assistant.user_name = user_name
+    personal_assistant.user_id = user_id
+    personal_assistant.conversation_id = conversation_id
+    personal_assistant.conversation_memory.user_id = user_id
+
     personal_assistant.conversation_memory.retrieve_conversation(conversation_id)
 
     conversation_memory = personal_assistant.conversation_memory.get_context_summary()
@@ -131,13 +142,24 @@ async def database_agent_node(state: OrchestratorState) -> dict:
         "user_id": state.get("user_id"),
     }
     try:
-        result = await database_agent_super_agent.ainvoke(db_state)
+        result = await asyncio.wait_for(
+            database_agent_super_agent.ainvoke(db_state),
+            timeout=10.0
+        )
         agent_result = result.get("result", {})
         data = agent_result.get("data", [])
         edit = result.get("edit", False)
         return {
             "is_awaiting_data": not edit,
             "data": data,
+            "routing_decision": "database_agent",
+            "agents_used": "database_agent"
+        }
+    except asyncio.TimeoutError:
+        print(f"[Database Agent] Timeout after 10 seconds while handling request")
+        return {
+            "is_awaiting_data": False,
+            "data": [],
             "routing_decision": "database_agent",
             "agents_used": "database_agent"
         }
@@ -177,13 +199,23 @@ def personal_assistant_response(state: OrchestratorState) -> dict:
     user_id = state.get("user_id", "default")
     user_name = state.get("user_name", "User")
     
-    # Create or reuse single PersonalAssistant instance
-    if personal_assistant is None:
+    needs_new_instance = (
+        personal_assistant is None
+        or personal_assistant.user_id != user_id
+        or personal_assistant.conversation_id != conversation_id
+    )
+
+    if needs_new_instance:
         personal_assistant = PersonalAssistant(
             user_id=user_id,
             conversation_id=conversation_id,
             user_name=user_name
         )
+    else:
+        personal_assistant.user_name = user_name
+        personal_assistant.user_id = user_id
+        personal_assistant.conversation_id = conversation_id
+        personal_assistant.conversation_memory.user_id = user_id
     
     routing_decision = state.get("routing_decision", "personal_assistant")
     routing_message = state.get("routing_message", "")

@@ -296,7 +296,7 @@ def decision_for_validation(state: BehaviourAnalystState):
     """Return the next node's name based on a probabilistic decision:
     15% chance to return 'audit', otherwise 'pass'."""
     import random
-    if random.random() < 0.95:
+    if random.random() < 0.40:
         return "audit"
     return "pass"
 

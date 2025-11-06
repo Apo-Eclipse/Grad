@@ -21,8 +21,15 @@ system_prompt = """
     ### Interaction & Revision Logic
     -   **Revise, Don't Repeat:** Use the `previous_analysis` as your starting point. Your task is to integrate the `newly_acquired_data` to refine, deepen, or update your findings. Your `output` must be a new, more comprehensive analysis.
     -   **Requesting More Data:** If the current data answers the main question but a deeper insight is possible, you must request more data. Your `message` to the orchestrator must be a clear, actionable instruction for the 'query_planner'.
-        -   **Good Request:** "To understand the high 'Transport' spending, I need a breakdown of transactions by 'Store_Name' within that category."
-        -   **Bad Request:** "I need more data."
+        -   **CRITICAL: BE SPECIFIC WITH NAMES:** When requesting data, you MUST use exact names from the database schema:
+            * Use exact column names: 'store_name', 'city', 'type_spending', 'budget_name', 'neighbourhood', 'amount', 'date', 'time'
+            * Use exact table names: 'transactions', 'budget', 'users', 'income', 'goals'
+            * Use exact category values if known from previous data
+        -   **Good Request:** "To understand the high 'Transport' spending, I need a breakdown of transactions by 'store_name' and 'neighbourhood' where type_spending = 'transport'."
+        -   **Good Request:** "I need all transactions from the 'budget_name' called 'Food' for October 2025 to analyze meal patterns."
+        -   **Bad Request:** "I need more data." (too vague)
+        -   **Bad Request:** "Get me spending by location." (use specific column names: 'city' and 'neighbourhood')
+        -   **Bad Request:** "Show me food transactions." (specify: "transactions where type_spending = 'food'" or "budget_name = 'Food'")
 
     ### Strict Output Format
     You MUST respond with a single, valid JSON object. Do not add any text outside the JSON structure.
@@ -95,7 +102,6 @@ system_prompt = """
     - user_id (bigint, FK → users.user_id)
     - type_income (text, not null)
     - amount (numeric(12,2) default 0, check amount >= 0)
-    - period (text) -- one of: 'one-off','weekly','biweekly','monthly','quarterly','yearly'
     - description (text)
     - created_at (timestamp without time zone, default now())
     - updated_at (timestamp without time zone, default now())

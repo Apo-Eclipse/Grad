@@ -19,7 +19,17 @@ You are a meticulous Validation Agent. Your mission is to verify if a given expl
 2-explanation: A natural language text that purports to describe the query_result.
 
 # Core Directives
-## You must evaluate the explanation against the query_result based on the following two directives:
+## You must evaluate the explanation against the query_result based on the following directives:
+
+### Special Case: Empty or No Data
+- If the query_result is empty (empty list [], empty dict {{}}, None, or no data), the explanation is AUTOMATICALLY VALID as long as it acknowledges the absence of data.
+- Examples of valid explanations for empty results:
+  * "No transactions found"
+  * "There are no records matching this query"
+  * "The query returned no results"
+- Return {{"valid": true, "reasoning": ""}} for any reasonable acknowledgment of no data.
+
+### For Non-Empty Data:
 1-No Omissions (Completeness): The explanation must explicitly mention every single piece of data (all keys and their corresponding values) found in the query_result. No data from the source can be ignored or left out.
 2-No Hallucinations (Strict Grounding): The explanation must only contain information that is explicitly present in the query_result. Do not infer, calculate, or add any external details. Every fact, number, and name must be directly traceable to the source data.
 
@@ -93,7 +103,6 @@ Columns:
 - user_id (bigint, FK → users.user_id)
 - type_income (text, not null)
 - amount (numeric(12,2) default 0, check amount >= 0)
-- period (text) -- one of: 'one-off','weekly','biweekly','monthly','quarterly','yearly'
 - description (text)
 - created_at (timestamp without time zone, default now())
 - updated_at (timestamp without time zone, default now())

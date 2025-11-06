@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import os
 from datetime import datetime
-from typing import Dict, Iterable, Optional, Tuple
+from typing import Dict, Optional, Tuple
 
 import pandas as pd
 import requests
@@ -11,7 +11,9 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-API_BASE_URL = os.getenv("API_BASE_URL", "https://grad-pth6g.ondigitalocean.app/api").rstrip("/")
+DEFAULT_REMOTE_API = "https://grad-pth6g.ondigitalocean.app/api".rstrip("/")
+ENV_API_BASE = os.getenv("API_BASE_URL")
+API_BASE_URL = "http://127.0.0.1:8000/api"  
 
 EMPLOYMENT_OPTIONS: Dict[str, str] = {
     "1": "Employed Full-time",
@@ -70,6 +72,24 @@ def request_json(
         detail = response.text
     print(f"Error calling {path}: {detail}")
     return False, None
+
+
+def detect_api_base_url() -> str:
+    """Try local endpoints before falling back to the hosted API."""
+    candidates = []
+    for candidate in (ENV_API_BASE, "http://127.0.0.1:8000/api", "http://localhost:8000/api", DEFAULT_REMOTE_API):
+        if candidate and candidate not in candidates:
+            candidates.append(candidate.rstrip("/"))
+
+    for base in candidates:
+        health_url = f"{base}/personal_assistant/health"
+        try:
+            resp = requests.get(health_url, timeout=3)
+            if resp.status_code == 200:
+                return base
+        except requests.RequestException:
+            continue
+    return DEFAULT_REMOTE_API
 
 
 def start_conversation(user_id: int, channel: str = "web") -> Optional[Dict]:
@@ -245,10 +265,14 @@ def conversation_loop(user_id: int, user_name: str) -> None:
 
 
 def main() -> None:
+    global API_BASE_URL
+    API_BASE_URL = detect_api_base_url()
+    source_note = "detected locally" if API_BASE_URL.startswith("http://127.0.0.1") or API_BASE_URL.startswith("http://localhost") else "using configured/remote endpoint"
+
     print("\n" + "=" * 80)
     print("Personal Assistant CLI")
     print("=" * 80)
-    print(f"Connecting to API at: {API_BASE_URL}")
+    print(f"Connecting to API at: {API_BASE_URL} ({source_note})")
 
     user_id, profile = choose_user()
     if not user_id:

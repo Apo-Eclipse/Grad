@@ -68,7 +68,6 @@ TABLE: income
   - user_id (bigint, FK -> users.user_id)
   - type_income (text, not null)
   - amount (numeric(12,2), default 0, CHECK amount >= 0)
-  - period (text: one-off|weekly|biweekly|monthly|quarterly|yearly)
   - description (text)
   - created_at (timestamp without time zone)
   - updated_at (timestamp without time zone)

@@ -13,14 +13,34 @@ import httpx
 
 
 def _resolve_api_base_url() -> str:
-    """Resolve API base URL using environment variables or internal defaults."""
-    port = (
-        os.getenv("PORT")
-        or os.getenv("APP_PORT")
-        or os.getenv("DEFAULT_PORT")
-        or "8080"
-    )
-    return f"http://127.0.0.1:{port}/api".rstrip("/")
+    """Resolve API base URL by probing local hosts before falling back."""
+    explicit = os.getenv("API_BASE_URL")
+    if explicit:
+        return explicit.rstrip("/")
+
+    configured_port = os.getenv("APP_PORT") or os.getenv("PORT") or os.getenv("DEFAULT_PORT")
+    if configured_port:
+        return f"http://127.0.0.1:{configured_port}/api".rstrip("/")
+
+    ports = ["8000", "8080"]
+    candidates = []
+    for port in ports:
+        if not port:
+            continue
+        for host in ("127.0.0.1", "localhost"):
+            candidate = f"http://{host}:{port}/api".rstrip("/")
+            if candidate not in candidates:
+                candidates.append(candidate)
+
+    for candidate in candidates:
+        try:
+            resp = httpx.get(f"{candidate}/personal_assistant/health", timeout=2.0)
+            if resp.status_code == 200:
+                return candidate
+        except httpx.HTTPError:
+            continue
+
+    return "http://127.0.0.1:8000/api"
 
 @dataclass
 class ConversationTurn:
@@ -48,7 +68,7 @@ class ConversationMemory:
     Uses REST API endpoints for storing messages in PostgreSQL.
     """
 
-    API_BASE_URL = os.getenv("API_BASE_URL", _resolve_api_base_url())
+    API_BASE_URL = _resolve_api_base_url()
 
     def __init__(
         self,

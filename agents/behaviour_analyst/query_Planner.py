@@ -49,7 +49,7 @@ Inputs provided to you:
 Available schema (key fields only; PostgreSQL 18, schema public):
 - transactions(transaction_id, date, amount, time, store_name, city, neighbourhood, type_spending, user_id, budget_id, created_at)
 - budget(budget_id, user_id, budget_name, description, total_limit, priority_level_int, is_active, created_at, updated_at)
-- income(income_id, user_id, type_income, amount, period, description, created_at, updated_at)
+- income(income_id, user_id, type_income, amount, description, created_at, updated_at)
 - goals(goal_id, goal_name, description, target, user_id, start_date, due_date, status, created_at, updated_at)
 - users(user_id, first_name, last_name, ...)
 
