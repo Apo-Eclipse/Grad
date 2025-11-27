@@ -64,9 +64,9 @@ user_prompt = """
 Request: {request}
 User ID: {user}
 
-Completed Steps: {steps}
+last steps generated: {steps}
 
-Orchestrator context: {message}
+Orchestrator request: {message}
 """
 
 prompt = ChatPromptTemplate.from_messages([

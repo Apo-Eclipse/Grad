@@ -4,7 +4,8 @@ outdata/
 data/
 .env
 .github/
-# Ignore Python cache directories
 __pycache__/
 **/__pycache__/
 .dockerignore
+goal_main.py
+main.py

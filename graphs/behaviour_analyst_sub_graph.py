@@ -52,18 +52,18 @@ def orchestrator(state: BehaviourAnalystState) -> dict:
     message = state.get("message", [])
     
     print("===> (Node) Orchestrator Invoked <===")
-    
-    print("request:", state.get("request", ""))
     Output = Behaviour_analyser_orchestrator.invoke({
         "request": state.get("request", ""),
         "analysis": state.get("analysis", ""),
         "message": message,
         "data_acquired": state.get("data_acquired", []),
         "sender": state.get("sender", ""),
-        "user_id": state.get("user_id", "")
+        "user_id": state.get("user_id", ""),
+        "steps": state.get("steps", [])
     })
     next_step = Output.next_step
     message = Output.message
+    print(f"Orchestrator message to {next_step}: {message}")
     return {"message": message, "sender": "orchestrator", "next_step": next_step, "user_id": state.get("user_id", "")}
 
 def query_planner(state: BehaviourAnalystState) -> dict:

@@ -103,3 +103,19 @@ class IncomeCreateSchema(BaseModel):
     type_income: str
     amount: Decimal
     description: Optional[str] = None
+
+
+class GoalMakerRequestSchema(BaseModel):
+    user_id: int
+    user_request: str
+    conversation_id: Optional[int] = None
+
+
+class GoalMakerResponseSchema(BaseModel):
+    conversation_id: int
+    message: str
+    goal_name: Optional[str] = None
+    target: Optional[float] = None
+    goal_description: Optional[str] = None
+    due_date: Optional[str] = None
+    is_done: bool = False

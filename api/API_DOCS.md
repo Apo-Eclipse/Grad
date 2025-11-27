@@ -24,6 +24,8 @@
   - Conversation endpoints: start session, analyze query, health.
   - `_insert_chat_message` centralizes `chat_messages` inserts.
   - `_store_messages_sync` records user/assistant messages and optional JSON data; updates `chat_conversations.last_message_at`.
+  - `_get_user_summary` and `_get_conversation_summary` build goal-aware context (profile, income, goals, and recent spending patterns) for specialized agents.
+  - Goal Maker endpoint `/api/personal_assistant/goals/assist` provides a structured goal-setting conversation with per-conversation memory.
 - `api/personal_assistant_api/services.py`
   - `PersonalAssistantService` lazily loads `graphs.main_graph.main_orchestrator_graph`.
   - `run_analysis` handles async (`ainvoke`) and sync (`invoke` in executor) orchestrators and normalizes results.
@@ -49,6 +51,7 @@
   - POST `/api/personal_assistant/conversations/start` - start a session
   - POST `/api/personal_assistant/analyze` - run analysis and persist messages
   - GET  `/api/personal_assistant/health` - health check
+  - POST `/api/personal_assistant/goals/assist` - structured goal-making conversation with memory
 - Database
   - GET  `/api/database/transactions?user_id=&start_date=&end_date=&limit=` - retrieve transactions
   - POST `/api/database/transactions` - create new transaction
@@ -78,6 +81,72 @@
 ---
 
 ## Detailed Endpoint Documentation
+
+### Personal Assistant / Goal Maker Endpoint
+
+#### POST /api/personal_assistant/goals/assist
+Continue a goal-focused conversation for a specific user using the Goal Maker agent. Conversations are persisted in `chat_conversations` and `chat_messages`, so the agent has memory of previous turns.
+
+**Request Body:**
+```json
+{
+  "user_id": 3,
+  "user_request": "I want to start saving for a car",
+  "conversation_id": 42
+}
+```
+
+**Field Notes:**
+- `user_id` (int, required): ID of the user for whom the goal is being defined.
+- `user_request` (string, required): The latest message from the user about their goal (question, constraint, clarification, etc.).
+- `conversation_id` (int, required): Existing conversation identifier created via `POST /api/personal_assistant/conversations/start` (use `channel='goal_maker'`).
+
+**Behavior & Memory:**
+- The client must first call `POST /api/personal_assistant/conversations/start` with `channel='goal_maker'` to obtain a `conversation_id`.
+- For each call, the same `conversation_id` is passed so the service can load recent `chat_messages` and build `last_conversation` context.
+- `_get_user_summary` enriches the agent's context with:
+  - Basic profile (name, job_title, employment_status, education_level, address, birthday).
+  - Aggregated income (`SUM(amount)` from `income`).
+  - **All active goals** with complete details (goal_name, description, target, start_date, due_date).
+  - Recent spending patterns (last 90 days): total spend, top 3 categories, top 3 stores, and main spending area (city/neighbourhood).
+- Every call persists:
+  - The user message (`sender_type='user'`, `source_agent='User'`).
+  - The Goal Maker reply (`sender_type='assistant'`, `source_agent='GoalMaker'`).
+  - An optional JSON message containing `{goal_name, target, goal_description, due_date, is_done}` when the agent proposes or finalizes a goal.
+
+**Goal completion marker (`is_done`):**
+- `is_done` is `false` while the goal is still being clarified or the user has not explicitly confirmed they are satisfied with the plan (amount and timeline).
+- When the goal is fully specified and the user clearly confirms they are happy with it, the Goal Maker sets `is_done` to `true`.
+
+**Response (200 OK):**
+```json
+{
+  "conversation_id": 42,
+  "message": "Great, let's set this up. How much would you like to save in total for your car?",
+  "goal_name": "New Car",
+  "target": null,
+  "goal_description": "Saving to buy a new car",
+  "due_date": null,
+  "is_done": false
+}
+```
+
+**Error Responses:**
+```json
+{
+  "error": "INVALID_REQUEST",
+  "message": "user_request cannot be empty",
+  "timestamp": "2024-11-04T09:30:00"
+}
+```
+
+```json
+{
+  "error": "GOAL_MAKER_ERROR",
+  "message": "Failed to create or resolve conversation",
+  "timestamp": "2024-11-04T09:31:00"
+}
+```
 
 ### Transaction Endpoints
 

@@ -11,8 +11,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-DEFAULT_REMOTE_API = "https://grad-pth6g.ondigitalocean.app/api".rstrip("/")
-ENV_API_BASE = os.getenv("API_BASE_URL")
+# Local API only - no remote fallback
 API_BASE_URL = "http://127.0.0.1:8000/api"  
 
 EMPLOYMENT_OPTIONS: Dict[str, str] = {
@@ -42,7 +41,7 @@ def request_json(
     *,
     params: Optional[Dict] = None,
     json_body: Optional[Dict] = None,
-    timeout: int = 30,
+    timeout: int = 300,
 ) -> Tuple[bool, Optional[Dict]]:
     """Send an HTTP request and return (success, json_payload)."""
     url = f"{API_BASE_URL}{path}"
@@ -75,21 +74,20 @@ def request_json(
 
 
 def detect_api_base_url() -> str:
-    """Try local endpoints before falling back to the hosted API."""
-    candidates = []
-    for candidate in (ENV_API_BASE, "http://127.0.0.1:8000/api", "http://localhost:8000/api", DEFAULT_REMOTE_API):
-        if candidate and candidate not in candidates:
-            candidates.append(candidate.rstrip("/"))
+    """Try local endpoints only (8000 and 8080)."""
+    candidates = ["http://127.0.0.1:8000/api", "http://localhost:8000/api", "http://127.0.0.1:8080/api", "http://localhost:8080/api"]
 
     for base in candidates:
         health_url = f"{base}/personal_assistant/health"
         try:
-            resp = requests.get(health_url, timeout=3)
+            resp = requests.get(health_url, timeout=10)
             if resp.status_code == 200:
                 return base
         except requests.RequestException:
             continue
-    return DEFAULT_REMOTE_API
+    
+    # Default to local port 8000
+    return "http://127.0.0.1:8000/api"
 
 
 def start_conversation(user_id: int, channel: str = "web") -> Optional[Dict]:

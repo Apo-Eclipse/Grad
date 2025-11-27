@@ -144,7 +144,7 @@ async def database_agent_node(state: OrchestratorState) -> dict:
     try:
         result = await asyncio.wait_for(
             database_agent_super_agent.ainvoke(db_state),
-            timeout=10.0
+            timeout=20.0
         )
         agent_result = result.get("result", {})
         data = agent_result.get("data", [])
