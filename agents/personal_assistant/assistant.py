@@ -7,10 +7,10 @@ conversation memory and LLM interaction only.
 """
 
 from typing import Dict, Any, Optional
+from datetime import datetime
 from langchain_core.prompts import ChatPromptTemplate
 from LLMs.azure_models import azure_llm
-from .memory_manager import ConversationMemory, UserProfile
-from datetime import datetime
+from .memory_manager import UserProfile
 
 
 class PersonalAssistant:
@@ -21,18 +21,12 @@ class PersonalAssistant:
 
         Args:
             user_id: Unique identifier for the user
-            conversation_id: The ID of the conversation to load
+            conversation_id: The ID of the conversation
             user_name: Human-readable name of the user
         """
         self.user_id = user_id
         self.user_name = user_name
         self.conversation_id = conversation_id
-
-        # Initialize memory storage
-        self.conversation_memory = ConversationMemory(user_id=user_id)
-        
-        # Retrieve the conversation
-        self.conversation_memory.retrieve_conversation(conversation_id)
 
         # Initialize user profile
         self.user_profile = UserProfile(
@@ -56,24 +50,18 @@ class PersonalAssistant:
         - Use the user's name ({user_name}) occasionally to create a personal touch.
         """
 
-    def invoke(self, user_message: str, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def invoke(self, user_message: str, conversation_history: str, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
         Process a user message and generate a response.
 
         Args:
             user_message: The user's input message
+            conversation_history: The conversation history summary string
             context: Optional additional context (may include agent_result, routing_decision)
 
         Returns:
             Dictionary with response and metadata
         """
-        
-        # Refresh conversation history from the database before each invoke
-        # This ensures we have the latest messages from previous interactions
-        self.conversation_memory.retrieve_conversation(self.conversation_id)
-        
-        # get conversation history summary "last 5 turns"
-        history_summary = self.conversation_memory.get_context_summary()
         
         # Check if we have analysis/data context to reflect on
         analysis_summary = context.get("analysis", "") if context else ""
@@ -123,7 +111,7 @@ class PersonalAssistant:
             
             formatted_prompt = prompt_template.format_prompt(
                 user_name=self.user_name,
-                context_summary=history_summary,
+                context_summary=conversation_history,
                 user_message=user_message
             )
             
@@ -140,26 +128,3 @@ class PersonalAssistant:
             "timestamp": datetime.now().isoformat(),
             "memory_updated": True
         }
-
-    def get_memory_summary(self) -> Dict[str, Any]:
-        """Get a summary of the conversation memory and user profile."""
-        stats = self.conversation_memory.get_statistics()
-        return {
-            "user_id": self.user_id,
-            "user_name": self.user_name,
-            "conversation_stats": stats,
-            "total_conversations": self.user_profile.conversation_count,
-            "last_interaction": self.user_profile.last_interaction
-        }
-
-    def get_conversation_history(self, limit: int = 10) -> str:
-        """
-        Get formatted conversation history.
-
-        Args:
-            limit: Maximum number of turns to retrieve
-
-        Returns:
-            Formatted conversation history string
-        """
-        return self.conversation_memory.get_full_history()

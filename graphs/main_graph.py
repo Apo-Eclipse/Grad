@@ -15,6 +15,7 @@ from pydantic import BaseModel, Field
 from graphs.database_sub_graph import database_agent_super_agent
 from graphs.behaviour_analyst_sub_graph import behaviour_analyst_super_agent
 from agents.personal_assistant import PersonalAssistant
+from agents.personal_assistant.memory_manager import ConversationMemory
 from LLMs.azure_models import gpt_oss_llm
 
 
@@ -43,46 +44,23 @@ class OrchestratorState(TypedDict):
     agents_used: str  # Track which agent was called: 'database_agent', 'behaviour_analyst', etc.
 
 
-# Single PersonalAssistant instance (reused within a conversation)
-personal_assistant = None
-
-
 def personal_assistant_orchestrator(state: OrchestratorState) -> dict:
     """PersonalAssistant uses LLM to decide routing and generate message."""
-    global personal_assistant
     
     conversation_id = state.get("conversation_id", "")
     user_id = state.get("user_id", "default")
     user_name = state.get("user_name", "User")
     
-    needs_new_instance = (
-        personal_assistant is None
-        or personal_assistant.user_id != user_id
-        or personal_assistant.conversation_id != conversation_id
-    )
-
-    if needs_new_instance:
-        personal_assistant = PersonalAssistant(
-            user_id=user_id,
-            conversation_id=conversation_id,
-            user_name=user_name
-        )
-
-    # Refresh context for existing instance (user might have renamed, etc.)
-    personal_assistant.user_name = user_name
-    personal_assistant.user_id = user_id
-    personal_assistant.conversation_id = conversation_id
-    personal_assistant.conversation_memory.user_id = user_id
-
-    personal_assistant.conversation_memory.retrieve_conversation(conversation_id)
-
-    conversation_memory = personal_assistant.conversation_memory.get_context_summary()
+    # 1. Fetch Memory Externally (Stateless Pattern)
+    memory = ConversationMemory(user_id=user_id, conversation_id=conversation_id)
+    memory.retrieve_conversation(conversation_id)
+    conversation_memory_str = memory.get_context_summary()
     
     user_message = state.get("user_message", "")
     
     # System prompt for routing decision
     system_prompt = f"""
-    last conversations : {conversation_memory}
+    last conversations : {conversation_memory_str}
     
     
     You are a Personal Assistant's routing system. Your job is to:
@@ -193,29 +171,22 @@ async def behaviour_analyst_node(state: OrchestratorState) -> dict:
 
 def personal_assistant_response(state: OrchestratorState) -> dict:
     """PersonalAssistant generates final response using memory and context."""
-    global personal_assistant
     
     conversation_id = state.get("conversation_id", "")
     user_id = state.get("user_id", "default")
     user_name = state.get("user_name", "User")
     
-    needs_new_instance = (
-        personal_assistant is None
-        or personal_assistant.user_id != user_id
-        or personal_assistant.conversation_id != conversation_id
+    # 1. Fetch Memory Externally
+    memory = ConversationMemory(user_id=user_id, conversation_id=conversation_id)
+    memory.retrieve_conversation(conversation_id)
+    conversation_memory_str = memory.get_context_summary()
+    
+    # 2. Instantiate Stateless Assistant
+    personal_assistant = PersonalAssistant(
+        user_id=user_id,
+        conversation_id=conversation_id,
+        user_name=user_name
     )
-
-    if needs_new_instance:
-        personal_assistant = PersonalAssistant(
-            user_id=user_id,
-            conversation_id=conversation_id,
-            user_name=user_name
-        )
-    else:
-        personal_assistant.user_name = user_name
-        personal_assistant.user_id = user_id
-        personal_assistant.conversation_id = conversation_id
-        personal_assistant.conversation_memory.user_id = user_id
     
     routing_decision = state.get("routing_decision", "personal_assistant")
     routing_message = state.get("routing_message", "")
@@ -225,7 +196,7 @@ def personal_assistant_response(state: OrchestratorState) -> dict:
     if routing_decision == "database_agent":
         if is_awaiting_data:
             confirmation_prompt = f"The user ({state.get('user_name','User')}) asked: {state.get('user_message')}. Give a very brief one-sentence confirmation that you're showing them the results."
-            confirmation = personal_assistant.invoke(confirmation_prompt, context={
+            confirmation = personal_assistant.invoke(confirmation_prompt, conversation_history=conversation_memory_str, context={
                                                         "routing_decision": routing_decision,
                                                         "routing_message": routing_message
                                                     })
@@ -236,7 +207,7 @@ def personal_assistant_response(state: OrchestratorState) -> dict:
                 "agents_used": agents_used  # Preserve agents_used
             }
         confirmation_prompt = f"The user ({state.get('user_name','User')}) asked: {state.get('user_message')}. Give a very brief one-sentence confirmation."
-        confirmation = personal_assistant.invoke(confirmation_prompt, context={
+        confirmation = personal_assistant.invoke(confirmation_prompt, conversation_history=conversation_memory_str, context={
             "routing_decision": routing_decision,
             "routing_message": routing_message
         })
@@ -254,7 +225,7 @@ def personal_assistant_response(state: OrchestratorState) -> dict:
             "routing_message": routing_message,
             "type": state.get("user_message")
         }    
-        response = personal_assistant.invoke(state.get("user_message",""), context=context).get("response","no response")
+        response = personal_assistant.invoke(state.get("user_message",""), conversation_history=conversation_memory_str, context=context).get("response","no response")
         return {
             "final_output": response,
             "data": [],
@@ -268,7 +239,7 @@ def personal_assistant_response(state: OrchestratorState) -> dict:
             "type": state.get("user_message")
     }
     
-    response = personal_assistant.invoke(state.get("user_message",""), context=context)
+    response = personal_assistant.invoke(state.get("user_message",""), conversation_history=conversation_memory_str, context=context)
     return {
         "final_output": response.get("response","no response"),
         "data": [],
