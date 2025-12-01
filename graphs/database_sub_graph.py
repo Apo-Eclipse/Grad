@@ -57,17 +57,27 @@ async def execute_single_query(request: str, user_id: object) -> dict:
         out = await asyncio.to_thread(DatabaseAgent.invoke, {"request": request, "user_id": user_id})
         query = out.query
         edit = out.edit
+        message = getattr(out, "message", "")
+
+        # If no query is generated (e.g., validation error), return the message
+        if not query:
+            return {"step": request, "query": None, "data": message, "edit": False}
+
         if not edit:
             # SELECT query handled directly via Django connection
             try:
                 results = await asyncio.to_thread(_execute_select_query, query)
-                return {"step": request, "query": query, "data": results, "edit": False}
+                # Append confirmation message if available
+                final_data = results
+                return {"step": request, "query": query, "data": final_data, "edit": False, "message": message}
             except Exception as e:
                 return {"step": request, "query": query, "data": f"Database error: {str(e)}", "edit": False}
         else:
             try:
-                message = await asyncio.to_thread(_execute_modify_query, query)
-                return {"step": request, "query": query, "data": message, "edit": True}
+                db_message = await asyncio.to_thread(_execute_modify_query, query)
+                # Combine DB result with Agent message
+                final_message = f"{message}\n{db_message}" if message else db_message
+                return {"step": request, "query": query, "data": final_message, "edit": True}
             except Exception as e:
                 return {"step": request, "query": query, "data": f"Error Executing Edit Query: {str(e)}", "edit": True}
     

@@ -25,6 +25,8 @@ class RoutingDecision(BaseModel):
     message: str = Field(..., description="Message to send to the user about this routing decision")
 
 
+from api.personal_assistant_api.db_retrieval import fetch_active_budgets
+
 class OrchestratorState(TypedDict):
     """State for the orchestrator graph."""
     user_id: str
@@ -51,6 +53,16 @@ def personal_assistant_orchestrator(state: OrchestratorState) -> dict:
     user_id = state.get("user_id", "default")
     user_name = state.get("user_name", "User")
     
+    # Fetch active budgets directly
+    try:
+        budgets = fetch_active_budgets(int(user_id)) if str(user_id).isdigit() else []
+        if budgets:
+            available_budgets = ", ".join([f"{b['budget_name']} (ID: {b['budget_id']})" for b in budgets])
+        else:
+            available_budgets = "No active budgets found."
+    except Exception:
+        available_budgets = "Error fetching budgets."
+    
     # 1. Fetch Memory Externally (Stateless Pattern)
     memory = ConversationMemory(user_id=user_id, conversation_id=conversation_id)
     memory.retrieve_conversation(conversation_id)
@@ -62,16 +74,28 @@ def personal_assistant_orchestrator(state: OrchestratorState) -> dict:
     system_prompt = f"""
     last conversations : {conversation_memory_str}
     
+    Available Budgets: {available_budgets}
     
     You are a Personal Assistant's routing system. Your job is to:
     1. Analyze the user's request
     2. Decide which agent should handle it:
         - "database_agent": For queries about transactions, spending, budget, income, account data, balance, history
         - "behaviour_analyst": For requests about analysis, trends, recommendations, insights, patterns, comparisons
-        - "personal_assistant": For general chat that doesn't need any agent
+        - "personal_assistant": For general chat that doesn't need any agent OR if data is missing for a transaction.
     3. Generate a message telling the agent/assistant what to do, the message should be clear and specific and.
     4. If the user request is related to the memory or previous conversations, when generating the message, you must include relevant context from the conversation history to help the agent understand the user's needs better.
     
+    CRITICAL RULE FOR ADDING TRANSACTIONS:
+    - If the user wants to ADD a transaction, you MUST check if they provided:
+      a) The Amount
+      b) The Category (which must match one of the 'Available Budgets' above)
+    - IF ANY of these are missing or the category is ambiguous/invalid:
+      - Route to "personal_assistant"
+      - Message: "Ask the user to provide the missing [Amount/Category]. List the available budgets if the category was invalid."
+    - ONLY route to "database_agent" if both Amount and a Valid Category are present.
+    - **IMPORTANT**: When routing to "database_agent", you MUST resolve the category name to its 'ID' from the Available Budgets list. Include the 'budget_id' explicitly in the message.
+      - Example: "Add transaction of 50 for Food (budget_id 1)..."
+
     For example:
     
     Assistant: The most recent analysis you requested was about your budget category "Dining Out" for last month.

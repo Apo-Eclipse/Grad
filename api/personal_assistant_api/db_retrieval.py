@@ -323,9 +323,8 @@ def search_transactions(
 
 
 # ============ BUDGET ============
-@db_router.get("budget", response=List[Dict[str, Any]])
-def get_budgets(request, user_id: int = Query(...)):
-    """Retrieve active user budgets only."""
+def fetch_active_budgets(user_id: int) -> List[Dict[str, Any]]:
+    """Retrieve active user budgets (reusable function)."""
     query = """
         SELECT
             budget_id,
@@ -342,6 +341,12 @@ def get_budgets(request, user_id: int = Query(...)):
         ORDER BY priority_level_int ASC, budget_name
     """
     return _run_select(query, [user_id], log_name="budgets")
+
+
+@db_router.get("budget", response=List[Dict[str, Any]])
+def get_budgets(request, user_id: int = Query(...)):
+    """Retrieve active user budgets only."""
+    return fetch_active_budgets(user_id)
 
 
 @db_router.post("budget", response=Dict[str, Any])

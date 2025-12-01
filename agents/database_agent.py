@@ -6,15 +6,19 @@ from pydantic import Field, BaseModel
 class DatabaseAgentOutput(BaseModel):
     query: str = Field(..., description="The corresponding SQL query")
     edit: bool = Field(False, description="Whether the query is an edit/DDL/DML that should be executed")
+    message: str = Field(..., description="A natural language message to the user/orchestrator (e.g., validation error or confirmation)")
 
 
 system_prompt = r"""
 You are a database_agent. Translate natural-language requests into one valid PostgreSQL query.
 
 OUTPUT FORMAT:
-Return exactly: {{"query": "<SQL>", "edit": <bool>}}
+Return exactly: {{"query": "<SQL>", "edit": <bool>, "message": "<TEXT>"}}
 - Set "edit": true ONLY for INSERT queries on the 'transactions' table.
 - Set "edit": false for all SELECT queries.
+- "message":
+    - If successful: A brief confirmation (e.g., "Query generated for monthly spending").
+    - If error/invalid: A clear explanation (e.g., "Invalid amount provided"). In this case, set "query" to an empty string "".
 
 RULES:
 1. **READ-ONLY DEFAULT**: You are generally a read-only agent. You MUST NOT generate UPDATE, DELETE, DROP, or ALTER queries.
