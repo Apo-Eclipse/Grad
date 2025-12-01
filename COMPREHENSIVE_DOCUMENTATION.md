@@ -158,6 +158,18 @@ flowchart TD
     *   **Scrapper**: Extracts meaningful content from web pages.
     *   **News Finder**: Searches for relevant financial news articles.
 
+#### 2.3.8 Goal Maker Agent (Standalone)
+*   **Role**: A specialized, standalone agent dedicated to helping users define and refine their financial goals.
+*   **Independence**: Unlike the other agents, the Goal Maker operates outside the main Personal Assistant graph. It is accessed via a dedicated API endpoint (`/api/goals/assist`).
+*   **Function**: It engages in a focused dialogue to turn vague aspirations (e.g., "I want to save money") into SMART goals (Specific, Measurable, Achievable, Relevant, Time-bound) and persists them to the `goals` table.
+
+```mermaid
+graph LR
+    User([User]) -->|Goal Request| GM[Goal Maker Agent]
+    GM -->|Refinement Loop| User
+    GM -->|Save Goal| DB[(Database)]
+```
+
 ---
 
 ## 3. Technical Implementation

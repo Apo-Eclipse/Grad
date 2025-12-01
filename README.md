@@ -33,6 +33,9 @@ graph TD
     DBAgent --> Chat
     Analyst --> Chat
     Chat --> Final[Response]
+    
+    User2[User Goal Request] --> GoalMaker[Goal Maker Agent]
+    GoalMaker --> DB[(Database)]
 ```
 
 ## 💻 Tech Stack
