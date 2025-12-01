@@ -43,6 +43,9 @@ graph TD
 
     User3[User Budget Request] --> BudgetMaker[Budget Maker Agent]
     BudgetMaker --> DB
+
+    User4[User Transaction Request] --> TransactionMaker[Transaction Maker Agent]
+    TransactionMaker --> DB
 ```
 
 ## 💻 Tech Stack

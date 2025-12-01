@@ -162,18 +162,6 @@ flowchart TD
     Step2 -- Yes --> QP[Query Planner]
     Step2 -- No --> Step3{3. Quality/Insights OK?}
     Step3 -- No --> Analyser
-    Step3 -- Yes --> Step4{4. Task Complete?}
-    Step4 -- Yes --> End([End])
-    Step4 -- No --> Analyser
-```
-
-#### 2.3.5 Transaction Management
-Transaction addition is no longer handled by the main router or the Database Agent. Instead, it is offloaded to the **Transaction Maker Agent** (Section 4.7) to ensure structured data entry, validation against active budgets, and a dedicated user experience.
-
-#### 2.3.6 Trend Analysis Agent (Extension)
-*   **Role**: Scans external data sources or internal logs to identify broad themes.
-*   **Mechanism**: Extracts key themes, relevance scores, and supporting keywords to present a "digest" of financial trends relevant to the user's profile.
-
 #### 2.3.7 Recommendation Agent (Extension)
 *   **Role**: Provides external financial advice or news.
 *   **Components**:

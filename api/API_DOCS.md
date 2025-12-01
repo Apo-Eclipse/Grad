@@ -211,6 +211,22 @@ Continue a budget-focused conversation for a specific user using the Budget Make
 #### POST /api/personal_assistant/transaction/assist
 Handles natural language requests to add transactions. Uses the `TransactionMaker` agent to parse details and map categories to active budgets.
 
+```mermaid
+sequenceDiagram
+    participant User
+    participant API
+    participant Agent as Transaction Maker
+    participant DB
+
+    User->>API: POST /transaction/assist
+    API->>DB: Fetch Active Budgets
+    API->>Agent: Invoke(Request + Budgets)
+    Agent->>Agent: Parse & Map Category
+    Agent-->>API: JSON Response
+    API->>DB: Persist Conversation
+    API-->>User: Response (Message + Data)
+```
+
 **Request Body:**
 ```json
 {
