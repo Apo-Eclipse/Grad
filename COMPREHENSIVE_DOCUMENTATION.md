@@ -113,8 +113,9 @@ graph TD
 *   **Mechanism**:
     1.  Receives a schema definition in its prompt.
     2.  Generates a PostgreSQL-compliant query.
-    3.  Returns a structured object `{"query": "...", "edit": bool}`.
-*   **Safety**: Read-only queries are executed immediately; modification queries (INSERT/UPDATE) are flagged for potential future approval flows (currently auto-executed in this prototype).
+    3.  Returns a structured object `{"query": "...", "edit": bool, "message": "..."}`.
+*   **Safety**: Read-only queries are executed immediately; modification queries (INSERT/UPDATE) are flagged.
+*   **Validation**: The `message` field allows the agent to return natural language validation errors (e.g., "Invalid category") or confirmation messages, improving the user experience when data is missing or incorrect.
 
 #### 2.3.3 Behaviour Analyst (The "Advisor")
 *   **Role**: Performs multi-step reasoning to explain *why* something happened.
@@ -165,6 +166,16 @@ flowchart TD
     Step4 -- Yes --> End([End])
     Step4 -- No --> Analyser
 ```
+
+#### 2.3.5 Budget Validation Logic
+The Orchestrator now includes a critical validation step for **Transaction Management**:
+1.  **Budget Fetching**: Before routing, the system fetches the user's *Active Budgets* (e.g., "Food (ID: 1)").
+2.  **Validation**: If the user wants to *add* a transaction, the router checks for:
+    *   **Amount**: Is it specified?
+    *   **Category**: Does it match an active budget?
+3.  **Resolution**:
+    *   If valid: The router resolves the category name to its `budget_id` and passes it to the `DatabaseAgent`.
+    *   If invalid/missing: The router directs the `PersonalAssistant` to ask the user for the missing details, listing the available options.
     *   **Writer**: Drafts the narrative content.
 
 #### 2.3.6 Trend Analysis Agent (Extension)

@@ -48,6 +48,7 @@ sequenceDiagram
   - Includes comprehensive error handling and performance timing.
 - `api/personal_assistant_api/db_retrieval.py`
   - `_run_select` and `_execute_modify` centralize database I/O; `_safe_json_body` only backs the generic SQL helpers.
+  - `fetch_active_budgets` is a reusable helper that retrieves active budgets for both the API and the Router.
   - CRUD endpoints use Pydantic request schemas so Ninja validates payloads (see `TransactionCreateSchema`, `BudgetCreateSchema`, etc.).
   - Transaction responses include `budget_name`, and `/users/{user_id}/exists` returns a minimal profile for quick lookups.
   - Overspend analytics now returns category rows plus a `summary` block with total income, total spend, and net position.
@@ -58,6 +59,7 @@ sequenceDiagram
   - `database_agent_node` includes 10-second timeout protection and enhanced error handling.
   - PersonalAssistant instance management ensures proper context isolation across conversations.
   - Database agent receives combined user ask and routing instruction for better context.
+  - **Budget Validation**: The orchestrator now fetches active budgets and validates transaction requests (checking amount/category) before routing. It also resolves category names to `budget_id` for the Database Agent.
 - `agents/behaviour_analyst/analyser.py`
   - Financial analyst agent with strict requirements for specific column/table names when requesting data.
   - Enforces explicit naming: 'store_name', 'city', 'type_spending', 'budget_name', 'neighbourhood', etc.
