@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import asyncio
 from typing import TypedDict, List
 
@@ -39,12 +40,20 @@ def _execute_modify_query(query: str) -> str:
     return f"Write operation successful. Rows affected: {rows_affected}"
 
 
+=======
+from agents import DatabaseAgent
+from langgraph.graph import StateGraph, END, START
+from typing import TypedDict
+import pandas as pd
+import sqlite3
+import json
+import time
+>>>>>>> c5cc8a00b674920893a03711ccfe2a7e80167f20
 class DatabaseAgentState(TypedDict):
-    request: str
-    result: dict
-    user_id: object
-    edit: bool
+    request: str         
+    result: dict         
 
+<<<<<<< HEAD
 
 async def execute_single_query(request: str, user_id: object) -> dict:
     """
@@ -84,10 +93,31 @@ async def database_agent(state: DatabaseAgentState) -> dict:
     result = await execute_single_query(step_text, user)
     return {"result": result, "edit": result.get("edit", False)}
 
+=======
+def database_agent(state: DatabaseAgentState):
+    step_text = state.get("request", "")
+    try:
+        out = DatabaseAgent.invoke({"request": step_text, "user": "1"})
+        query = out.query
+        results = []
+        with sqlite3.connect("D:/projects/Multi-Agent System/data/database.db") as conn:
+            try:
+                df = pd.read_sql(query, conn)
+                results = df.to_dict(orient="records")
+            except Exception as e:
+                results = f"Error Executing Query: {str(e)}"
+        return {"result": {"step": step_text, "query": query, "data": results}}
+    except Exception as e:
+        return {"result": {"step": step_text, "query": None, "data": f"Agent Error: {str(e)}"}}
+>>>>>>> c5cc8a00b674920893a03711ccfe2a7e80167f20
 
 builder = StateGraph(DatabaseAgentState)
 builder.add_node("database_agent", database_agent)
 builder.add_edge(START, "database_agent")
 builder.add_edge("database_agent", END)
+<<<<<<< HEAD
 
 database_agent_super_agent = builder.compile()
+=======
+database_agent_super_agent = builder.compile()
+>>>>>>> c5cc8a00b674920893a03711ccfe2a7e80167f20

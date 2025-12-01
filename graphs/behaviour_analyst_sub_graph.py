@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import asyncio
 import ast
 import logging
@@ -7,43 +8,53 @@ from typing import TypedDict, List
 from agents import Explainer_agent, Analyser, Behaviour_analyser_orchestrator, Query_planner, ValidationAgent
 from graphs.database_sub_graph import database_agent_super_agent
 from langgraph.graph import StateGraph, END, START
+=======
+from agents import Explainer_agent, Analyser, Behaviour_analyser_orchestrator, Query_planner
+from graphs.database_sub_graph import database_agent_super_agent
+from langgraph.graph import StateGraph, END, START
+from langgraph.types import Command
+from typing import TypedDict
+import ast
+import time
+import csv
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import warnings
+import logging
+>>>>>>> c5cc8a00b674920893a03711ccfe2a7e80167f20
 
-# --- Setup Logging and Warnings ---
 warnings.filterwarnings("ignore", message=".*missing ScriptRunContext.*")
+
 logging.getLogger().setLevel(logging.ERROR)
+
 
 class BehaviourAnalystState(TypedDict):
     request: str
     analysis: str
     message: str
-    user_id: int
+    user: str
     sender: str
-    validation_tasks: List[dict]
-    data_acquired: List[str]
-    validation_results: List[tuple]
-    steps: List[str]          # To hold the plan from the query_planner
-    db_results: List[dict]  # To hold the results from the db_agent
-    next_step: str          # To control routing from the orchestrator    
+    data_acquired: list[str]
+    
+def add_to_logs(sender, receiver, message):
+    with open("./data/logs.csv", mode='a', newline='', encoding='utf-8') as file:
+        writer = csv.writer(file)
+        writer.writerow([sender, receiver, message])
 
-def analyser(state: BehaviourAnalystState) -> dict:
-    """Node that analyzes the current state and acquired data."""
-    print("===> (Node) Analyser Invoked <===")
+
+def analyser(state: BehaviourAnalystState):
+    print("===> Analyser Invoked <===")
     data_acquired = state.get("data_acquired", [])
     request = state.get("request", "")
     message = state.get("message", "")
     analysis = state.get("analysis", "")
-    
-    Output = Analyser.invoke({
-        "data_acquired": data_acquired,
-        "message": message,
-        "user_request": request,
-        "previous_analysis": analysis
-    })
-    
+    Output = Analyser.invoke({"data_acquired": data_acquired, "message": message, "user_request": request, "previous_analysis": analysis})
     analysis = Output.output
     message = Output.message
-    return {"analysis": analysis, "message": "Analyser: " + message, "sender": "analyser", "user_id": state.get("user_id", "")}
+    print("Analysis: ", analysis)
+    add_to_logs("analyser", "orchestrator", message)
+    return {"analysis": analysis, "message": message, "sender": "analyser", "analysis": analysis}
 
+<<<<<<< HEAD
 def orchestrator(state: BehaviourAnalystState) -> dict:
     """
     The central router of the graph. It decides which node to call next
@@ -65,45 +76,70 @@ def orchestrator(state: BehaviourAnalystState) -> dict:
     message = Output.message
     print(f"Orchestrator message to {next_step}: {message}")
     return {"message": message, "sender": "orchestrator", "next_step": next_step, "user_id": state.get("user_id", "")}
-
-def query_planner(state: BehaviourAnalystState) -> dict:
-    """
-    Node that plans which database queries are needed to fulfill the request.
-    """
-    message = state.get("message", [])
-    
-    print("===> (Node) Query Planner Invoked <===")
-    Output = Query_planner.invoke({
-        "request": state.get("request", ""),
-        "message": message,
-        "steps": state.get("steps", "no completed steps yet"),
-        "user": state.get("user_id", "")
-    })
-    
+=======
+def orchestrator(state: BehaviourAnalystState):
+    print("===> Orchestrator Invoked <===")
+    request = state.get("request", "")
+    analysis = state.get("analysis", "")
+    data_acquired = state.get("data_acquired", [])
+    message = state.get("message", "")
+    sender = state.get("sender", "")
+    Output = Behaviour_analyser_orchestrator.invoke({"request": request,
+                                                    "analysis": analysis,
+                                                    "message": message,
+                                                    "data_acquired": data_acquired,
+                                                    "sender": sender,
+                                                    "user": state.get("user", "")})
     message = Output.message
-    steps_output = Output.output
+    next_step = Output.next_step
+    print("Next step: ", next_step)
+    print("Message to {}: ".format(next_step), message)
     
-    # Ensure steps are in list format
-    if isinstance(steps_output, str):
+    add_to_logs("orchestrator", next_step, message)
+    return Command(update = {
+            "data_acquired": data_acquired,
+            "message": message, 
+            "analysis": analysis,
+            "user": state.get("user", ""),
+            "request": request,
+            "sender": "orchestrator"   
+            },
+            goto = next_step)
+>>>>>>> c5cc8a00b674920893a03711ccfe2a7e80167f20
+
+def query_planner(state: BehaviourAnalystState):
+    print("===> Query Planner Invoked <===")
+    request = state.get("request", "")
+    message = state.get("message", "")
+    data_acquired = state.get("data_acquired", [])
+    Output = Query_planner.invoke({"request": request, "message": message, "data_acquired": data_acquired, "user": state.get("user", "")})
+    message = Output.message
+    steps = Output.output
+    
+    if isinstance(steps, str):
         try:
-            steps = ast.literal_eval(steps_output)
-        except (ValueError, SyntaxError):
-            steps = [steps_output]
-    else:
-        steps = steps_output
-        
-    print(f"Planned {len(steps)} DB queries.")
-    return {"steps": steps, "sender": "query_planner", "message": message, "user_id": state.get("user_id", "")}
+            steps = ast.literal_eval(steps)
+        except Exception:
+            steps = [steps]
+    
+    add_to_logs("query_planner", "orchestrator", message)
+    
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        future_to_step = {executor.submit(run_step, step): step for step in steps}
+        for future in as_completed(future_to_step):
+            step = future_to_step[future]
+            try:
+                print("===> Query Planner Invoked <===")
+                data, result = future.result()
+                print(data)
+                data_acquired.extend(result)
+            except Exception as exc:
+                print(f'Step {step} generated an exception: {exc}')
+    
+    return {"data_acquired": data_acquired, "sender": "query_planner", "message": message}
 
-async def db_agent(state: BehaviourAnalystState) -> dict:
-    """
-    Async node that executes all planned database queries in parallel.
-    """
-    print("===> (Node) Database Agent Invoked <===")
-    steps = state.get("steps", [])
-    if not steps:
-        return {"db_results": [], "sender": "db_agent"}
 
+<<<<<<< HEAD
     # Create a list of async tasks for the database agent subgraph
     tasks = [database_agent_super_agent.ainvoke({"request": step, "user_id": state.get("user_id")}) for step in steps]
     
@@ -256,27 +292,37 @@ async def validation(state: BehaviourAnalystState) -> dict:
     }
 
 # --- Build the Graph ---
+=======
+def run_step(step):
+    data_acquired = []
+    db_state = database_agent_super_agent.invoke({"request": step})
+    step = db_state.get("result", {}).get("step", "")
+    query = db_state.get("result", {}).get("query", "")
+    table = db_state.get("result", {}).get("data", [])
+    data_to_written = "The request was: " + str(step) \
+                        + "\n\n" + "The result was: " + str(table) + "\n"
+    ex_out = Explainer_agent.invoke({"request": data_to_written})
+    try:
+        explanation = ex_out.explanation
+        data_acquired.append(explanation)
+        ex_out += "\n\n" + "The explanation was: " + str(explanation) + "\n"
+    except Exception:
+        ex_out += "\n\n" + "Could not get explanation"
+    return data_to_written,data_acquired
+>>>>>>> c5cc8a00b674920893a03711ccfe2a7e80167f20
 
 builder = StateGraph(BehaviourAnalystState)
-
-# all the nodes of the graph
-builder.add_node("orchestrator", orchestrator)
 builder.add_node("analyser", analyser)
+builder.add_node("orchestrator", orchestrator)
 builder.add_node("query_planner", query_planner)
-builder.add_node("db_agent", db_agent)
-builder.add_node("explainer", explainer)
-builder.add_node("validation", validation)
 
 builder.add_edge(START, "orchestrator")
+builder.add_edge("orchestrator", END)
 
-# data acquisition flow
-builder.add_edge("query_planner", "db_agent")
-builder.add_edge("db_agent", "explainer")
-
-# feedback loops back to the orchestrator
-# builder.add_edge("explainer", "orchestrator")
+builder.add_edge("query_planner", "orchestrator")
 builder.add_edge("analyser", "orchestrator")
 
+<<<<<<< HEAD
 # routing logic from the orchestrator
 def route_from_orchestrator(state: BehaviourAnalystState):
     """Return the next node's name based on the orchestrator's decision."""
@@ -325,3 +371,6 @@ builder.add_conditional_edges(
 )
 
 behaviour_analyst_super_agent = builder.compile()
+=======
+behaviour_analyst_super_agent = builder.compile()
+>>>>>>> c5cc8a00b674920893a03711ccfe2a7e80167f20

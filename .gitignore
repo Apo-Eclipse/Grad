@@ -2,6 +2,7 @@ env/
 README.md
 outdata/
 data/
+<<<<<<< HEAD
 .env
 .github/
 __pycache__/
@@ -9,3 +10,6 @@ __pycache__/
 .dockerignore
 goal_main.py
 main.py
+=======
+.env
+>>>>>>> c5cc8a00b674920893a03711ccfe2a7e80167f20

@@ -1,51 +1,35 @@
 from typing import Literal,TypedDict
-from LLMs.azure_models import large_azure_llm, gpt_oss_llm
+from LLMs.gemini_models import gemini_llm
+from LLMs.azure_models import azure_llm
 from langgraph.graph import StateGraph, END
 from typing import Dict, Any
 from langchain_core.prompts import ChatPromptTemplate
 from pydantic import Field, BaseModel
-from langchain.output_parsers import PydanticOutputParser, OutputFixingParser
-
-
+from LLMs.ollama_llm import ollama_llm
 
 class orchestratorOutput(BaseModel):
     message: str = Field(..., description="The message from the agent. (ok if there is no problem and error if there is)")
     next_step: Literal['query_planner', 'analyser', "end"] = Field(..., description="The next agent to handle the task: Query Planner, Behavior Analyst, or end if the task is complete.")
     
 system_prompt = """
-You are the Orchestrator, the central decision-maker in a data analysis pipeline.
-Your mission is to evaluate the task's current state and route it to the next logical step to answer a user's request.
-
-You will receive the following context:
-- user_request: The user's original question.
-- data_acquired: The data retrieved so far.
-- analysis: The insights generated from the data.
-- sender: The agent that provided the last message.
-- message: The content of the last message.
-
-### Your Decision-Making Logic (Evaluate in this strict order)
-
-1.  **Check for analyser's Explicit Request for Data:**
-    - **Condition:** If the `sender` is 'analyser' AND its `message` clearly states that more information or data is required to proceed.
-    - **Action:** Immediately route to `query_planner`. Your message to the planner should be based on the analyser's specific request.
-
-2.  **Assess Analysis Quality:**
-    - **Condition:** If the `data_acquired` IS sufficient, but the `analysis` is incomplete, inaccurate, or does not address the `user_request`.
-    - **Action:** Route to `analyser`. Your message must provide specific feedback for improvement.
-
-3.  **Determine Task Completion:**
-    - **Condition:** If the data is sufficient AND the analysis is high-quality and directly answers the `user_request`.
-    - **Action:** Route to `end`. Your message should be a final confirmation.
-
-### Output Format
-You MUST respond with a single, valid JSON object:
-{{
-    "next_step": "query_planner | analyser | end",
-    "message": "A clear, concise message or instruction for the next step."
-}}
-"""
+    You are the Orchestrator Agent.  
+    Your task is to coordinate between the Query Planner, analyser, and the end of the process.
+    The query planner agent outlines clear and simple steps for another database agent to create SQL-style queries that retrieve insights about a **single user's** behavior and spending patterns.
+    The analyser agent analyzes the data retrieved by the database agent and provides insights based on the queries outlined by the query planner.
+    Decide where to route this:
+    - If their is specific questions or analysis to be done on the data -> return query_planner
+    - If the analyser agent ask or recommends for additional data -> return query_planner
+    - If the analyser agent not been called-> return analyser
+    - If the task is complete and all data gathered -> return end
+    Formate:
+    {{
+        "next_step": "the agent that should handle the next step",
+        "message": "Any additional messages or instructions to the next agent"
+    }}
+    """
 
 user_prompt = """
+<<<<<<< HEAD
 Current Task State:
 - User Request: {request}
 - Data Acquired by database agent: {data_acquired}
@@ -55,6 +39,14 @@ Current Task State:
 {message}
 
 Based on the current state, decide the next step.
+=======
+    Data acquired: {data_acquired}
+    analysis done: {analysis} 
+    first request: {request}
+    user: {user}
+    message sended from {sender}: {message}
+    Based on the above information, decide the next step for the task.
+>>>>>>> c5cc8a00b674920893a03711ccfe2a7e80167f20
 """
 
 prompt = ChatPromptTemplate.from_messages([
@@ -62,4 +54,4 @@ prompt = ChatPromptTemplate.from_messages([
     ("user", user_prompt)
 ])
 
-Behaviour_analyser_orchestrator = prompt | gpt_oss_llm.with_structured_output(orchestratorOutput)
+Behaviour_analyser_orchestrator = prompt | azure_llm.with_structured_output(orchestratorOutput)
