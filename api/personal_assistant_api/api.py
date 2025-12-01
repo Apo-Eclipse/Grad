@@ -725,9 +725,13 @@ def transaction_assist(request, payload: TransactionMakerRequestSchema):
             [f"{b['budget_name']} (ID: {b['budget_id']})" for b in active_budgets_list]
         ) if active_budgets_list else "No active budgets found."
 
+        # Fetch conversation history
+        last_conversation = _get_conversation_summary(conversation_id)
+
         agent_input = {
             "active_budgets": active_budgets_str,
             "current_date": datetime.now().date().isoformat(),
+            "last_conversation": last_conversation,
             "user_request": payload.user_request,
         }
 
@@ -762,6 +766,11 @@ def transaction_assist(request, payload: TransactionMakerRequestSchema):
                 "budget_id": transaction_result.budget_id,
                 "store_name": transaction_result.store_name,
                 "date": transaction_result.date,
+                "time": transaction_result.time,
+                "city": transaction_result.city,
+                "neighbourhood": transaction_result.neighbourhood,
+                "type_spending": transaction_result.type_spending,
+                "is_done": transaction_result.is_done,
             }
             if any(transaction_payload.values()):
                 _insert_chat_message(
@@ -791,7 +800,11 @@ def transaction_assist(request, payload: TransactionMakerRequestSchema):
             "budget_id": transaction_result.budget_id,
             "store_name": transaction_result.store_name,
             "date": transaction_result.date,
-            "is_done": getattr(transaction_result, "is_done", False),
+            "time": transaction_result.time,
+            "city": transaction_result.city,
+            "neighbourhood": transaction_result.neighbourhood,
+            "type_spending": transaction_result.type_spending,
+            "is_done": transaction_result.is_done,
         }
         return 200, response
 

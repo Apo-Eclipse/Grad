@@ -152,4 +152,8 @@ class TransactionMakerResponseSchema(BaseModel):
     budget_id: Optional[int] = None
     store_name: Optional[str] = None
     date: Optional[str] = None
+    time: Optional[str] = None
+    city: Optional[str] = None
+    neighbourhood: Optional[str] = None
+    type_spending: Optional[str] = None
     is_done: bool = False
