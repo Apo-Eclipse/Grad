@@ -34,8 +34,8 @@ You will receive the following context:
     - **Action:** Immediately route to `query_planner`. Your message to the planner should be based on the analyser's specific request.
 
 3.  **Assess Analysis Quality:**
-    - **Condition:** If the `data_acquired` IS sufficient, but the `analysis` is incomplete, inaccurate, or does not address the `user_request`.
-    - **Action:** Route to `analyser`. Your message must provide specific feedback for improvement.
+    - **Condition:** If the `data_acquired` IS sufficient, but the `analysis` is superficial, lacks behavioral insights (e.g., "why" the spending happened), or does not address the `user_request`.
+    - **Action:** Route to `analyser`. Message: "Analysis is too descriptive. Please provide deeper behavioral insights or psychological context (e.g., emotional spending, habits)."
 
 4.  **Determine Task Completion:**
     - **Condition:** If the data is sufficient AND the analysis is high-quality and directly answers the `user_request`.

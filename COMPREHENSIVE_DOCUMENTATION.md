@@ -103,6 +103,8 @@ graph TD
     *   **Query Planner**: Breaks down a complex question (e.g., "Compare my food spending to last year") into multiple SQL steps.
     *   **DB Agent**: Executes these steps in parallel.
     *   **Explainer**: Synthesizes the data into a narrative.
+    *   **Psychological Profiling**: The Analyser now evaluates spending behavior for patterns like "Emotional Spending", "Impulse Buying", and "Goal Alignment" to provide deeper insights.
+    *   **Loop Prevention**: Mechanisms are in place to detect stalled progress or repeated requests, ensuring the agent gracefully handles missing data.
     *   **Validation**: A self-correction loop where an LLM critiques the explanation against the raw data to ensure hallucination-free insights.
 
 ```mermaid
@@ -110,7 +112,7 @@ stateDiagram-v2
     [*] --> InternalOrchestrator
     
     InternalOrchestrator --> QueryPlanner: Need Data
-    InternalOrchestrator --> Analyser: Need Summary
+    InternalOrchestrator --> Analyser: Need Analysis
     
     QueryPlanner --> DBAgent: Plan Queries
     DBAgent --> Explainer: Execute & Explain
@@ -127,6 +129,22 @@ stateDiagram-v2
     Analyser --> InternalOrchestrator: Analysis Result
     
     InternalOrchestrator --> [*]: Final Output
+```
+
+### 2.3.4 Orchestrator Decision Logic
+The Orchestrator follows a strict evaluation pipeline to prevent loops and ensure quality:
+
+```mermaid
+flowchart TD
+    Start([State Evaluation]) --> Step1{1. Loop/Stalled?}
+    Step1 -- Yes --> Analyser[Analyser]
+    Step1 -- No --> Step2{2. Explicit Data Request?}
+    Step2 -- Yes --> QP[Query Planner]
+    Step2 -- No --> Step3{3. Quality/Insights OK?}
+    Step3 -- No --> Analyser
+    Step3 -- Yes --> Step4{4. Task Complete?}
+    Step4 -- Yes --> End([End])
+    Step4 -- No --> Analyser
 ```
     *   **Writer**: Drafts the narrative content.
 
@@ -156,7 +174,7 @@ stateDiagram-v2
 The PostgreSQL database is normalized to ensure data integrity:
 *   **`users`**: Core profile (ID, name, job, income summary).
 *   **`transactions`**: Individual spend records (amount, date, category, merchant).
-*   **`budget`**: Spending limits per category.
+*   **`budget`**: Spending limits per category (Note: Limits are strictly **MONTHLY**).
 *   **`goals`**: Financial targets (e.g., "Save for Car").
 *   **`chat_conversations` & `chat_messages`**: Full audit trail of user-agent interactions.
 
@@ -186,7 +204,7 @@ The system employs a **Stateless Memory Pattern** to ensure thread safety and re
 
 1.  **External Fetching**: The Orchestrator (`main_graph.py`) instantiates a temporary `ConversationMemory` object for each incoming request.
 2.  **Database Retrieval**: It fetches the most recent conversation turns (e.g., last 10 messages) from the PostgreSQL database.
-3.  **Context Injection**: This history is formatted as a string and passed as an argument to the `PersonalAssistant` agent.
+3.  **Context Injection**: This history is formatted as a string and passed as an argument to the `PersonalAssistant` agent. Additionally, the **Current Date** is injected into the context of all agents (Orchestrator, Analyser, Query Planner) to enable accurate relative time reasoning (e.g., "this month").
 4.  **Stateless Execution**: The Assistant processes the input (History + Current Message) without retaining any internal state.
 
 This approach guarantees that:
