@@ -114,8 +114,8 @@ graph TD
     1.  Receives a schema definition in its prompt.
     2.  Generates a PostgreSQL-compliant query.
     3.  Returns a structured object `{"query": "...", "edit": bool, "message": "..."}`.
-*   **Safety**: Read-only queries are executed immediately; modification queries (INSERT/UPDATE) are flagged.
-*   **Validation**: The `message` field allows the agent to return natural language validation errors (e.g., "Invalid category") or confirmation messages, improving the user experience when data is missing or incorrect.
+*   **Safety**: **Strictly Read-Only**. All `INSERT`, `UPDATE`, `DELETE` operations are forbidden and will be rejected by the agent.
+*   **Validation**: The `message` field allows the agent to return natural language validation errors or confirmation messages.
 
 #### 2.3.3 Behaviour Analyst (The "Advisor")
 *   **Role**: Performs multi-step reasoning to explain *why* something happened.
@@ -167,16 +167,8 @@ flowchart TD
     Step4 -- No --> Analyser
 ```
 
-#### 2.3.5 Budget Validation Logic
-The Orchestrator now includes a critical validation step for **Transaction Management**:
-1.  **Budget Fetching**: Before routing, the system fetches the user's *Active Budgets* (e.g., "Food (ID: 1)").
-2.  **Validation**: If the user wants to *add* a transaction, the router checks for:
-    *   **Amount**: Is it specified?
-    *   **Category**: Does it match an active budget?
-3.  **Resolution**:
-    *   If valid: The router resolves the category name to its `budget_id` and passes it to the `DatabaseAgent`.
-    *   If invalid/missing: The router directs the `PersonalAssistant` to ask the user for the missing details, listing the available options.
-    *   **Writer**: Drafts the narrative content.
+#### 2.3.5 Transaction Management
+Transaction addition is no longer handled by the main router or the Database Agent. Instead, it is offloaded to the **Transaction Maker Agent** (Section 4.7) to ensure structured data entry, validation against active budgets, and a dedicated user experience.
 
 #### 2.3.6 Trend Analysis Agent (Extension)
 *   **Role**: Scans external data sources or internal logs to identify broad themes.
@@ -195,24 +187,6 @@ The Orchestrator now includes a critical validation step for **Transaction Manag
 
 ```mermaid
 graph LR
-    User([User]) -->|Goal Request| GM[Goal Maker Agent]
-    GM -->|Refinement Loop| User
-    GM -->|Save Goal| DB[(Database)]
-```
-
-#### 2.3.9 Budget Maker Agent (Standalone)
-*   **Role**: Assists users in creating realistic monthly budgets.
-*   **Independence**: Operates via `/api/budget/assist`.
-*   **Function**: Helps define budget name, monthly limit, and priority level (1-10). It validates limits against income and spending history.
-
-```mermaid
-graph LR
-    User([User]) -->|Budget Request| BM[Budget Maker Agent]
-    BM -->|Refinement Loop| User
-    BM -->|Save Budget| DB[(Database)]
-```
-
----
 
 ## 3. Technical Implementation
 
@@ -430,6 +404,7 @@ This approach guarantees that:
 | `POST` | `/api/personal_assistant/analyze` | Main entry point. Sends user message, triggers agents, returns response + data. |
 | `POST` | `/api/goals/assist` | Specialized endpoint for the Goal Maker agent to refine financial goals. |
 | `POST` | `/api/budget/assist` | Specialized endpoint for the Budget Maker agent to define monthly budgets. |
+| `POST` | `/api/personal_assistant/transaction/assist` | Specialized endpoint for the Transaction Maker agent to add transactions. |
 | `GET` | `/api/personal_assistant/health` | Service health check. |
 
 #### Database Retrieval (Transactions)
@@ -545,6 +520,19 @@ The API uses Pydantic models for request and response validation.
 {
   "user_id": "int (optional)",
   "first_name": "string",
+  "last_name": "string",
+  "job_title": "string",
+  "address": "string",
+  "birthday": "YYYY-MM-DD",
+  "gender": "string",
+  "employment_status": "string",
+  "education_level": "string"
+}
+```
+
+**IncomeCreateSchema**
+```json
+{
   "user_id": "int",
   "type_income": "string",
   "amount": "decimal",

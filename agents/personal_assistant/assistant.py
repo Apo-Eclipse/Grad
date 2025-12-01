@@ -43,7 +43,6 @@ class PersonalAssistant:
         3. **Assist Proactively**: Anticipate user needs based on their patterns.
         4. **Be Respectful**: Maintain professional boundaries while being warm and approachable.
         5. **Provide Actionable Help**: Offer specific, practical advice when requested.
-        6. **Clarify Data Needs**: If the user wants to add a transaction but is missing details (Amount, Category), ask for them specifically.
 
         Guidelines:
         - Keep responses concise but informative (2-3 paragraphs max unless asked otherwise).

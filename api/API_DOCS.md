@@ -62,18 +62,6 @@ sequenceDiagram
   - **Budget Validation**: The orchestrator now fetches active budgets and validates transaction requests (checking amount/category) before routing. It also resolves category names to `budget_id` for the Database Agent.
 - `agents/behaviour_analyst/analyser.py`
   - Financial analyst agent with strict requirements for specific column/table names when requesting data.
-  - Enforces explicit naming: 'store_name', 'city', 'type_spending', 'budget_name', 'neighbourhood', etc.
-
-**Endpoints**
-- Personal Assistant
-  - POST `/api/personal_assistant/conversations/start` - start a session
-  - POST `/api/personal_assistant/analyze` - run analysis and persist messages
-  - GET  `/api/personal_assistant/health` - health check
-  - POST `/api/personal_assistant/goals/assist` - structured goal-making conversation with memory
-- Database
-  - GET  `/api/database/transactions?user_id=&start_date=&end_date=&limit=` - retrieve transactions
-  - POST `/api/database/transactions` - create new transaction
-  - PUT  `/api/database/transactions/{transaction_id}` - update existing transaction
   - DELETE `/api/database/transactions/{transaction_id}` - delete transaction (permanent)
   - GET  `/api/database/transactions/search?user_id=&query=&category=&min_amount=&max_amount=&start_date=&end_date=&city=&neighbourhood=&limit=` - advanced transaction search
   - GET  `/api/database/budget?user_id=` - retrieve active budgets only
@@ -215,6 +203,46 @@ Continue a budget-focused conversation for a specific user using the Budget Make
   "description": "Monthly food expenses",
   "priority_level_int": null,
   "is_done": false
+}
+```
+
+### Transaction Maker Endpoint
+
+#### POST /api/personal_assistant/transaction/assist
+Handles natural language requests to add transactions. Uses the `TransactionMaker` agent to parse details and map categories to active budgets.
+
+**Request Body:**
+```json
+{
+  "user_id": 1,
+  "user_request": "Spent 50 on food",
+  "conversation_id": 123
+}
+```
+
+**Response (200 OK):**
+```json
+{
+  "conversation_id": 123,
+  "message": "Recorded 50 EGP for Food.",
+  "amount": 50.0,
+  "budget_id": 1,
+  "store_name": null,
+  "date": "2024-01-01",
+  "is_done": true
+}
+```
+
+### Health Check
+
+#### GET /api/personal_assistant/health
+Simple health check to verify the API is running.
+
+**Response (200 OK):**
+```json
+{
+  "status": "healthy",
+  "timestamp": "2024-01-01T12:00:00"
 }
 ```
 
@@ -464,46 +492,7 @@ Soft delete a goal by setting `status='inactive'` (not permanent deletion).
 }
 ```
 
-### Goals Endpoints
 
-#### POST /api/database/goals
-Create a new goal.
-
-**Request Body:**
-```json
-{
-  "user_id": 1,
-  "goal_name": "Save for vacation",
-  "description": "Beach trip to Mediterranean",
-  "target": 5000.00,
-  "start_date": "2024-01-01",
-  "due_date": "2024-12-31",
-  "status": "active"
-}
-```
-
-**Response (201 Created):**
-```json
-{
-  "success": true,
-  "message": "Goal created successfully",
-  "goal_id": 3
-}
-```
-
-#### DELETE /api/database/goals/{goal_id}
-Soft delete a goal by setting `status='inactive'` (not permanent deletion).
-
-**Path Parameters:**
-- `goal_id` (int, required): ID of the goal to deactivate
-
-**Response (200 OK):**
-```json
-{
-  "success": true,
-  "message": "Goal deactivated successfully"
-}
-```
 
 ### Users Endpoints
 
@@ -511,8 +500,6 @@ Soft delete a goal by setting `status='inactive'` (not permanent deletion).
 Create a new user.
 
 **Request Body:**
-```json
-{
 ```json
 {
   "success": true,

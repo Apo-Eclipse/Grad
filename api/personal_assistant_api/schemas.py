@@ -137,3 +137,19 @@ class BudgetMakerResponseSchema(BaseModel):
     description: Optional[str] = None
     priority_level_int: Optional[int] = None
     is_done: bool = False
+
+
+class TransactionMakerRequestSchema(BaseModel):
+    user_id: int
+    user_request: str
+    conversation_id: Optional[int] = None
+
+
+class TransactionMakerResponseSchema(BaseModel):
+    conversation_id: int
+    message: str
+    amount: Optional[float] = None
+    budget_id: Optional[int] = None
+    store_name: Optional[str] = None
+    date: Optional[str] = None
+    is_done: bool = False

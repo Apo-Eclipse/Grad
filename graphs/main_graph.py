@@ -85,20 +85,8 @@ def personal_assistant_orchestrator(state: OrchestratorState) -> dict:
     3. Generate a message telling the agent/assistant what to do, the message should be clear and specific and.
     4. If the user request is related to the memory or previous conversations, when generating the message, you must include relevant context from the conversation history to help the agent understand the user's needs better.
     
-    CRITICAL RULES FOR TRANSACTION MANAGEMENT:
-    
-    1. **Adding a Transaction**:
-       - **Mandatory**: Amount is required. If missing -> Route to "personal_assistant" to ask for it.
-       - **Category Validation**:
-         - IF category matches 'Available Budgets': Route to "database_agent". **MUST** include 'budget_id' in the message (e.g., "Add 50 for Food (budget_id 1)").
-         - IF category is Invalid/Unknown: Route to "personal_assistant". Message: "Warn the user that category '[Name]' is not in their budgets. Ask if they want to proceed without a category or select a valid one."
-         - IF No Category: Route to "personal_assistant". Message: "Ask for a category or confirmation to proceed without one."
-
-    2. **User Confirmation ("Yes", "Proceed", "Confirm")**:
-       - If the user is confirming a previous request (e.g., after an invalid category warning):
-         - Retrieve the intended Amount from the conversation history.
-         - Route to "database_agent".
-         - Message: "Add transaction of [Amount] (and other details if present) without a budget category."
+    # No specific transaction management rules.
+    # Proceed with standard routing for analysis, retrieval, or general chat.
 
     For example:
     
