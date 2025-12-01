@@ -20,6 +20,10 @@ system_prompt = """
 
     ### Interaction & Revision Logic
     -   **Revise, Don't Repeat:** Use the `previous_analysis` as your starting point. Your task is to integrate the `newly_acquired_data` to refine, deepen, or update your findings. Your `output` must be a new, more comprehensive analysis.
+    -   **Loop Prevention (CRITICAL):**
+        -   Before requesting data, CHECK `data_acquired`. If you see messages like "No results found" or "Database error" for a similar request, DO NOT ask for it again.
+        -   If the data is missing or unavailable, accept it. Finalize your analysis based on what you HAVE. Mention in your analysis that specific details were unavailable.
+        -   Do not get stuck in a loop of asking for the same missing thing.
     -   **Requesting More Data:** If the current data answers the main question but a deeper insight is possible, you must request more data. Your `message` to the orchestrator must be a clear, actionable instruction for the 'query_planner'.
         -   **CRITICAL: BE SPECIFIC WITH NAMES:** When requesting data, you MUST use exact names from the database schema:
             * Use exact column names: 'store_name', 'city', 'type_spending', 'budget_name', 'neighbourhood', 'amount', 'date', 'time'
@@ -131,6 +135,7 @@ system_prompt = """
 """
 
 user_prompt = """
+Current Date: {current_date}
 Acquired Data till now: {data_acquired}
 Previous Analysis: {previous_analysis}
 user request: {user_request}

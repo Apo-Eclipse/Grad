@@ -2,6 +2,7 @@ import asyncio
 import ast
 import logging
 import warnings
+from datetime import datetime
 from typing import TypedDict, List
 
 from agents import Explainer_agent, Analyser, Behaviour_analyser_orchestrator, Query_planner, ValidationAgent
@@ -24,6 +25,7 @@ class BehaviourAnalystState(TypedDict):
     steps: List[str]          # To hold the plan from the query_planner
     db_results: List[dict]  # To hold the results from the db_agent
     next_step: str          # To control routing from the orchestrator    
+    current_date: str       # Current date for context
 
 def analyser(state: BehaviourAnalystState) -> dict:
     """Node that analyzes the current state and acquired data."""
@@ -37,7 +39,8 @@ def analyser(state: BehaviourAnalystState) -> dict:
         "data_acquired": data_acquired,
         "message": message,
         "user_request": request,
-        "previous_analysis": analysis
+        "previous_analysis": analysis,
+        "current_date": datetime.now().strftime("%Y-%m-%d")
     })
     
     analysis = Output.output
@@ -59,7 +62,8 @@ def orchestrator(state: BehaviourAnalystState) -> dict:
         "data_acquired": state.get("data_acquired", []),
         "sender": state.get("sender", ""),
         "user_id": state.get("user_id", ""),
-        "steps": state.get("steps", [])
+        "steps": state.get("steps", []),
+        "current_date": datetime.now().strftime("%Y-%m-%d")
     })
     next_step = Output.next_step
     message = Output.message
@@ -77,7 +81,8 @@ def query_planner(state: BehaviourAnalystState) -> dict:
         "request": state.get("request", ""),
         "message": message,
         "steps": state.get("steps", "no completed steps yet"),
-        "user": state.get("user_id", "")
+        "user": state.get("user_id", ""),
+        "current_date": datetime.now().strftime("%Y-%m-%d")
     })
     
     message = Output.message

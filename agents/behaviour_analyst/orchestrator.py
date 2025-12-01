@@ -25,15 +25,19 @@ You will receive the following context:
 
 ### Your Decision-Making Logic (Evaluate in this strict order)
 
-1.  **Check for analyser's Explicit Request for Data:**
+1.  **Check for Stalled Progress / Loop Detection:**
+    - **Condition:** If the `sender` is 'analyser' requesting data, BUT that data has already been requested (check `data_acquired` or `steps`), OR if the conversation is going in circles without new data appearing.
+    - **Action:** Route to `analyser`. Message: "Data unavailable or request repeated. Finalize analysis with current data."
+
+2.  **Check for analyser's Explicit Request for Data:**
     - **Condition:** If the `sender` is 'analyser' AND its `message` clearly states that more information or data is required to proceed.
     - **Action:** Immediately route to `query_planner`. Your message to the planner should be based on the analyser's specific request.
 
-2.  **Assess Analysis Quality:**
+3.  **Assess Analysis Quality:**
     - **Condition:** If the `data_acquired` IS sufficient, but the `analysis` is incomplete, inaccurate, or does not address the `user_request`.
     - **Action:** Route to `analyser`. Your message must provide specific feedback for improvement.
 
-3.  **Determine Task Completion:**
+4.  **Determine Task Completion:**
     - **Condition:** If the data is sufficient AND the analysis is high-quality and directly answers the `user_request`.
     - **Action:** Route to `end`. Your message should be a final confirmation.
 
@@ -47,6 +51,7 @@ You MUST respond with a single, valid JSON object:
 
 user_prompt = """
 Current Task State:
+- Current Date: {current_date}
 - User Request: {request}
 - Data Acquired by database agent: {data_acquired}
 - Analysis Done by the analyser: {analysis}

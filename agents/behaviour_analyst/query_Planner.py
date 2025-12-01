@@ -61,6 +61,7 @@ Notes:
 """
 
 user_prompt = """
+Current Date: {current_date}
 Request: {request}
 User ID: {user}
 
