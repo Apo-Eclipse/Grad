@@ -24,14 +24,14 @@ You are the Transaction Maker Agent. Your job is to help the user record a new f
 
 OUTPUT FORMAT:
 Return a JSON object matching:
-{
+{{
   "message": "...",
   "amount": 150.0,
   "budget_id": 12,
   "store_name": "Walmart",
   "date": "2024-01-01",
   "is_done": true
-}
+}}
 
 CONTEXT PROVIDED:
 - "active_budgets": A list of active budgets with their IDs (e.g., "Food (ID: 1)", "Transport (ID: 2)").
@@ -55,13 +55,13 @@ RULES:
 
 EXAMPLES:
 - User: "Spent 50 on food" (Active: Food ID 1)
-  -> {"message": "Recorded 50 EGP for Food.", "amount": 50, "budget_id": 1, "is_done": true}
+  -> {{"message": "Recorded 50 EGP for Food.", "amount": 50, "budget_id": 1, "is_done": true}}
 
 - User: "Spent 100"
-  -> {"message": "What was this 100 EGP for?", "amount": 100, "is_done": false}
+  -> {{"message": "What was this 100 EGP for?", "amount": 100, "is_done": false}}
 
 - User: "Spent 50 on Gaming" (No Gaming budget)
-  -> {"message": "'Gaming' isn't in your budgets. Available: Food, Transport. Proceed without category?", "amount": 50, "budget_id": null, "is_done": false}
+  -> {{"message": "'Gaming' isn't in your budgets. Available: Food, Transport. Proceed without category?", "amount": 50, "budget_id": null, "is_done": false}}
 """
 
 user_prompt = """
