@@ -166,7 +166,7 @@ flowchart TD
 *   **Language**: Python 3.10+ (Type-hinted).
 *   **Web Framework**: Django Ninja (chosen for its async support and Pydantic integration).
 *   **LLM Orchestration**: LangGraph & LangChain.
-*   **LLM Provider**: Azure OpenAI (GPT-4o and GPT-3.5-Turbo).
+*   **LLM Provider**: Azure OpenAI (GPT-5.1-Chat and GPT-OSS-120b).
 *   **Database**: PostgreSQL 14+.
 *   **Server**: Waitress (Production WSGI server for Windows).
 
