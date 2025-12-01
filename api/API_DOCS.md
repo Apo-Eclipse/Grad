@@ -13,6 +13,22 @@
   - `/api/personal_assistant/*` (api/personal_assistant_api/api.py)
   - `/api/database/*` (api/personal_assistant_api/db_retrieval.py)
 
+```mermaid
+sequenceDiagram
+    participant Client
+    participant API as Django Ninja
+    participant Service as PA Service
+    participant DB as PostgreSQL
+
+    Client->>API: POST /api/personal_assistant/analyze
+    API->>Service: run_analysis()
+    Service->>DB: Fetch Context (History/Profile)
+    Service->>Service: Run LangGraph Orchestrator
+    Service->>DB: Store Result (Chat Messages)
+    Service-->>API: Result
+    API-->>Client: JSON Response
+```
+
 **Directory Layout**
 - `api/api_config`: Django project wiring (settings, URLs, ASGI/WSGI).
 - `api/personal_assistant_api`: Endpoints, services, and schemas.
@@ -101,6 +117,21 @@ Continue a goal-focused conversation for a specific user using the Goal Maker ag
 - `user_request` (string, required): The latest message from the user about their goal (question, constraint, clarification, etc.).
 - `conversation_id` (int, required): Existing conversation identifier created via `POST /api/personal_assistant/conversations/start` (use `channel='goal_maker'`).
 
+```mermaid
+sequenceDiagram
+    participant User
+    participant API
+    participant Agent as Goal/Budget Maker
+    participant DB
+
+    User->>API: POST /assist (Request)
+    API->>DB: Load User Summary & History
+    API->>Agent: Invoke(Context + Request)
+    Agent-->>API: JSON Response (Message + Fields)
+    API->>DB: Persist Interaction
+    API-->>User: Response (Question or Final Confirmation)
+```
+
 **Behavior & Memory:**
 - The client must first call `POST /api/personal_assistant/conversations/start` with `channel='goal_maker'` to obtain a `conversation_id`.
 - For each call, the same `conversation_id` is passed so the service can load recent `chat_messages` and build `last_conversation` context.
@@ -145,6 +176,43 @@ Continue a goal-focused conversation for a specific user using the Goal Maker ag
   "error": "GOAL_MAKER_ERROR",
   "message": "Failed to create or resolve conversation",
   "timestamp": "2024-11-04T09:31:00"
+}
+```
+
+### Budget Maker Endpoint
+
+#### POST /api/personal_assistant/budget/assist
+Continue a budget-focused conversation for a specific user using the Budget Maker agent.
+
+**Request Body:**
+```json
+{
+  "user_id": 3,
+  "user_request": "I want to set a budget for food",
+  "conversation_id": 42
+}
+```
+
+**Field Notes:**
+- `user_id` (int, required): ID of the user.
+- `user_request` (string, required): The latest message from the user.
+- `conversation_id` (int, required): Existing conversation identifier.
+
+**Behavior:**
+- Similar to Goal Maker, it maintains conversation history.
+- Helps the user define `budget_name`, `total_limit` (monthly), and `priority_level_int` (1-10).
+- Validates limits against income and spending history.
+
+**Response (200 OK):**
+```json
+{
+  "conversation_id": 42,
+  "message": "Okay, what is the maximum amount you want to spend on food each month?",
+  "budget_name": "Food",
+  "total_limit": null,
+  "description": "Monthly food expenses",
+  "priority_level_int": null,
+  "is_done": false
 }
 ```
 
@@ -547,6 +615,20 @@ Add a new income source.
 - On success, `_store_messages_sync` persists the user input, assistant output, and JSON data (if any).
 - Response returns `final_output` and, when present, `data` and `conversation_id`.
 - Timeout protection prevents indefinite waits on database operations.
+
+```mermaid
+flowchart TD
+    Req[Request] --> Validate{Validate Schema}
+    Validate -- Invalid --> Err[400 Error]
+    Validate -- Valid --> Enrich[Enrich Metadata]
+    Enrich --> Service[Call Service]
+    Service --> Async{Async?}
+    Async -- Yes --> Await[Await with Timeout]
+    Async -- No --> Thread[Run in ThreadPool]
+    Await --> Store[Store Messages]
+    Thread --> Store
+    Store --> Resp[Return Response]
+```
 
 **Schemas**
 - `AnalysisRequestSchema` (`api/personal_assistant_api/schemas.py:8`)

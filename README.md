@@ -11,6 +11,8 @@ An advanced, conversational financial advisor powered by Large Language Models (
     *   **Personal Assistant**: Manages the conversation and user context.
     *   **Database Agent**: Translates questions into SQL queries.
     *   **Behaviour Analyst**: Analyzes spending patterns, detects "emotional spending," and identifies habits.
+    *   **Goal Maker**: Helps users define SMART financial goals.
+    *   **Budget Maker**: Assists in setting realistic monthly budgets with priority levels.
 *   **Psychological Profiling**: Understands the *why* behind your spending (Retail Therapy, Impulse Buying, Social Pressure).
 *   **Stateless Memory**: Thread-safe design ensuring privacy and scalability.
 *   **Probabilistic Validation**: Self-correcting mechanism to ensure accurate, hallucination-free insights.
@@ -36,6 +38,9 @@ graph TD
     
     User2[User Goal Request] --> GoalMaker[Goal Maker Agent]
     GoalMaker --> DB[(Database)]
+
+    User3[User Budget Request] --> BudgetMaker[Budget Maker Agent]
+    BudgetMaker --> DB
 ```
 
 ## 💻 Tech Stack
@@ -46,6 +51,31 @@ graph TD
 *   **AI Models**: Azure OpenAI (GPT-5.1-Chat, GPT-OSS-120b)
 *   **Database**: PostgreSQL 14+
 *   **Server**: Waitress (WSGI)
+
+## 🔌 API Layer (How it Works)
+
+The system exposes a robust REST API built with **Django Ninja**. It acts as the gateway between the user and the intelligent agents.
+
+### Request Lifecycle
+1.  **Validation**: Pydantic schemas ensure all requests are well-formed.
+2.  **Orchestration**: The API calls the `PersonalAssistantService`, which spins up the LangGraph agents.
+3.  **Async Execution**: Long-running analysis tasks are handled asynchronously to keep the server responsive.
+4.  **Persistence**: Every interaction is automatically logged to the PostgreSQL database for memory and auditing.
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant API as Django Ninja
+    participant Service as PA Service
+    participant DB as PostgreSQL
+
+    Client->>API: POST /analyze
+    API->>Service: Validate & Invoke
+    Service->>Service: Run Agents (LangGraph)
+    Service->>DB: Persist Chat History
+    Service-->>API: Return Result
+    API-->>Client: JSON Response
+```
 
 ## 🏁 Getting Started
 

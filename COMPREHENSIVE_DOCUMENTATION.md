@@ -32,7 +32,26 @@ The primary objectives of this project are:
 The system follows a **Micro-Service inspired Monolithic Architecture**, where distinct logical components interact through well-defined interfaces. The core components are:
 
 1.  **Client Layer**: A Command Line Interface (CLI) that serves as the user entry point. It communicates exclusively via HTTP REST APIs.
-2.  **API Layer**: A Django Ninja (FastAPI-like) web service that handles authentication, request validation, and routing.
+2.  **API Layer**: A **Django Ninja** web service that acts as the secure gateway.
+    *   **Validation**: Uses Pydantic schemas to validate every request body and query parameter.
+    *   **Async Handling**: Offloads heavy LLM tasks to background threads to keep the server responsive.
+    *   **Persistence**: Automatically logs every request/response pair to the `chat_messages` table.
+
+    ```mermaid
+    sequenceDiagram
+        participant Client
+        participant API as Django Ninja
+        participant Service as PA Service
+        participant DB as PostgreSQL
+
+        Client->>API: POST /analyze
+        API->>Service: Validate & Invoke
+        Service->>Service: Run Agents (LangGraph)
+        Service->>DB: Persist Chat History
+        Service-->>API: Return Result
+        API-->>Client: JSON Response
+    ```
+
 3.  **Orchestration Layer**: Built with **LangGraph**, this layer manages the state of the conversation and routes tasks to specialized agents.
 4.  **Agent Layer**: Independent modules responsible for specific domains (SQL generation, Data Analysis, Chat).
 5.  **Data Layer**: A PostgreSQL database storing structured financial data and unstructured conversation logs.
@@ -170,6 +189,18 @@ graph LR
     GM -->|Save Goal| DB[(Database)]
 ```
 
+#### 2.3.9 Budget Maker Agent (Standalone)
+*   **Role**: Assists users in creating realistic monthly budgets.
+*   **Independence**: Operates via `/api/budget/assist`.
+*   **Function**: Helps define budget name, monthly limit, and priority level (1-10). It validates limits against income and spending history.
+
+```mermaid
+graph LR
+    User([User]) -->|Budget Request| BM[Budget Maker Agent]
+    BM -->|Refinement Loop| User
+    BM -->|Save Budget| DB[(Database)]
+```
+
 ---
 
 ## 3. Technical Implementation
@@ -242,6 +273,7 @@ This approach guarantees that:
 | `POST` | `/api/personal_assistant/conversations/start` | Start a new conversation session. Returns `conversation_id`. |
 | `POST` | `/api/personal_assistant/analyze` | Main entry point. Sends user message, triggers agents, returns response + data. |
 | `POST` | `/api/goals/assist` | Specialized endpoint for the Goal Maker agent to refine financial goals. |
+| `POST` | `/api/budget/assist` | Specialized endpoint for the Budget Maker agent to define monthly budgets. |
 | `GET` | `/api/personal_assistant/health` | Service health check. |
 
 #### Database Retrieval (Transactions)
@@ -378,6 +410,15 @@ The API uses Pydantic models for request and response validation.
 ```
 
 **GoalMakerRequestSchema**
+```json
+{
+  "user_id": "int",
+  "user_request": "string",
+  "conversation_id": "int (optional)"
+}
+```
+
+**BudgetMakerRequestSchema**
 ```json
 {
   "user_id": "int",

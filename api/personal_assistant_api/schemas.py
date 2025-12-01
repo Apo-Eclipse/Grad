@@ -119,3 +119,19 @@ class GoalMakerResponseSchema(BaseModel):
     goal_description: Optional[str] = None
     due_date: Optional[str] = None
     is_done: bool = False
+
+
+class BudgetMakerRequestSchema(BaseModel):
+    user_id: int
+    user_request: str
+    conversation_id: Optional[int] = None
+
+
+class BudgetMakerResponseSchema(BaseModel):
+    conversation_id: int
+    message: str
+    budget_name: Optional[str] = None
+    total_limit: Optional[float] = None
+    description: Optional[str] = None
+    priority_level_int: Optional[int] = None
+    is_done: bool = False
