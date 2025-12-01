@@ -162,6 +162,22 @@ flowchart TD
     Step2 -- Yes --> QP[Query Planner]
     Step2 -- No --> Step3{3. Quality/Insights OK?}
     Step3 -- No --> Analyser
+
+#### 2.3.5 Transaction Management
+Transaction addition is no longer handled by the main router or the Database Agent. Instead, it is offloaded to the **Transaction Maker Agent** (Section 4.7) to ensure structured data entry, validation against active budgets, and a dedicated user experience.
+
+**Key Features:**
+*   **Context Awareness**: The agent has access to the conversation history, allowing it to remember previously provided details and avoid repetitive questions.
+*   **Comprehensive Data Capture**: It intelligently extracts optional fields like `time`, `city`, `neighbourhood`, and `store_name` if provided, or asks for them if missing (only once).
+*   **Budget Mapping**: Automatically maps natural language categories to active budget IDs.
+
+#### 2.3.6 Budget Maker Agent
+*   **Role**: Helps users define clear, realistic monthly budgets.
+*   **Features**:
+    *   **Context Analysis**: Checks income vs. total budgets and recent spending to prevent over-budgeting.
+    *   **Smart Categorization**: Standardizes vague categories (e.g., "fun money" -> "Entertainment").
+    *   **Priority Logic**: Assigns priority levels (1-10) based on a hierarchy of needs (Critical, Important, Discretionary).
+    *   **Interactive Dialogue**: Asks clarifying questions if details are missing or limits are unrealistic.
 #### 2.3.7 Recommendation Agent (Extension)
 *   **Role**: Provides external financial advice or news.
 *   **Components**:
@@ -172,6 +188,14 @@ flowchart TD
 *   **Role**: A specialized, standalone agent dedicated to helping users define and refine their financial goals.
 *   **Independence**: Unlike the other agents, the Goal Maker operates outside the main Personal Assistant graph. It is accessed via a dedicated API endpoint (`/api/goals/assist`).
 *   **Function**: It engages in a focused dialogue to turn vague aspirations (e.g., "I want to save money") into SMART goals (Specific, Measurable, Achievable, Relevant, Time-bound) and persists them to the `goals` table.
+
+#### 2.3.9 Presentation Super Agent
+*   **Role**: Generates visual reports and charts to present financial data effectively.
+*   **Components**:
+    *   **Orchestrator**: Routes tasks between the Visualizer and Writer agents.
+    *   **Visualizer**: Creates charts and graphs based on data.
+    *   **Writer**: Generates the narrative report.
+*   **Output**: Produces a combined HTML/CSS/JS report for rich visualization.
 
 ```mermaid
 graph LR
@@ -353,21 +377,6 @@ else:
     return chat(user_input)
 ```
 
-#### Validation Loop (`behaviour_analyst_sub_graph`)
-The system employs a **Probabilistic Validation** mechanism.
-1.  The `Explainer` generates an insight.
-2.  The `ValidationAgent` checks the insight against the raw data rows.
-3.  If invalid, the system loops back to the `Explainer` with specific feedback ("You said X, but data shows Y").
-4.  This cycle repeats until valid or a recursion limit is reached.
-
-### 3.4 Memory Management Strategy
-The system employs a **Stateless Memory Pattern** to ensure thread safety and reliability in a multi-user environment.
-
-1.  **External Fetching**: The Orchestrator (`main_graph.py`) instantiates a temporary `ConversationMemory` object for each incoming request.
-2.  **Database Retrieval**: It fetches the most recent conversation turns (e.g., last 10 messages) from the PostgreSQL database.
-3.  **Context Injection**: This history is formatted as a string and passed as an argument to the `PersonalAssistant` agent. Additionally, the **Current Date** is injected into the context of all agents (Orchestrator, Analyser, Query Planner) to enable accurate relative time reasoning (e.g., "this month").
-4.  **Stateless Execution**: The Assistant processes the input (History + Current Message) without retaining any internal state.
-
 This approach guarantees that:
 *   **No Cross-Talk**: Users never share memory space.
 *   **Persistence**: Memory is durable and survives server restarts.
@@ -385,43 +394,51 @@ This approach guarantees that:
 
 ### 4.2 API Endpoints
 
-#### Personal Assistant & Analysis
+#### Assistant Agents
 | Method | Endpoint | Description |
 | :--- | :--- | :--- |
-| `POST` | `/api/personal_assistant/conversations/start` | Start a new conversation session. Returns `conversation_id`. |
-| `POST` | `/api/personal_assistant/analyze` | Main entry point. Sends user message, triggers agents, returns response + data. |
-| `POST` | `/api/goals/assist` | Specialized endpoint for the Goal Maker agent to refine financial goals. |
-| `POST` | `/api/budget/assist` | Specialized endpoint for the Budget Maker agent to define monthly budgets. |
-| `POST` | `/api/personal_assistant/transaction/assist` | Specialized endpoint for the Transaction Maker agent to add transactions. |
-| `GET` | `/api/personal_assistant/health` | Service health check. |
+| `POST` | `/api/transaction/assist` | Natural language transaction entry agent. |
+| `POST` | `/api/budget/assist` | Interactive budget creation agent. |
+| `POST` | `/api/goals/assist` | Goal setting assistant. |
+| `POST` | `/api/analyze` | General Personal Assistant chat. |
 
-#### Database Retrieval (Transactions)
-| Method | Endpoint | Description |
-| :--- | :--- | :--- |
-| `GET` | `/api/database/transactions` | List transactions with filters (date, limit). |
-| `POST` | `/api/database/transactions` | Create a new transaction manually. |
-| `PUT` | `/api/database/transactions/{id}` | Update an existing transaction. |
-| `DELETE` | `/api/database/transactions/{id}` | Delete a transaction. |
-| `GET` | `/api/database/transactions/search` | Advanced search (store name, category, amount range, city). |
-
-#### Database Retrieval (Budget & Goals)
-| Method | Endpoint | Description |
-| :--- | :--- | :--- |
-| `GET` | `/api/database/budget` | List active budgets. |
-| `POST` | `/api/database/budget` | Create a new budget category. |
-| `DELETE` | `/api/database/budget/{id}` | Soft delete (deactivate) a budget. |
-| `GET` | `/api/database/goals` | List financial goals (filter by status). |
-| `POST` | `/api/database/goals` | Create a new goal. |
-| `DELETE` | `/api/database/goals/{id}` | Soft delete a goal. |
-
-#### Database Retrieval (Users & Income)
+#### Database Resources
+**Users**
 | Method | Endpoint | Description |
 | :--- | :--- | :--- |
 | `GET` | `/api/database/users/{id}` | Get user profile details. |
 | `POST` | `/api/database/users` | Create a new user profile. |
 | `GET` | `/api/database/users/{id}/exists` | Check if a user ID exists. |
+
+**Income**
+| Method | Endpoint | Description |
+| :--- | :--- | :--- |
 | `GET` | `/api/database/income` | List all income sources. |
+| `GET` | `/api/database/income/active` | List active income sources. |
 | `POST` | `/api/database/income` | Add a new income source. |
+
+**Transactions**
+| Method | Endpoint | Description |
+| :--- | :--- | :--- |
+| `GET` | `/api/database/transactions` | List transactions (supports filtering). |
+| `POST` | `/api/database/transactions` | Create a new transaction manually. |
+| `PUT` | `/api/database/transactions/{id}` | Update a transaction. |
+| `DELETE` | `/api/database/transactions/{id}` | Delete a transaction. |
+| `GET` | `/api/database/transactions/search` | Advanced search for transactions. |
+
+**Budgets**
+| Method | Endpoint | Description |
+| :--- | :--- | :--- |
+| `GET` | `/api/database/budget` | List active budgets. |
+| `POST` | `/api/database/budget` | Create a new budget. |
+| `DELETE` | `/api/database/budget/{id}` | Soft delete a budget. |
+
+**Goals**
+| Method | Endpoint | Description |
+| :--- | :--- | :--- |
+| `GET` | `/api/database/goals` | List goals. |
+| `POST` | `/api/database/goals` | Create a new goal. |
+| `DELETE` | `/api/database/goals/{id}` | Soft delete a goal. |
 
 #### Analytics & History
 | Method | Endpoint | Description |
@@ -436,6 +453,7 @@ This approach guarantees that:
 | Method | Endpoint | Description |
 | :--- | :--- | :--- |
 | `POST` | `/api/database/execute/select` | Execute a raw read-only SQL query (Admin/Debug use). |
+| `POST` | `/api/database/execute/modify` | Execute INSERT/UPDATE/DELETE SQL queries (Admin/Debug use). |
 
 ### 4.3 API Schemas
 The API uses Pydantic models for request and response validation.
@@ -543,6 +561,32 @@ The API uses Pydantic models for request and response validation.
   "user_id": "int",
   "user_request": "string",
   "conversation_id": "int (optional)"
+}
+```
+
+**TransactionMakerRequestSchema**
+```json
+{
+  "user_id": "int",
+  "user_request": "string",
+  "conversation_id": "int (optional)"
+}
+```
+
+**TransactionMakerResponseSchema**
+```json
+{
+  "conversation_id": "int",
+  "message": "string",
+  "amount": "decimal (optional)",
+  "budget_id": "int (optional)",
+  "store_name": "string (optional)",
+  "date": "YYYY-MM-DD (optional)",
+  "time": "HH:MM:SS (optional)",
+  "city": "string (optional)",
+  "neighbourhood": "string (optional)",
+  "type_spending": "string (optional)",
+  "is_done": "bool"
 }
 ```
 

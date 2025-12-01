@@ -240,11 +240,15 @@ sequenceDiagram
 ```json
 {
   "conversation_id": 123,
-  "message": "Recorded 50 EGP for Food.",
+  "message": "Recorded 50 EGP for Food at Seoudi (Cairo).",
   "amount": 50.0,
   "budget_id": 1,
-  "store_name": null,
+  "store_name": "Seoudi",
   "date": "2024-01-01",
+  "time": "14:30:00",
+  "city": "Cairo",
+  "neighbourhood": "Zamalek",
+  "type_spending": "Food",
   "is_done": true
 }
 ```
@@ -594,6 +598,218 @@ Add a new income source.
 {
   "success": false,
   "error": "user_id, type_income, and amount are required"
+}
+```
+
+
+### Conversation Endpoints
+
+#### GET /api/database/conversations
+Retrieve chat conversations for a user.
+
+**Query Parameters:**
+- `user_id` (int, required): User ID
+- `limit` (int, optional): Max results (default: 50)
+
+**Response (200 OK):**
+```json
+[
+  {
+    "conversation_id": 42,
+    "title": "Budget Planning",
+    "last_message_at": "2024-01-01T12:00:00"
+  }
+]
+```
+
+#### GET /api/database/messages
+Retrieve messages from a conversation.
+
+**Query Parameters:**
+- `conversation_id` (int, required): Conversation ID
+- `limit` (int, optional): Max results (default: 100)
+
+**Response (200 OK):**
+```json
+[
+  {
+    "message_id": 101,
+    "sender_type": "user",
+    "content": "Hello",
+    "created_at": "2024-01-01T12:00:00"
+  }
+]
+```
+
+### User Endpoints
+
+#### GET /api/database/users/{user_id}
+Get user profile details.
+
+**Path Parameters:**
+- `user_id` (int, required): User ID
+
+**Response (200 OK):**
+```json
+{
+  "user_id": 1,
+  "first_name": "John",
+  "last_name": "Doe",
+  "job_title": "Engineer"
+}
+```
+
+#### GET /api/database/users/{user_id}/exists
+Check if a user ID exists.
+
+**Response (200 OK):**
+```json
+{
+  "exists": true,
+  "user": { "first_name": "John", "last_name": "Doe" }
+}
+```
+
+### Additional Resource Endpoints
+
+#### GET /api/database/income
+List all income sources.
+
+**Query Parameters:**
+- `user_id` (int, required): User ID
+
+**Response (200 OK):**
+```json
+[
+  {
+    "income_id": 1,
+    "type_income": "Salary",
+    "amount": 5000.00
+  }
+]
+```
+
+#### GET /api/database/goals
+List goals.
+
+**Query Parameters:**
+- `user_id` (int, required): User ID
+- `status` (str, optional): Filter by status (e.g., 'active')
+
+**Response (200 OK):**
+```json
+[
+  {
+    "goal_id": 1,
+    "goal_name": "Save for Car",
+    "target": 10000.00,
+    "status": "active"
+  }
+]
+```
+
+#### GET /api/database/transactions
+List transactions (supports filtering).
+
+**Query Parameters:**
+- `user_id` (int, required): User ID
+- `start_date` (str, optional): YYYY-MM-DD
+- `end_date` (str, optional): YYYY-MM-DD
+- `limit` (int, optional): Max results (default: 100)
+
+**Response (200 OK):**
+```json
+[
+  {
+    "transaction_id": 1,
+    "amount": 50.00,
+    "store_name": "Store A"
+  }
+]
+```
+
+
+#### GET /api/database/analytics/monthly-spend
+Aggregate spending by budget category for the current month.
+
+**Query Parameters:**
+- `user_id` (int, required): User ID
+
+**Response (200 OK):**
+```json
+{
+  "data": [
+    {
+      "budget_name": "Food",
+      "month": "2024-01-01T00:00:00",
+      "total_spent": 1500.00
+    }
+  ]
+}
+```
+
+#### GET /api/database/analytics/overspend
+Identify overspent categories and net financial position for the current month.
+
+**Query Parameters:**
+- `user_id` (int, required): User ID
+
+**Response (200 OK):**
+```json
+{
+  "data": [
+    {
+      "budget_name": "Food",
+      "spent": 2000.00,
+      "total_limit": 1500.00,
+      "pct_of_limit": 133.33
+    }
+  ],
+  "summary": {
+    "total_income": 5000.00,
+    "total_spent": 4500.00,
+    "net_position": 500.00
+  }
+}
+```
+
+#### GET /api/database/analytics/income-total
+Aggregate total income by type.
+
+**Query Parameters:**
+- `user_id` (int, required): User ID
+
+**Response (200 OK):**
+```json
+{
+  "data": [
+    {
+      "type_income": "Salary",
+      "total_amount": 60000.00
+    }
+  ]
+}
+```
+
+### System Tools
+
+#### POST /api/database/execute/modify
+Execute INSERT, UPDATE, or DELETE SQL queries. **Admin/Debug use only.**
+
+**Request Body:**
+```json
+{
+  "query": "DELETE FROM transactions WHERE transaction_id = %s",
+  "params": [123]
+}
+```
+
+**Response (200 OK):**
+```json
+{
+  "success": true,
+  "rows_affected": 1,
+  "data": { ... }
 }
 ```
 

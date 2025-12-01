@@ -13,7 +13,7 @@ An advanced, conversational financial advisor powered by Large Language Models (
     *   **Behaviour Analyst**: Analyzes spending patterns, detects "emotional spending," and identifies habits.
     - **Goal Maker**: Specialized agent for setting SMART financial goals.
     - **Budget Maker**: Interactive agent for defining monthly budgets with priority levels.
-    - **Transaction Maker**: Natural language agent for recording transactions and mapping them to active budgets.
+    - **Transaction Maker**: Context-aware agent for recording detailed transactions (time, location, category) and mapping them to active budgets.
     - **Presentation Super Agent**: Generates visual reports and charts.
 *   **Psychological Profiling**: Understands the *why* behind your spending (Retail Therapy, Impulse Buying, Social Pressure).
 *   **Stateless Memory**: Thread-safe design ensuring privacy and scalability.
