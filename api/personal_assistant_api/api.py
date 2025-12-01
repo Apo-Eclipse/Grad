@@ -203,6 +203,23 @@ def _get_user_summary(user_id: int) -> str:
             active_goals_rows = cursor.fetchall() or []
             active_goals_count = len(active_goals_rows)
 
+            # Retrieve all active budgets
+            cursor.execute(
+                """
+                SELECT
+                    budget_name,
+                    total_limit,
+                    priority_level_int
+                FROM budget
+                WHERE user_id = %s
+                  AND is_active = true
+                ORDER BY priority_level_int DESC
+            """,
+                [user_id],
+            )
+            active_budgets_rows = cursor.fetchall() or []
+            active_budgets_count = len(active_budgets_rows)
+
             # Recent spending patterns (last 90 days)
             cursor.execute(
                 """
@@ -307,6 +324,14 @@ def _get_user_summary(user_id: int) -> str:
             parts.append("Active goals: " + "; ".join(goal_bits))
         else:
             parts.append("Active goals: no active goals recorded yet")
+
+        if active_budgets_count > 0:
+            budget_bits = [f"{active_budgets_count} active budget(s):"]
+            for b_name, b_limit, b_prio in active_budgets_rows:
+                budget_bits.append(f"  - {b_name} ({float(b_limit):.2f} EGP, Prio {b_prio})")
+            parts.append("Active budgets: " + "; ".join(budget_bits))
+        else:
+            parts.append("Active budgets: no active budgets recorded yet")
 
         if top_categories_rows:
             categories_str = ", ".join(
