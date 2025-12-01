@@ -32,10 +32,11 @@ TABLE: users
   - address (text, not null)
   - birthday (date, not null)
   - gender (gender_type: male|female)
-  - employment_status (employment_categories: Employed Full-time|Part-time|Unemployed|Retired)
+  - employment_status (employment_categories: Employed Full-time|Part-time|Unemployed|Retired|Student)
   - education_level (edu_level: High school|Associate degree|Bachelor degree|Masters Degree|PhD)
   - created_at (timestamp without time zone)
   - updated_at (timestamp without time zone)
+  - user_persona (jsonb)
 
 TABLE: income
   - income_id (bigint, PK)
@@ -57,3 +58,23 @@ TABLE: goals
   - status (text, default 'active')
   - created_at (timestamp without time zone)
   - updated_at (timestamp without time zone)
+
+TABLE: chat_conversations
+  - conversation_id (bigint, PK)
+  - user_id (bigint, FK -> users.user_id)
+  - title (text)
+  - channel (text)
+  - started_at (timestamp without time zone)
+  - last_message_at (timestamp without time zone)
+  - summary_text (text)
+  - summary_created_at (timestamp without time zone)
+
+TABLE: chat_messages
+  - message_id (bigint, PK)
+  - conversation_id (bigint, FK -> chat_conversations.conversation_id)
+  - sender_type (text)
+  - source_agent (text)
+  - content (text)
+  - content_type (text)
+  - language (text)
+  - created_at (timestamp without time zone)

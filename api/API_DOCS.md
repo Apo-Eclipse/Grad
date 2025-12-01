@@ -511,18 +511,6 @@ Create a new user.
 **Request Body:**
 ```json
 {
-  "first_name": "Ahmed",
-  "last_name": "Hassan",
-  "birthday": "1990-05-15",
-  "job_title": "Software Engineer",
-  "address": "123 Main St, Cairo",
-  "employment_status": "Employed Full-time",
-  "education_level": "Bachelor degree",
-  "gender": "male"
-}
-```
-
-**Response (201 Created):**
 ```json
 {
   "success": true,

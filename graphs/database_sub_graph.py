@@ -27,10 +27,12 @@ def _execute_select_query(query: str) -> List[dict]:
 
 def _execute_modify_query(query: str) -> str:
     cleaned = (query or "").strip()
-    upper = cleaned.upper()
-    if not upper.startswith(("INSERT", "UPDATE", "DELETE")):
+    # Normalize whitespace to single spaces for robust checking
+    normalized = " ".join(cleaned.split()).upper()
+    if not normalized.startswith("INSERT INTO TRANSACTIONS"):
         raise ValueError(
-            "Only INSERT, UPDATE, or DELETE queries are allowed for modifications."
+            "Security Restriction: Only INSERT queries for the 'transactions' table are allowed. "
+            "UPDATE, DELETE, and other modifications are forbidden."
         )
     with connection.cursor() as cursor:
         cursor.execute(cleaned)

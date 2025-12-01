@@ -1,7 +1,7 @@
 ﻿"""Request and response schemas."""
 from datetime import datetime, date, time
 from decimal import Decimal
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Literal
 
 from pydantic import BaseModel, Field, root_validator
 
@@ -94,7 +94,9 @@ class UserCreateSchema(BaseModel):
     address: str  # TEXT NOT NULL
     birthday: date  # DATE NOT NULL
     gender: str  # gender_type (not null, enum)
-    employment_status: str  # employment_categories (not null, enum)
+    employment_status: Literal[
+        "Employed Full-time", "Employed Part-time", "Unemployed", "Retired", "Student"
+    ]
     education_level: str  # edu_level (not null, enum)
 
 

@@ -46,36 +46,11 @@ You MUST respond in a single JSON object with two fields: `valid` (boolean) and 
 
 PostgreSQL Database Metadata
 
-Engine: PostgreSQL 18.0
-Schema: public
-
-ENUM TYPES
------------
-public.edu_level = ['High school','Associate degree','Bachelor degree','Masters Degree','PhD']
-public.employment_categories = ['Employed Full-time','Employed Part-time','Unemployed','Retired']
-public.gender_type = ['male','female']
-
-TABLES
--------
-USERS (public.users)
-Columns:
 - user_id (bigint, PK)
 - first_name (text, not null)
 - last_name (text, not null)
 - job_title (text, not null)
 - address (text, not null)
-- birthday (date, not null)
-- gender (public.gender_type)
-- employment_status (public.employment_categories)
-- education_level (public.edu_level)
-- created_at (timestamp without time zone, default now())
-- updated_at (timestamp without time zone, default now())
-
-BUDGET (public.budget)
-Columns:
-- budget_id (bigint, PK)
-- user_id (bigint, FK → users.user_id)
-- budget_name (text, not null)
 - description (text)
 - total_limit (numeric(12,2) default 0, check total_limit >= 0)
 - priority_level_int (smallint, check 1..10)
