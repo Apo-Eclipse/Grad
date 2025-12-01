@@ -1,4 +1,5 @@
 <<<<<<< HEAD
+<<<<<<< HEAD
 import asyncio
 from typing import TypedDict, List
 
@@ -42,12 +43,16 @@ def _execute_modify_query(query: str) -> str:
 
 =======
 from agents import DatabaseAgent
+=======
+from agents import DatabaseAgent
+>>>>>>> c5cc8a00b674920893a03711ccfe2a7e80167f20
 from langgraph.graph import StateGraph, END, START
 from typing import TypedDict
 import pandas as pd
 import sqlite3
 import json
 import time
+<<<<<<< HEAD
 >>>>>>> c5cc8a00b674920893a03711ccfe2a7e80167f20
 class DatabaseAgentState(TypedDict):
     request: str         
@@ -96,6 +101,14 @@ async def database_agent(state: DatabaseAgentState) -> dict:
 =======
 def database_agent(state: DatabaseAgentState):
     step_text = state.get("request", "")
+=======
+class DatabaseAgentState(TypedDict):
+    request: str         
+    result: dict         
+
+def database_agent(state: DatabaseAgentState):
+    step_text = state.get("request", "")
+>>>>>>> c5cc8a00b674920893a03711ccfe2a7e80167f20
     try:
         out = DatabaseAgent.invoke({"request": step_text, "user": "1"})
         query = out.query
@@ -109,6 +122,9 @@ def database_agent(state: DatabaseAgentState):
         return {"result": {"step": step_text, "query": query, "data": results}}
     except Exception as e:
         return {"result": {"step": step_text, "query": None, "data": f"Agent Error: {str(e)}"}}
+<<<<<<< HEAD
+>>>>>>> c5cc8a00b674920893a03711ccfe2a7e80167f20
+=======
 >>>>>>> c5cc8a00b674920893a03711ccfe2a7e80167f20
 
 builder = StateGraph(DatabaseAgentState)
@@ -116,8 +132,12 @@ builder.add_node("database_agent", database_agent)
 builder.add_edge(START, "database_agent")
 builder.add_edge("database_agent", END)
 <<<<<<< HEAD
+<<<<<<< HEAD
 
 database_agent_super_agent = builder.compile()
+=======
+database_agent_super_agent = builder.compile()
+>>>>>>> c5cc8a00b674920893a03711ccfe2a7e80167f20
 =======
 database_agent_super_agent = builder.compile()
 >>>>>>> c5cc8a00b674920893a03711ccfe2a7e80167f20

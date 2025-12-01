@@ -1,4 +1,5 @@
 <<<<<<< HEAD
+<<<<<<< HEAD
 import asyncio
 import ast
 import logging
@@ -12,6 +13,11 @@ from langgraph.graph import StateGraph, END, START
 from agents import Explainer_agent, Analyser, Behaviour_analyser_orchestrator, Query_planner
 from graphs.database_sub_graph import database_agent_super_agent
 from langgraph.graph import StateGraph, END, START
+=======
+from agents import Explainer_agent, Analyser, Behaviour_analyser_orchestrator, Query_planner
+from graphs.database_sub_graph import database_agent_super_agent
+from langgraph.graph import StateGraph, END, START
+>>>>>>> c5cc8a00b674920893a03711ccfe2a7e80167f20
 from langgraph.types import Command
 from typing import TypedDict
 import ast
@@ -20,6 +26,9 @@ import csv
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import warnings
 import logging
+<<<<<<< HEAD
+>>>>>>> c5cc8a00b674920893a03711ccfe2a7e80167f20
+=======
 >>>>>>> c5cc8a00b674920893a03711ccfe2a7e80167f20
 
 warnings.filterwarnings("ignore", message=".*missing ScriptRunContext.*")
@@ -54,6 +63,7 @@ def analyser(state: BehaviourAnalystState):
     add_to_logs("analyser", "orchestrator", message)
     return {"analysis": analysis, "message": message, "sender": "analyser", "analysis": analysis}
 
+<<<<<<< HEAD
 <<<<<<< HEAD
 def orchestrator(state: BehaviourAnalystState) -> dict:
     """
@@ -116,6 +126,46 @@ def query_planner(state: BehaviourAnalystState):
     message = Output.message
     steps = Output.output
     
+=======
+def orchestrator(state: BehaviourAnalystState):
+    print("===> Orchestrator Invoked <===")
+    request = state.get("request", "")
+    analysis = state.get("analysis", "")
+    data_acquired = state.get("data_acquired", [])
+    message = state.get("message", "")
+    sender = state.get("sender", "")
+    Output = Behaviour_analyser_orchestrator.invoke({"request": request,
+                                                    "analysis": analysis,
+                                                    "message": message,
+                                                    "data_acquired": data_acquired,
+                                                    "sender": sender,
+                                                    "user": state.get("user", "")})
+    message = Output.message
+    next_step = Output.next_step
+    print("Next step: ", next_step)
+    print("Message to {}: ".format(next_step), message)
+    
+    add_to_logs("orchestrator", next_step, message)
+    return Command(update = {
+            "data_acquired": data_acquired,
+            "message": message, 
+            "analysis": analysis,
+            "user": state.get("user", ""),
+            "request": request,
+            "sender": "orchestrator"   
+            },
+            goto = next_step)
+
+def query_planner(state: BehaviourAnalystState):
+    print("===> Query Planner Invoked <===")
+    request = state.get("request", "")
+    message = state.get("message", "")
+    data_acquired = state.get("data_acquired", [])
+    Output = Query_planner.invoke({"request": request, "message": message, "data_acquired": data_acquired, "user": state.get("user", "")})
+    message = Output.message
+    steps = Output.output
+    
+>>>>>>> c5cc8a00b674920893a03711ccfe2a7e80167f20
     if isinstance(steps, str):
         try:
             steps = ast.literal_eval(steps)
@@ -139,6 +189,7 @@ def query_planner(state: BehaviourAnalystState):
     return {"data_acquired": data_acquired, "sender": "query_planner", "message": message}
 
 
+<<<<<<< HEAD
 <<<<<<< HEAD
     # Create a list of async tasks for the database agent subgraph
     tasks = [database_agent_super_agent.ainvoke({"request": step, "user_id": state.get("user_id")}) for step in steps]
@@ -305,10 +356,27 @@ def run_step(step):
     try:
         explanation = ex_out.explanation
         data_acquired.append(explanation)
+=======
+def run_step(step):
+    data_acquired = []
+    db_state = database_agent_super_agent.invoke({"request": step})
+    step = db_state.get("result", {}).get("step", "")
+    query = db_state.get("result", {}).get("query", "")
+    table = db_state.get("result", {}).get("data", [])
+    data_to_written = "The request was: " + str(step) \
+                        + "\n\n" + "The result was: " + str(table) + "\n"
+    ex_out = Explainer_agent.invoke({"request": data_to_written})
+    try:
+        explanation = ex_out.explanation
+        data_acquired.append(explanation)
+>>>>>>> c5cc8a00b674920893a03711ccfe2a7e80167f20
         ex_out += "\n\n" + "The explanation was: " + str(explanation) + "\n"
     except Exception:
         ex_out += "\n\n" + "Could not get explanation"
     return data_to_written,data_acquired
+<<<<<<< HEAD
+>>>>>>> c5cc8a00b674920893a03711ccfe2a7e80167f20
+=======
 >>>>>>> c5cc8a00b674920893a03711ccfe2a7e80167f20
 
 builder = StateGraph(BehaviourAnalystState)
@@ -322,6 +390,7 @@ builder.add_edge("orchestrator", END)
 builder.add_edge("query_planner", "orchestrator")
 builder.add_edge("analyser", "orchestrator")
 
+<<<<<<< HEAD
 <<<<<<< HEAD
 # routing logic from the orchestrator
 def route_from_orchestrator(state: BehaviourAnalystState):
@@ -371,6 +440,9 @@ builder.add_conditional_edges(
 )
 
 behaviour_analyst_super_agent = builder.compile()
+=======
+behaviour_analyst_super_agent = builder.compile()
+>>>>>>> c5cc8a00b674920893a03711ccfe2a7e80167f20
 =======
 behaviour_analyst_super_agent = builder.compile()
 >>>>>>> c5cc8a00b674920893a03711ccfe2a7e80167f20

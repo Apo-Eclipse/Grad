@@ -11,10 +11,14 @@ from .Recommendation_agent.news_finder import NewsWriter
 from .Recommendation_agent.scrapper import Scrapper
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 from .database_agent import DatabaseAgent
 
 from .personal_assistant.assistant import PersonalAssistant
 from .personal_assistant.memory_manager import ConversationMemory, UserProfile
+=======
+from .database_agent import DatabaseAgent
+>>>>>>> c5cc8a00b674920893a03711ccfe2a7e80167f20
 =======
 from .database_agent import DatabaseAgent
 >>>>>>> c5cc8a00b674920893a03711ccfe2a7e80167f20

@@ -30,6 +30,7 @@ system_prompt = """
 
 user_prompt = """
 <<<<<<< HEAD
+<<<<<<< HEAD
 Current Task State:
 - User Request: {request}
 - Data Acquired by database agent: {data_acquired}
@@ -40,12 +41,17 @@ Current Task State:
 
 Based on the current state, decide the next step.
 =======
+=======
+>>>>>>> c5cc8a00b674920893a03711ccfe2a7e80167f20
     Data acquired: {data_acquired}
     analysis done: {analysis} 
     first request: {request}
     user: {user}
     message sended from {sender}: {message}
     Based on the above information, decide the next step for the task.
+<<<<<<< HEAD
+>>>>>>> c5cc8a00b674920893a03711ccfe2a7e80167f20
+=======
 >>>>>>> c5cc8a00b674920893a03711ccfe2a7e80167f20
 """
 

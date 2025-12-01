@@ -19,4 +19,7 @@ gemini_embedding = GoogleGenerativeAIEmbeddings(
     model="models/gemini-embedding-001", 
     google_api_key=os.getenv("GEMINI_API_KEY") 
 )
+<<<<<<< HEAD
+>>>>>>> c5cc8a00b674920893a03711ccfe2a7e80167f20
+=======
 >>>>>>> c5cc8a00b674920893a03711ccfe2a7e80167f20

@@ -10,6 +10,7 @@ class AnalyserOutput(BaseModel):
     
 system_prompt = """
 <<<<<<< HEAD
+<<<<<<< HEAD
     You are a Senior Financial Analyst Agent.
     Your mission is to synthesize all available user transaction data into a deep, insightful narrative. You must explain the user's financial behavior, identify key patterns, spot anomalies, and decide if more specific data is needed to complete the picture.
 
@@ -134,6 +135,12 @@ system_prompt = """
     Your task is to analyze the spending behavior of a user based on text explain tables data acquired from previous queries.
     You have to return a summary of the analysis and any insights you can derive from the data.
     
+=======
+    You are the analyser Agent.
+    Your task is to analyze the spending behavior of a user based on text explain tables data acquired from previous queries.
+    You have to return a summary of the analysis and any insights you can derive from the data.
+    
+>>>>>>> c5cc8a00b674920893a03711ccfe2a7e80167f20
     ### Rules
     1. Focus on the user's spending patterns, habits, and any anomalies you can identify.
     2. Use the data acquired to provide a comprehensive analysis.
@@ -150,6 +157,9 @@ system_prompt = """
     9. You have to request more data if needed for better analysis such as more analysis on specific category or store or location or time such as filter by specific store, location.
     10. Revise your analysis based on the new data acquired to rewrite your output.
     11. Do not request more analysis in the output field, only in the message field.
+<<<<<<< HEAD
+>>>>>>> c5cc8a00b674920893a03711ccfe2a7e80167f20
+=======
 >>>>>>> c5cc8a00b674920893a03711ccfe2a7e80167f20
 """
 metadata = """ 

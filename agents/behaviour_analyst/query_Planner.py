@@ -13,6 +13,7 @@ class query_plannerOutput(BaseModel):
         description="A list of clear and simple steps for another database agent to create SQL-style queries that retrieve insights about a single user's behavior and spending patterns."
     )
 <<<<<<< HEAD
+<<<<<<< HEAD
     message: str = Field(
         "",
         description="One concise sentence summarizing what the steps cover and any notable gaps."
@@ -64,6 +65,8 @@ Notes:
 - Keep steps short and implementation-ready for a downstream SQL generator.
 - Do NOT emit SQL. Only plain-language step descriptions.
 =======
+=======
+>>>>>>> c5cc8a00b674920893a03711ccfe2a7e80167f20
     message: str = Field("", description="A concise summary of the steps outlined in the output.")
     
 system_prompt = """
@@ -97,6 +100,9 @@ system_prompt = """
         "Step 2 ...",
         ...
     ]
+<<<<<<< HEAD
+>>>>>>> c5cc8a00b674920893a03711ccfe2a7e80167f20
+=======
 >>>>>>> c5cc8a00b674920893a03711ccfe2a7e80167f20
 """
 
@@ -106,6 +112,7 @@ metadata = """
 ------------------------------------------------------------
 Purpose: Stores demographic and socioeconomic information for each user.
 
+<<<<<<< HEAD
 <<<<<<< HEAD
 last steps generated: {steps}
 
@@ -123,6 +130,20 @@ Columns:
 - Address (VARCHAR(200)): Residential address (includes neighborhood and city).
 - Income_EGP (DECIMAL(10,2)): Monthly income in Egyptian Pounds.
 
+=======
+Columns:
+- User_ID (INT, PK, AUTO_INCREMENT): Unique identifier for each user.
+- Name (VARCHAR(100)): User's full name.
+- Age (INT): User's age in years.
+- Gender (ENUM('Male','Female','Other')): Gender of the user.
+- Job_Title (VARCHAR(100)): Current job title.
+- Employment_Status (ENUM('Full-time','Part-time','Unemployed','Freelancer','Student')): Employment type.
+- Education (VARCHAR(100)): Highest level of education completed.
+- Marital_Status (ENUM('Single','Married','Divorced','Widowed')): Marital status.
+- Address (VARCHAR(200)): Residential address (includes neighborhood and city).
+- Income_EGP (DECIMAL(10,2)): Monthly income in Egyptian Pounds.
+
+>>>>>>> c5cc8a00b674920893a03711ccfe2a7e80167f20
 ------------------------------------------------------------
 2. transactions_table
 ------------------------------------------------------------
@@ -186,6 +207,9 @@ Notes:
 - All monetary values are stored in Egyptian Pounds (EGP).
 - Date and time fields enable fine-grained temporal analysis.
 - The schema supports both behavioral analytics and personalized financial storytelling.
+<<<<<<< HEAD
+>>>>>>> c5cc8a00b674920893a03711ccfe2a7e80167f20
+=======
 >>>>>>> c5cc8a00b674920893a03711ccfe2a7e80167f20
 """
 

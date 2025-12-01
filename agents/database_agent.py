@@ -35,89 +35,6 @@ Date and Time Handling:
         * Hour and Minute for time-of-day analysis
     - Do not reference the raw DateTime column.
 
-<<<<<<< HEAD
-RULES:
-1. One SQL query only. PostgreSQL 18.0 syntax.
-2. Use DATE_TRUNC, EXTRACT for dates. Single quotes in SQL, double quotes in JSON.
-3. Available tables: users, budget, goals, income, transactions (read-only)
-4. Numeric: ROUND(val::numeric, 2) for 2 decimals. Use aggregates (SUM, COUNT, AVG, MIN, MAX) with GROUP BY.
-5. Always constrain by user_id's.
-6. In selecting columns dont show id fields, is_active, created_at, updated_at.
-7. In selecting columns try to show columns names not index numbers. so the results are easy to read. like {{"budget_name": "Food", "month": "2024-01", "total_spent": 250.75}}, not {{ 0: "Food", 1: "2024-01", 2: 250.75}}
-
-DATABASE SCHEMA (with field types):
-
-TABLE: transactions (NO "updated_at" - only created_at exists)
-  - transaction_id (bigint, PK)
-  - date (date, not null)
-  - amount (numeric(12,2), not null, CHECK amount >= 0)
-  - time (time without time zone)
-  - store_name (text)
-  - city (text)
-  - type_spending (text)
-  - user_id (bigint, FK -> users.user_id)
-  - budget_id (bigint, FK -> budget.budget_id)
-  - neighbourhood (text)
-  - created_at (timestamp without time zone, default now())
-
-TABLE: budget
-  - budget_id (bigint, PK)
-  - user_id (bigint, FK -> users.user_id)
-  - budget_name (text, not null)
-  - description (text)
-  - total_limit (numeric(12,2), default 0, CHECK total_limit >= 0)
-  - priority_level_int (smallint, 1-10)
-  - is_active (boolean, default true)
-  - created_at (timestamp without time zone)
-  - updated_at (timestamp without time zone)
-
-TABLE: users
-  - user_id (bigint, PK)
-  - first_name (text, not null)
-  - last_name (text, not null)
-  - job_title (text, not null)
-  - address (text, not null)
-  - birthday (date, not null)
-  - gender (gender_type: male|female)
-  - employment_status (employment_categories: Employed Full-time|Part-time|Unemployed|Retired)
-  - education_level (edu_level: High school|Associate degree|Bachelor degree|Masters Degree|PhD)
-  - created_at (timestamp without time zone)
-  - updated_at (timestamp without time zone)
-
-TABLE: income
-  - income_id (bigint, PK)
-  - user_id (bigint, FK -> users.user_id)
-  - type_income (text, not null)
-  - amount (numeric(12,2), default 0, CHECK amount >= 0)
-  - description (text)
-  - created_at (timestamp without time zone)
-  - updated_at (timestamp without time zone)
-
-TABLE: goals
-  - goal_id (bigint, PK)
-  - user_id (bigint, FK -> users.user_id)
-  - goal_name (text, not null)
-  - description (text)
-  - target (numeric(12,2), default 0, CHECK target >= 0)
-  - start_date (date)
-  - due_date (date)
-  - status (text, default 'active')
-  - created_at (timestamp without time zone)
-  - updated_at (timestamp without time zone)
-
-COMMON PATTERNS:
-- Monthly spend by budget:
-  SELECT b.budget_name, DATE_TRUNC('month', t.date) AS month, ROUND(SUM(t.amount)::numeric, 2) AS total_spent
-  FROM transactions t JOIN budget b ON t.budget_id = b.budget_id
-  WHERE t.user_id = $USER_ID GROUP BY b.budget_name, month ORDER BY month DESC
-
-- Overspend detection:
-  SELECT b.budget_name, ROUND(SUM(t.amount)::numeric, 2) AS spent, b.total_limit,
-  ROUND(100.0 * SUM(t.amount) / NULLIF(b.total_limit, 0), 2) AS pct_of_limit
-  FROM transactions t JOIN budget b ON t.budget_id = b.budget_id
-  WHERE t.user_id = $USER_ID AND DATE_TRUNC('month', t.date) = DATE_TRUNC('month', CURRENT_DATE)
-  GROUP BY b.budget_name, b.total_limit ORDER BY pct_of_limit DESC
-=======
 Grouping and Ranking (SQLite-safe):
     - For "most frequent", "top", or "highest" results:
         * Always compute aggregates with GROUP BY.
@@ -127,7 +44,6 @@ Grouping and Ranking (SQLite-safe):
     - In SQLite, enforce this with:
         * Subquery + MAX() joined back to the grouped results (always works), OR
         * Window functions (RANK, ROW_NUMBER, DENSE_RANK) if supported.
->>>>>>> c5cc8a00b674920893a03711ccfe2a7e80167f20
 """
 
 

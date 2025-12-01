@@ -394,6 +394,9 @@ def run_recommendation_agent():
 def main():
     run_trend_analysis()
     return
+<<<<<<< HEAD
+>>>>>>> c5cc8a00b674920893a03711ccfe2a7e80167f20
+=======
 >>>>>>> c5cc8a00b674920893a03711ccfe2a7e80167f20
 
 if __name__ == "__main__":
