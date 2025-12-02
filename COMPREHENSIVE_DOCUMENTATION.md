@@ -37,20 +37,20 @@ The system follows a **Micro-Service inspired Monolithic Architecture**, where d
     *   **Async Handling**: Offloads heavy LLM tasks to background threads to keep the server responsive.
     *   **Persistence**: Automatically logs every request/response pair to the `chat_messages` table.
 
-    ```mermaid
-    sequenceDiagram
-        participant Client
-        participant API as Django Ninja
-        participant Service as PA Service
-        participant DB as PostgreSQL
+```mermaid
+sequenceDiagram
+    participant Client
+    participant API as Django Ninja
+    participant Service as PA Service
+    participant DB as PostgreSQL
 
-        Client->>API: POST /analyze
-        API->>Service: Validate & Invoke
-        Service->>Service: Run Agents (LangGraph)
-        Service->>DB: Persist Chat History
-        Service-->>API: Return Result
-        API-->>Client: JSON Response
-    ```
+    Client->>API: POST /analyze
+    API->>Service: Validate & Invoke
+    Service->>Service: Run Agents (LangGraph)
+    Service->>DB: Persist Chat History
+    Service-->>API: Return Result
+    API-->>Client: JSON Response
+```
 
 3.  **Orchestration Layer**: Built with **LangGraph**, this layer manages the state of the conversation and routes tasks to specialized agents.
 4.  **Agent Layer**: Independent modules responsible for specific domains (SQL generation, Data Analysis, Chat).
@@ -156,12 +156,15 @@ The Orchestrator follows a strict evaluation pipeline to prevent loops and ensur
 
 ```mermaid
 flowchart TD
-    Start([State Evaluation]) --> Step1{1. Loop/Stalled?}
+    Start([State Evaluation]) --> Step1{"1. Loop/Stalled?"}
     Step1 -- Yes --> Analyser[Analyser]
-    Step1 -- No --> Step2{2. Explicit Data Request?}
+    Step1 -- No --> Step2{"2. Explicit Data Request?"}
     Step2 -- Yes --> QP[Query Planner]
-    Step2 -- No --> Step3{3. Quality/Insights OK?}
-    Step3 -- No --> Analyser
+    Step2 -- No --> Step3{"3. Quality/Insights OK?"}
+    Step3 -- No --> Analyser[Analyser]
+```
+
+**Figure: Orchestrator Decision Logic**
 
 #### 2.3.5 Transaction Management
 Transaction addition is no longer handled by the main router or the Database Agent. Instead, it is offloaded to the **Transaction Maker Agent** (Section 4.7) to ensure structured data entry, validation against active budgets, and a dedicated user experience.
@@ -197,8 +200,6 @@ Transaction addition is no longer handled by the main router or the Database Age
     *   **Writer**: Generates the narrative report.
 *   **Output**: Produces a combined HTML/CSS/JS report for rich visualization.
 
-```mermaid
-graph LR
 
 ## 3. Technical Implementation
 
@@ -224,57 +225,57 @@ erDiagram
     CHAT_CONVERSATIONS ||--o{ CHAT_MESSAGES : contains
 
     USERS {
-        bigint user_id PK
-        text first_name
-        text last_name
-        text job_title
-        text address
+        int user_id PK
+        string first_name
+        string last_name
+        string job_title
+        string address
         date birthday
-        gender_type gender
-        employment_categories employment_status
-        edu_level education_level
-        jsonb user_persona
+        string gender
+        string employment_status
+        string education_level
+        json user_persona
     }
     BUDGET {
-        bigint budget_id PK
-        bigint user_id FK
-        text budget_name
-        numeric total_limit
-        smallint priority_level_int
+        int budget_id PK
+        int user_id FK
+        string budget_name
+        float total_limit
+        int priority_level_int
     }
     GOALS {
-        bigint goal_id PK
-        bigint user_id FK
-        text goal_name
-        numeric target
+        int goal_id PK
+        int user_id FK
+        string goal_name
+        float target
         date due_date
     }
     INCOME {
-        bigint income_id PK
-        bigint user_id FK
-        text type_income
-        numeric amount
+        int income_id PK
+        int user_id FK
+        string type_income
+        float amount
     }
     TRANSACTIONS {
-        bigint transaction_id PK
-        bigint user_id FK
-        bigint budget_id FK
-        date date
-        numeric amount
-        text store_name
-        text type_spending
+        int transaction_id PK
+        int user_id FK
+        int budget_id FK
+        date transaction_date
+        float amount
+        string store_name
+        string type_spending
     }
     CHAT_CONVERSATIONS {
-        bigint conversation_id PK
-        bigint user_id FK
-        text title
-        text channel
+        int conversation_id PK
+        int user_id FK
+        string title
+        string channel
     }
     CHAT_MESSAGES {
-        bigint message_id PK
-        bigint conversation_id FK
-        text sender_type
-        text content
+        int message_id PK
+        int conversation_id FK
+        string sender_type
+        string content
     }
 ```
 
