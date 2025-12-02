@@ -1,6 +1,6 @@
 from typing import TypedDict
 from LLMs.gemini_models import gemini_llm
-from LLMs.azure_models import azure_llm
+from LLMs.azure_models import azure_llm, large_azure_llm
 from langchain_core.prompts import ChatPromptTemplate
 from pydantic import Field, BaseModel
 
@@ -9,8 +9,6 @@ class AnalyserOutput(BaseModel):
     message : str = Field(..., description="Any additional message or insights from the analysis to the orchestrator.")
     
 system_prompt = """
-<<<<<<< HEAD
-<<<<<<< HEAD
     You are a Senior Financial Analyst Agent.
     Your mission is to synthesize all available user transaction data into a deep, insightful narrative. You must explain the user's financial behavior, identify key patterns, spot anomalies, and decide if more specific data is needed to complete the picture.
 
@@ -127,12 +125,10 @@ user request: {user_request}
 
 if there is new info in the Acquired Data till now update the previous analysis with it, DON'T RETURN THE SAME PREVIOUS ANALYSIS AS IT IS.
 """
+
 analyser_prompt = ChatPromptTemplate.from_messages([
-    ("user", system_prompt),
-    ("user", metadata),
-    ("user", "Acquired Data till now: {data_acquired}"),
-    ("user", "Previous Analysis: {previous_analysis}"),
-    ("user", "user request: {user_request}"),
+    ("system", system_prompt),
+    ("user", user_prompt),
 ])
 
-Analyser = analyser_prompt | azure_llm.with_structured_output(AnalyserOutput)
+Analyser = analyser_prompt | large_azure_llm.with_structured_output(AnalyserOutput, method="function_calling")

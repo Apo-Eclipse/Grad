@@ -1,11 +1,7 @@
-from typing import TypedDict
-from LLMs.gemini_models import gemini_llm
-from LLMs.azure_models import azure_llm
+from LLMs.azure_models import gpt_oss_llm
 from langchain_core.prompts import ChatPromptTemplate
 from pydantic import Field, BaseModel
-import sqlite3
 
-conn = sqlite3.connect("D:/projects/Multi-Agent System/data/database.db")
 
 class DatabaseAgentOutput(BaseModel):
     query: str = Field(..., description="The corresponding SQL query")
@@ -94,9 +90,8 @@ user_id: {user_id}
 """
 
 prompt = ChatPromptTemplate.from_messages([
-    ("user", system_prompt),
-    ("user", metadata),
-    ("user", "{request}, user_id: {user}"),
+    ("system", system_prompt),
+    ("user", user_prompt),
 ])
 
-DatabaseAgent = prompt | azure_llm.with_structured_output(DatabaseAgentOutput)
+DatabaseAgent = prompt | gpt_oss_llm.with_structured_output(DatabaseAgentOutput)

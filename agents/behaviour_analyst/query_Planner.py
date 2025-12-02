@@ -1,19 +1,13 @@
-from typing import Literal,TypedDict
-from LLMs.gemini_models import gemini_llm
-from LLMs.azure_models import azure_llm
-from langgraph.graph import StateGraph, END
-from typing import Dict, Any, List, Union
+from typing import List
+from LLMs.azure_models import gpt_oss_llm
 from langchain_core.prompts import ChatPromptTemplate
 from pydantic import Field, BaseModel
-from LLMs.ollama_llm import ollama_llm
 
 class query_plannerOutput(BaseModel):
     output: List[str] = Field(
-        ..., 
-        description="A list of clear and simple steps for another database agent to create SQL-style queries that retrieve insights about a single user's behavior and spending patterns."
+        ...,
+        description="A list (≤6) of clear, text-only steps for another database agent to create aggregated SQL queries about a single user's behavior."
     )
-<<<<<<< HEAD
-<<<<<<< HEAD
     message: str = Field(
         "",
         description="One concise sentence summarizing what the steps cover and any notable gaps."
@@ -75,107 +69,11 @@ User ID: {user}
 last steps generated: {steps}
 
 Orchestrator request: {message}
-=======
-Columns:
-- User_ID (INT, PK, AUTO_INCREMENT): Unique identifier for each user.
-- Name (VARCHAR(100)): User's full name.
-- Age (INT): User's age in years.
-- Gender (ENUM('Male','Female','Other')): Gender of the user.
-- Job_Title (VARCHAR(100)): Current job title.
-- Employment_Status (ENUM('Full-time','Part-time','Unemployed','Freelancer','Student')): Employment type.
-- Education (VARCHAR(100)): Highest level of education completed.
-- Marital_Status (ENUM('Single','Married','Divorced','Widowed')): Marital status.
-- Address (VARCHAR(200)): Residential address (includes neighborhood and city).
-- Income_EGP (DECIMAL(10,2)): Monthly income in Egyptian Pounds.
-
-=======
-Columns:
-- User_ID (INT, PK, AUTO_INCREMENT): Unique identifier for each user.
-- Name (VARCHAR(100)): User's full name.
-- Age (INT): User's age in years.
-- Gender (ENUM('Male','Female','Other')): Gender of the user.
-- Job_Title (VARCHAR(100)): Current job title.
-- Employment_Status (ENUM('Full-time','Part-time','Unemployed','Freelancer','Student')): Employment type.
-- Education (VARCHAR(100)): Highest level of education completed.
-- Marital_Status (ENUM('Single','Married','Divorced','Widowed')): Marital status.
-- Address (VARCHAR(200)): Residential address (includes neighborhood and city).
-- Income_EGP (DECIMAL(10,2)): Monthly income in Egyptian Pounds.
-
->>>>>>> c5cc8a00b674920893a03711ccfe2a7e80167f20
-------------------------------------------------------------
-2. transactions_table
-------------------------------------------------------------
-Purpose: Stores detailed records of every financial transaction for users.
-
-Columns:
-- Transaction_ID (INT, PK, AUTO_INCREMENT): Unique transaction identifier.
-- User_ID (INT, FK → user_table.User_ID): Linked user.
-- Category (VARCHAR(50)): Spending category (e.g., Groceries, Transport, Coffee).
-- Store_Name (VARCHAR(100)): Vendor or service provider name.
-- Day (TINYINT): Day of the month when the transaction occurred.
-- Month (TINYINT): Month of the year when the transaction occurred.
-- Year (SMALLINT): Year of the transaction.
-- Name_of_day (ENUM('Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday')): Weekday name.
-- Hour (TINYINT): Hour of the transaction (24-hour format).
-- Minute (TINYINT): Minute of the transaction.
-- Neighborhood (VARCHAR(100)): Neighborhood of the transaction.
-- City (VARCHAR(100)): City of the transaction (e.g., Cairo, Giza).
-- Amount_EGP (DECIMAL(10,2)): Transaction amount in Egyptian Pounds.
-- Type_spending (ENUM('Cash','Credit','Debit','E-Wallet','Bank Transfer')): Payment method.
-
-------------------------------------------------------------
-3. budget_table
-------------------------------------------------------------
-Purpose: Tracks spending limits and monitoring for each user and category.
-
-Columns:
-- user_id (INT, FK → user_table.User_ID): Linked user.
-- budget_name (VARCHAR(100)): Descriptive name for the budget (e.g., 'Groceries Budget Sep 2025').
-- priority_level (ENUM('low','mid','high')): Importance of this budget.
-- limit (DECIMAL(10,2)): Planned or allowed budget cap.
-- description (TEXT): Short status text describing spending performance or targets.
-
-------------------------------------------------------------
-4. goals_table
-------------------------------------------------------------
-Purpose: Tracks long-term financial goals and progress for each user.
-
-Columns:
-- user_id (INT, FK → user_table.User_ID): Linked user.
-- goal_name (VARCHAR(100)): Goal title (e.g., 'Emergency Fund').
-- target_date (DATE): Date by which the user wants to reach the goal.
-- target_saving (DECIMAL(10,2)): Total savings target in EGP.
-- current (DECIMAL(10,2)): Current amount saved.
-- objective (TEXT): Description of the goal.
-- query_saving (VARCHAR(255)): Optional computed formula or query for dynamic savings tracking.
-
-------------------------------------------------------------
-Relationships:
-- user_table (1) ───< transactions_table (many)
-- user_table (1) ───< budget_table (many)
-- user_table (1) ───< goals_table (many)
-
-------------------------------------------------------------
-Indexes and Keys:
-- PK: user_table.User_ID, transactions_table.Transaction_ID
-- FK: transactions_table.User_ID, budget_table.user_id, goals_table.user_id
-
-------------------------------------------------------------
-Notes:
-- All monetary values are stored in Egyptian Pounds (EGP).
-- Date and time fields enable fine-grained temporal analysis.
-- The schema supports both behavioral analytics and personalized financial storytelling.
-<<<<<<< HEAD
->>>>>>> c5cc8a00b674920893a03711ccfe2a7e80167f20
-=======
->>>>>>> c5cc8a00b674920893a03711ccfe2a7e80167f20
 """
 
 prompt = ChatPromptTemplate.from_messages([
     ("system", system_prompt),
-    ("user", metadata),
-    ("user", "The request is: {request}, user ID is: {user}"),
-    ("user", "orchestrator's message: {message}"),
+    ("user", user_prompt),
 ])
 
-Query_planner = prompt | azure_llm.with_structured_output(query_plannerOutput)
+Query_planner = prompt | gpt_oss_llm.with_structured_output(query_plannerOutput)

@@ -1,11 +1,12 @@
 from typing import Literal,TypedDict
-from LLMs.gemini_models import gemini_llm
-from LLMs.azure_models import azure_llm
+from LLMs.azure_models import large_azure_llm, gpt_oss_llm
 from langgraph.graph import StateGraph, END
 from typing import Dict, Any
 from langchain_core.prompts import ChatPromptTemplate
 from pydantic import Field, BaseModel
-from LLMs.ollama_llm import ollama_llm
+from langchain.output_parsers import PydanticOutputParser, OutputFixingParser
+
+
 
 class orchestratorOutput(BaseModel):
     message: str = Field(..., description="The message from the agent. (ok if there is no problem and error if there is)")
@@ -49,8 +50,6 @@ You MUST respond with a single, valid JSON object:
 """
 
 user_prompt = """
-<<<<<<< HEAD
-<<<<<<< HEAD
 Current Task State:
 - Current Date: {current_date}
 - User Request: {request}
@@ -61,19 +60,6 @@ Current Task State:
 {message}
 
 Based on the current state, decide the next step.
-=======
-=======
->>>>>>> c5cc8a00b674920893a03711ccfe2a7e80167f20
-    Data acquired: {data_acquired}
-    analysis done: {analysis} 
-    first request: {request}
-    user: {user}
-    message sended from {sender}: {message}
-    Based on the above information, decide the next step for the task.
-<<<<<<< HEAD
->>>>>>> c5cc8a00b674920893a03711ccfe2a7e80167f20
-=======
->>>>>>> c5cc8a00b674920893a03711ccfe2a7e80167f20
 """
 
 prompt = ChatPromptTemplate.from_messages([
@@ -81,4 +67,4 @@ prompt = ChatPromptTemplate.from_messages([
     ("user", user_prompt)
 ])
 
-Behaviour_analyser_orchestrator = prompt | azure_llm.with_structured_output(orchestratorOutput)
+Behaviour_analyser_orchestrator = prompt | gpt_oss_llm.with_structured_output(orchestratorOutput)
