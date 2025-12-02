@@ -1,7 +1,7 @@
 ﻿"""Request and response schemas."""
 from datetime import datetime, date, time
 from decimal import Decimal
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Literal
 
 from pydantic import BaseModel, Field, root_validator
 
@@ -94,7 +94,9 @@ class UserCreateSchema(BaseModel):
     address: str  # TEXT NOT NULL
     birthday: date  # DATE NOT NULL
     gender: str  # gender_type (not null, enum)
-    employment_status: str  # employment_categories (not null, enum)
+    employment_status: Literal[
+        "Employed Full-time", "Employed Part-time", "Unemployed", "Retired", "Student"
+    ]
     education_level: str  # edu_level (not null, enum)
 
 
@@ -118,4 +120,40 @@ class GoalMakerResponseSchema(BaseModel):
     target: Optional[float] = None
     goal_description: Optional[str] = None
     due_date: Optional[str] = None
+    is_done: bool = False
+
+
+class BudgetMakerRequestSchema(BaseModel):
+    user_id: int
+    user_request: str
+    conversation_id: Optional[int] = None
+
+
+class BudgetMakerResponseSchema(BaseModel):
+    conversation_id: int
+    message: str
+    budget_name: Optional[str] = None
+    total_limit: Optional[float] = None
+    description: Optional[str] = None
+    priority_level_int: Optional[int] = None
+    is_done: bool = False
+
+
+class TransactionMakerRequestSchema(BaseModel):
+    user_id: int
+    user_request: str
+    conversation_id: Optional[int] = None
+
+
+class TransactionMakerResponseSchema(BaseModel):
+    conversation_id: int
+    message: str
+    amount: Optional[float] = None
+    budget_id: Optional[int] = None
+    store_name: Optional[str] = None
+    date: Optional[str] = None
+    time: Optional[str] = None
+    city: Optional[str] = None
+    neighbourhood: Optional[str] = None
+    type_spending: Optional[str] = None
     is_done: bool = False

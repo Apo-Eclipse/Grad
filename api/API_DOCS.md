@@ -13,6 +13,22 @@
   - `/api/personal_assistant/*` (api/personal_assistant_api/api.py)
   - `/api/database/*` (api/personal_assistant_api/db_retrieval.py)
 
+```mermaid
+sequenceDiagram
+    participant Client
+    participant API as Django Ninja
+    participant Service as PA Service
+    participant DB as PostgreSQL
+
+    Client->>API: POST /api/personal_assistant/analyze
+    API->>Service: run_analysis()
+    Service->>DB: Fetch Context (History/Profile)
+    Service->>Service: Run LangGraph Orchestrator
+    Service->>DB: Store Result (Chat Messages)
+    Service-->>API: Result
+    API-->>Client: JSON Response
+```
+
 **Directory Layout**
 - `api/api_config`: Django project wiring (settings, URLs, ASGI/WSGI).
 - `api/personal_assistant_api`: Endpoints, services, and schemas.
@@ -32,6 +48,7 @@
   - Includes comprehensive error handling and performance timing.
 - `api/personal_assistant_api/db_retrieval.py`
   - `_run_select` and `_execute_modify` centralize database I/O; `_safe_json_body` only backs the generic SQL helpers.
+  - `fetch_active_budgets` is a reusable helper that retrieves active budgets for both the API and the Router.
   - CRUD endpoints use Pydantic request schemas so Ninja validates payloads (see `TransactionCreateSchema`, `BudgetCreateSchema`, etc.).
   - Transaction responses include `budget_name`, and `/users/{user_id}/exists` returns a minimal profile for quick lookups.
   - Overspend analytics now returns category rows plus a `summary` block with total income, total spend, and net position.
@@ -42,20 +59,9 @@
   - `database_agent_node` includes 10-second timeout protection and enhanced error handling.
   - PersonalAssistant instance management ensures proper context isolation across conversations.
   - Database agent receives combined user ask and routing instruction for better context.
+  - **Budget Validation**: The orchestrator now fetches active budgets and validates transaction requests (checking amount/category) before routing. It also resolves category names to `budget_id` for the Database Agent.
 - `agents/behaviour_analyst/analyser.py`
   - Financial analyst agent with strict requirements for specific column/table names when requesting data.
-  - Enforces explicit naming: 'store_name', 'city', 'type_spending', 'budget_name', 'neighbourhood', etc.
-
-**Endpoints**
-- Personal Assistant
-  - POST `/api/personal_assistant/conversations/start` - start a session
-  - POST `/api/personal_assistant/analyze` - run analysis and persist messages
-  - GET  `/api/personal_assistant/health` - health check
-  - POST `/api/personal_assistant/goals/assist` - structured goal-making conversation with memory
-- Database
-  - GET  `/api/database/transactions?user_id=&start_date=&end_date=&limit=` - retrieve transactions
-  - POST `/api/database/transactions` - create new transaction
-  - PUT  `/api/database/transactions/{transaction_id}` - update existing transaction
   - DELETE `/api/database/transactions/{transaction_id}` - delete transaction (permanent)
   - GET  `/api/database/transactions/search?user_id=&query=&category=&min_amount=&max_amount=&start_date=&end_date=&city=&neighbourhood=&limit=` - advanced transaction search
   - GET  `/api/database/budget?user_id=` - retrieve active budgets only
@@ -101,6 +107,21 @@ Continue a goal-focused conversation for a specific user using the Goal Maker ag
 - `user_request` (string, required): The latest message from the user about their goal (question, constraint, clarification, etc.).
 - `conversation_id` (int, required): Existing conversation identifier created via `POST /api/personal_assistant/conversations/start` (use `channel='goal_maker'`).
 
+```mermaid
+sequenceDiagram
+    participant User
+    participant API
+    participant Agent as Goal/Budget Maker
+    participant DB
+
+    User->>API: POST /assist (Request)
+    API->>DB: Load User Summary & History
+    API->>Agent: Invoke(Context + Request)
+    Agent-->>API: JSON Response (Message + Fields)
+    API->>DB: Persist Interaction
+    API-->>User: Response (Question or Final Confirmation)
+```
+
 **Behavior & Memory:**
 - The client must first call `POST /api/personal_assistant/conversations/start` with `channel='goal_maker'` to obtain a `conversation_id`.
 - For each call, the same `conversation_id` is passed so the service can load recent `chat_messages` and build `last_conversation` context.
@@ -145,6 +166,103 @@ Continue a goal-focused conversation for a specific user using the Goal Maker ag
   "error": "GOAL_MAKER_ERROR",
   "message": "Failed to create or resolve conversation",
   "timestamp": "2024-11-04T09:31:00"
+}
+```
+
+### Budget Maker Endpoint
+
+#### POST /api/personal_assistant/budget/assist
+Continue a budget-focused conversation for a specific user using the Budget Maker agent.
+
+**Request Body:**
+```json
+{
+  "user_id": 3,
+  "user_request": "I want to set a budget for food",
+  "conversation_id": 42
+}
+```
+
+**Field Notes:**
+- `user_id` (int, required): ID of the user.
+- `user_request` (string, required): The latest message from the user.
+- `conversation_id` (int, required): Existing conversation identifier.
+
+**Behavior:**
+- Similar to Goal Maker, it maintains conversation history.
+- Helps the user define `budget_name`, `total_limit` (monthly), and `priority_level_int` (1-10).
+- Validates limits against income and spending history.
+
+**Response (200 OK):**
+```json
+{
+  "conversation_id": 42,
+  "message": "Okay, what is the maximum amount you want to spend on food each month?",
+  "budget_name": "Food",
+  "total_limit": null,
+  "description": "Monthly food expenses",
+  "priority_level_int": null,
+  "is_done": false
+}
+```
+
+### Transaction Maker Endpoint
+
+#### POST /api/personal_assistant/transaction/assist
+Handles natural language requests to add transactions. Uses the `TransactionMaker` agent to parse details and map categories to active budgets.
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant API
+    participant Agent as Transaction Maker
+    participant DB
+
+    User->>API: POST /transaction/assist
+    API->>DB: Fetch Active Budgets
+    API->>Agent: Invoke(Request + Budgets)
+    Agent->>Agent: Parse & Map Category
+    Agent-->>API: JSON Response
+    API->>DB: Persist Conversation
+    API-->>User: Response (Message + Data)
+```
+
+**Request Body:**
+```json
+{
+  "user_id": 1,
+  "user_request": "Spent 50 on food",
+  "conversation_id": 123
+}
+```
+
+**Response (200 OK):**
+```json
+{
+  "conversation_id": 123,
+  "message": "Recorded 50 EGP for Food at Seoudi (Cairo).",
+  "amount": 50.0,
+  "budget_id": 1,
+  "store_name": "Seoudi",
+  "date": "2024-01-01",
+  "time": "14:30:00",
+  "city": "Cairo",
+  "neighbourhood": "Zamalek",
+  "type_spending": "Food",
+  "is_done": true
+}
+```
+
+### Health Check
+
+#### GET /api/personal_assistant/health
+Simple health check to verify the API is running.
+
+**Response (200 OK):**
+```json
+{
+  "status": "healthy",
+  "timestamp": "2024-01-01T12:00:00"
 }
 ```
 
@@ -394,46 +512,7 @@ Soft delete a goal by setting `status='inactive'` (not permanent deletion).
 }
 ```
 
-### Goals Endpoints
 
-#### POST /api/database/goals
-Create a new goal.
-
-**Request Body:**
-```json
-{
-  "user_id": 1,
-  "goal_name": "Save for vacation",
-  "description": "Beach trip to Mediterranean",
-  "target": 5000.00,
-  "start_date": "2024-01-01",
-  "due_date": "2024-12-31",
-  "status": "active"
-}
-```
-
-**Response (201 Created):**
-```json
-{
-  "success": true,
-  "message": "Goal created successfully",
-  "goal_id": 3
-}
-```
-
-#### DELETE /api/database/goals/{goal_id}
-Soft delete a goal by setting `status='inactive'` (not permanent deletion).
-
-**Path Parameters:**
-- `goal_id` (int, required): ID of the goal to deactivate
-
-**Response (200 OK):**
-```json
-{
-  "success": true,
-  "message": "Goal deactivated successfully"
-}
-```
 
 ### Users Endpoints
 
@@ -441,20 +520,6 @@ Soft delete a goal by setting `status='inactive'` (not permanent deletion).
 Create a new user.
 
 **Request Body:**
-```json
-{
-  "first_name": "Ahmed",
-  "last_name": "Hassan",
-  "birthday": "1990-05-15",
-  "job_title": "Software Engineer",
-  "address": "123 Main St, Cairo",
-  "employment_status": "Employed Full-time",
-  "education_level": "Bachelor degree",
-  "gender": "male"
-}
-```
-
-**Response (201 Created):**
 ```json
 {
   "success": true,
@@ -536,6 +601,218 @@ Add a new income source.
 }
 ```
 
+
+### Conversation Endpoints
+
+#### GET /api/database/conversations
+Retrieve chat conversations for a user.
+
+**Query Parameters:**
+- `user_id` (int, required): User ID
+- `limit` (int, optional): Max results (default: 50)
+
+**Response (200 OK):**
+```json
+[
+  {
+    "conversation_id": 42,
+    "title": "Budget Planning",
+    "last_message_at": "2024-01-01T12:00:00"
+  }
+]
+```
+
+#### GET /api/database/messages
+Retrieve messages from a conversation.
+
+**Query Parameters:**
+- `conversation_id` (int, required): Conversation ID
+- `limit` (int, optional): Max results (default: 100)
+
+**Response (200 OK):**
+```json
+[
+  {
+    "message_id": 101,
+    "sender_type": "user",
+    "content": "Hello",
+    "created_at": "2024-01-01T12:00:00"
+  }
+]
+```
+
+### User Endpoints
+
+#### GET /api/database/users/{user_id}
+Get user profile details.
+
+**Path Parameters:**
+- `user_id` (int, required): User ID
+
+**Response (200 OK):**
+```json
+{
+  "user_id": 1,
+  "first_name": "John",
+  "last_name": "Doe",
+  "job_title": "Engineer"
+}
+```
+
+#### GET /api/database/users/{user_id}/exists
+Check if a user ID exists.
+
+**Response (200 OK):**
+```json
+{
+  "exists": true,
+  "user": { "first_name": "John", "last_name": "Doe" }
+}
+```
+
+### Additional Resource Endpoints
+
+#### GET /api/database/income
+List all income sources.
+
+**Query Parameters:**
+- `user_id` (int, required): User ID
+
+**Response (200 OK):**
+```json
+[
+  {
+    "income_id": 1,
+    "type_income": "Salary",
+    "amount": 5000.00
+  }
+]
+```
+
+#### GET /api/database/goals
+List goals.
+
+**Query Parameters:**
+- `user_id` (int, required): User ID
+- `status` (str, optional): Filter by status (e.g., 'active')
+
+**Response (200 OK):**
+```json
+[
+  {
+    "goal_id": 1,
+    "goal_name": "Save for Car",
+    "target": 10000.00,
+    "status": "active"
+  }
+]
+```
+
+#### GET /api/database/transactions
+List transactions (supports filtering).
+
+**Query Parameters:**
+- `user_id` (int, required): User ID
+- `start_date` (str, optional): YYYY-MM-DD
+- `end_date` (str, optional): YYYY-MM-DD
+- `limit` (int, optional): Max results (default: 100)
+
+**Response (200 OK):**
+```json
+[
+  {
+    "transaction_id": 1,
+    "amount": 50.00,
+    "store_name": "Store A"
+  }
+]
+```
+
+
+#### GET /api/database/analytics/monthly-spend
+Aggregate spending by budget category for the current month.
+
+**Query Parameters:**
+- `user_id` (int, required): User ID
+
+**Response (200 OK):**
+```json
+{
+  "data": [
+    {
+      "budget_name": "Food",
+      "month": "2024-01-01T00:00:00",
+      "total_spent": 1500.00
+    }
+  ]
+}
+```
+
+#### GET /api/database/analytics/overspend
+Identify overspent categories and net financial position for the current month.
+
+**Query Parameters:**
+- `user_id` (int, required): User ID
+
+**Response (200 OK):**
+```json
+{
+  "data": [
+    {
+      "budget_name": "Food",
+      "spent": 2000.00,
+      "total_limit": 1500.00,
+      "pct_of_limit": 133.33
+    }
+  ],
+  "summary": {
+    "total_income": 5000.00,
+    "total_spent": 4500.00,
+    "net_position": 500.00
+  }
+}
+```
+
+#### GET /api/database/analytics/income-total
+Aggregate total income by type.
+
+**Query Parameters:**
+- `user_id` (int, required): User ID
+
+**Response (200 OK):**
+```json
+{
+  "data": [
+    {
+      "type_income": "Salary",
+      "total_amount": 60000.00
+    }
+  ]
+}
+```
+
+### System Tools
+
+#### POST /api/database/execute/modify
+Execute INSERT, UPDATE, or DELETE SQL queries. **Admin/Debug use only.**
+
+**Request Body:**
+```json
+{
+  "query": "DELETE FROM transactions WHERE transaction_id = %s",
+  "params": [123]
+}
+```
+
+**Response (200 OK):**
+```json
+{
+  "success": true,
+  "rows_affected": 1,
+  "data": { ... }
+}
+```
+
 ---
 
 
@@ -547,6 +824,20 @@ Add a new income source.
 - On success, `_store_messages_sync` persists the user input, assistant output, and JSON data (if any).
 - Response returns `final_output` and, when present, `data` and `conversation_id`.
 - Timeout protection prevents indefinite waits on database operations.
+
+```mermaid
+flowchart TD
+    Req[Request] --> Validate{Validate Schema}
+    Validate -- Invalid --> Err[400 Error]
+    Validate -- Valid --> Enrich[Enrich Metadata]
+    Enrich --> Service[Call Service]
+    Service --> Async{Async?}
+    Async -- Yes --> Await[Await with Timeout]
+    Async -- No --> Thread[Run in ThreadPool]
+    Await --> Store[Store Messages]
+    Thread --> Store
+    Store --> Resp[Return Response]
+```
 
 **Schemas**
 - `AnalysisRequestSchema` (`api/personal_assistant_api/schemas.py:8`)

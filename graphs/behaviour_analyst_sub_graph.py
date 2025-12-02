@@ -4,6 +4,7 @@ import asyncio
 import ast
 import logging
 import warnings
+from datetime import datetime
 from typing import TypedDict, List
 
 from agents import Explainer_agent, Analyser, Behaviour_analyser_orchestrator, Query_planner, ValidationAgent
@@ -42,13 +43,13 @@ class BehaviourAnalystState(TypedDict):
     message: str
     user: str
     sender: str
-    data_acquired: list[str]
-    
-def add_to_logs(sender, receiver, message):
-    with open("./data/logs.csv", mode='a', newline='', encoding='utf-8') as file:
-        writer = csv.writer(file)
-        writer.writerow([sender, receiver, message])
-
+    validation_tasks: List[dict]
+    data_acquired: List[str]
+    validation_results: List[tuple]
+    steps: List[str]          # To hold the plan from the query_planner
+    db_results: List[dict]  # To hold the results from the db_agent
+    next_step: str          # To control routing from the orchestrator    
+    current_date: str       # Current date for context
 
 def analyser(state: BehaviourAnalystState):
     print("===> Analyser Invoked <===")
@@ -56,7 +57,15 @@ def analyser(state: BehaviourAnalystState):
     request = state.get("request", "")
     message = state.get("message", "")
     analysis = state.get("analysis", "")
-    Output = Analyser.invoke({"data_acquired": data_acquired, "message": message, "user_request": request, "previous_analysis": analysis})
+    
+    Output = Analyser.invoke({
+        "data_acquired": data_acquired,
+        "message": message,
+        "user_request": request,
+        "previous_analysis": analysis,
+        "current_date": datetime.now().strftime("%Y-%m-%d")
+    })
+    
     analysis = Output.output
     message = Output.message
     print("Analysis: ", analysis)
@@ -80,88 +89,29 @@ def orchestrator(state: BehaviourAnalystState) -> dict:
         "data_acquired": state.get("data_acquired", []),
         "sender": state.get("sender", ""),
         "user_id": state.get("user_id", ""),
-        "steps": state.get("steps", [])
+        "steps": state.get("steps", []),
+        "current_date": datetime.now().strftime("%Y-%m-%d")
     })
     next_step = Output.next_step
     message = Output.message
     print(f"Orchestrator message to {next_step}: {message}")
     return {"message": message, "sender": "orchestrator", "next_step": next_step, "user_id": state.get("user_id", "")}
-=======
-def orchestrator(state: BehaviourAnalystState):
-    print("===> Orchestrator Invoked <===")
-    request = state.get("request", "")
-    analysis = state.get("analysis", "")
-    data_acquired = state.get("data_acquired", [])
-    message = state.get("message", "")
-    sender = state.get("sender", "")
-    Output = Behaviour_analyser_orchestrator.invoke({"request": request,
-                                                    "analysis": analysis,
-                                                    "message": message,
-                                                    "data_acquired": data_acquired,
-                                                    "sender": sender,
-                                                    "user": state.get("user", "")})
-    message = Output.message
-    next_step = Output.next_step
-    print("Next step: ", next_step)
-    print("Message to {}: ".format(next_step), message)
-    
-    add_to_logs("orchestrator", next_step, message)
-    return Command(update = {
-            "data_acquired": data_acquired,
-            "message": message, 
-            "analysis": analysis,
-            "user": state.get("user", ""),
-            "request": request,
-            "sender": "orchestrator"   
-            },
-            goto = next_step)
->>>>>>> c5cc8a00b674920893a03711ccfe2a7e80167f20
 
-def query_planner(state: BehaviourAnalystState):
-    print("===> Query Planner Invoked <===")
-    request = state.get("request", "")
-    message = state.get("message", "")
-    data_acquired = state.get("data_acquired", [])
-    Output = Query_planner.invoke({"request": request, "message": message, "data_acquired": data_acquired, "user": state.get("user", "")})
-    message = Output.message
-    steps = Output.output
+def query_planner(state: BehaviourAnalystState) -> dict:
+    """
+    Node that plans which database queries are needed to fulfill the request.
+    """
+    message = state.get("message", [])
     
-=======
-def orchestrator(state: BehaviourAnalystState):
-    print("===> Orchestrator Invoked <===")
-    request = state.get("request", "")
-    analysis = state.get("analysis", "")
-    data_acquired = state.get("data_acquired", [])
-    message = state.get("message", "")
-    sender = state.get("sender", "")
-    Output = Behaviour_analyser_orchestrator.invoke({"request": request,
-                                                    "analysis": analysis,
-                                                    "message": message,
-                                                    "data_acquired": data_acquired,
-                                                    "sender": sender,
-                                                    "user": state.get("user", "")})
-    message = Output.message
-    next_step = Output.next_step
-    print("Next step: ", next_step)
-    print("Message to {}: ".format(next_step), message)
+    print("===> (Node) Query Planner Invoked <===")
+    Output = Query_planner.invoke({
+        "request": state.get("request", ""),
+        "message": message,
+        "steps": state.get("steps", "no completed steps yet"),
+        "user": state.get("user_id", ""),
+        "current_date": datetime.now().strftime("%Y-%m-%d")
+    })
     
-    add_to_logs("orchestrator", next_step, message)
-    return Command(update = {
-            "data_acquired": data_acquired,
-            "message": message, 
-            "analysis": analysis,
-            "user": state.get("user", ""),
-            "request": request,
-            "sender": "orchestrator"   
-            },
-            goto = next_step)
-
-def query_planner(state: BehaviourAnalystState):
-    print("===> Query Planner Invoked <===")
-    request = state.get("request", "")
-    message = state.get("message", "")
-    data_acquired = state.get("data_acquired", [])
-    Output = Query_planner.invoke({"request": request, "message": message, "data_acquired": data_acquired, "user": state.get("user", "")})
     message = Output.message
     steps = Output.output
     

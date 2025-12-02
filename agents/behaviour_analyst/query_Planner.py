@@ -54,66 +54,24 @@ Inputs provided to you:
 
 Available schema (key fields only; PostgreSQL 18, schema public):
 - transactions(transaction_id, date, amount, time, store_name, city, neighbourhood, type_spending, user_id, budget_id, created_at)
-- budget(budget_id, user_id, budget_name, description, total_limit, priority_level_int, is_active, created_at, updated_at)
+- budget(budget_id, user_id, budget_name, description, total_limit (MONTHLY), priority_level_int, is_active, created_at, updated_at)
 - income(income_id, user_id, type_income, amount, description, created_at, updated_at)
 - goals(goal_id, goal_name, description, target, user_id, start_date, due_date, status, created_at, updated_at)
 - users(user_id, first_name, last_name, ...)
 
 Notes:
+- **CRITICAL:** Budget limits are **PER MONTH**. When checking overspending, ALWAYS aggregate transactions by month (e.g., "current month", "last month"). Never compare a yearly total against a monthly limit.
 - “budget/category” refers to transactions.budget_id → budget.budget_name.
 - Timestamps are WITHOUT time zone; use simple date windows like “current month” or “last 90 days”.
 - Keep steps short and implementation-ready for a downstream SQL generator.
 - Do NOT emit SQL. Only plain-language step descriptions.
-=======
-=======
->>>>>>> c5cc8a00b674920893a03711ccfe2a7e80167f20
-    message: str = Field("", description="A concise summary of the steps outlined in the output.")
-    
-system_prompt = """
-    You are the Query Planner Agent.  
-    Your task is to outline clear and simple steps for another database agent to create SQL-style queries that retrieve insights about a **single user's** behavior and spending patterns.  
-    ### Rules
-    1. Each step must represent **one query** that can be executed by a database agent.  
-    2. Focus only on **one user** at a time.  
-    3. Respond with **text only** (no code, SQL, or programming syntax).  
-    4. Concentrate on the **4 core aspects**:  
-    - Time  
-    - Location  
-    - Store  
-    - Category  
-    5. Provide insights based on **two dimensions**:  
-    - **Spending-based insights** (highest total amount, averages, min/max, etc.)  
-    - **Frequency-based insights** (most frequent store, most visited location, etc.).  
-    6. Use metrics like **mean, mode, min, max** when helpful.  
-    7. Only propose steps that could be derived from the **data and metadata** available (no external knowledge).  
-    8. Ensure all steps could be done with **SQL-like operations**.
-    9. Don't use steps such as "Find all transactions made by the user .." to avoid redundancy.
-    10. Give a message summarizing what you have done to the orchestrator.
-    
-    
-    ### Output Format
-    Respond in the following JSON format expressing the output as a list of steps: 
-    Example:
-    "message": "A concise summary of the steps outlined in the output as a confirmation to the orchestrator."
-    "output": [
-        "Step 1 ...",
-        "Step 2 ...",
-        ...
-    ]
-<<<<<<< HEAD
->>>>>>> c5cc8a00b674920893a03711ccfe2a7e80167f20
-=======
->>>>>>> c5cc8a00b674920893a03711ccfe2a7e80167f20
 """
 
-metadata = """
-------------------------------------------------------------
-1. user_table
-------------------------------------------------------------
-Purpose: Stores demographic and socioeconomic information for each user.
+user_prompt = """
+Current Date: {current_date}
+Request: {request}
+User ID: {user}
 
-<<<<<<< HEAD
-<<<<<<< HEAD
 last steps generated: {steps}
 
 Orchestrator request: {message}

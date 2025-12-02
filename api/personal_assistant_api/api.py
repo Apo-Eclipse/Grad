@@ -16,9 +16,16 @@ from .schemas import (
     ConversationResponseSchema,
     GoalMakerRequestSchema,
     GoalMakerResponseSchema,
+    BudgetMakerRequestSchema,
+    BudgetMakerResponseSchema,
+    TransactionMakerRequestSchema,
+    TransactionMakerResponseSchema,
 )
+from .db_retrieval import fetch_active_budgets
 from .services import get_analyst_service
 from agents.goal_maker import Goal_maker_agent
+from agents.budget_maker import Budget_maker_agent
+from agents.transaction_maker import Transaction_maker_agent
 
 logger = logging.getLogger(__name__)
 router = Router()
@@ -200,6 +207,23 @@ def _get_user_summary(user_id: int) -> str:
             active_goals_rows = cursor.fetchall() or []
             active_goals_count = len(active_goals_rows)
 
+            # Retrieve all active budgets
+            cursor.execute(
+                """
+                SELECT
+                    budget_name,
+                    total_limit,
+                    priority_level_int
+                FROM budget
+                WHERE user_id = %s
+                  AND is_active = true
+                ORDER BY priority_level_int DESC
+            """,
+                [user_id],
+            )
+            active_budgets_rows = cursor.fetchall() or []
+            active_budgets_count = len(active_budgets_rows)
+
             # Recent spending patterns (last 90 days)
             cursor.execute(
                 """
@@ -304,6 +328,14 @@ def _get_user_summary(user_id: int) -> str:
             parts.append("Active goals: " + "; ".join(goal_bits))
         else:
             parts.append("Active goals: no active goals recorded yet")
+
+        if active_budgets_count > 0:
+            budget_bits = [f"{active_budgets_count} active budget(s):"]
+            for b_name, b_limit, b_prio in active_budgets_rows:
+                budget_bits.append(f"  - {b_name} ({float(b_limit):.2f} EGP, Prio {b_prio})")
+            parts.append("Active budgets: " + "; ".join(budget_bits))
+        else:
+            parts.append("Active budgets: no active budgets recorded yet")
 
         if top_categories_rows:
             categories_str = ", ".join(
@@ -553,6 +585,233 @@ def goals_assist(request, payload: GoalMakerRequestSchema):
         logger.error("Error in goals_assist: %s", exc, exc_info=True)
         return 500, {
             "error": "GOAL_MAKER_ERROR",
+            "message": str(exc),
+            "timestamp": datetime.now(),
+        }
+
+
+@router.post("budget/assist", response={200: BudgetMakerResponseSchema, 400: AnalysisErrorSchema, 500: AnalysisErrorSchema})
+def budget_assist(request, payload: BudgetMakerRequestSchema):
+    """
+    Handle a budget-making conversation with memory using the Budget Maker agent.
+    """
+    try:
+        if not payload.user_request or not payload.user_request.strip():
+            return 400, {
+                "error": "INVALID_REQUEST",
+                "message": "user_request cannot be empty",
+                "timestamp": datetime.now(),
+            }
+
+        conversation_id = payload.conversation_id
+
+        if conversation_id is None:
+            return 400, {
+                "error": "CONVERSATION_REQUIRED",
+                "message": "conversation_id is required. Call /personal_assistant/conversations/start first.",
+                "timestamp": datetime.now(),
+            }
+
+        # Build memory context for the agent
+        user_info = _get_user_summary(payload.user_id)
+        last_conversation = _get_conversation_summary(conversation_id)
+
+        agent_input = {
+            "user_info": user_info,
+            "last_conversation": last_conversation,
+            "current_date": datetime.now().date().isoformat(),
+            "user_request": payload.user_request,
+        }
+
+        budget_result = Budget_maker_agent.invoke(agent_input)
+
+        # Persist this turn
+        with connection.cursor() as cursor:
+            now = datetime.now()
+            # User message
+            _insert_chat_message(
+                cursor,
+                conversation_id=conversation_id,
+                sender_type="user",
+                source_agent="User",
+                content=payload.user_request,
+                created_at=now,
+            )
+
+            # BudgetMaker reply
+            _insert_chat_message(
+                cursor,
+                conversation_id=conversation_id,
+                sender_type="assistant",
+                source_agent="BudgetMaker",
+                content=budget_result.message,
+                created_at=now,
+            )
+
+            # Optional structured budget payload
+            budget_payload: Dict[str, Any] = {
+                "budget_name": budget_result.budget_name,
+                "total_limit": budget_result.total_limit,
+                "description": budget_result.description,
+                "priority_level_int": budget_result.priority_level_int,
+            }
+            if any(budget_payload.values()):
+                _insert_chat_message(
+                    cursor,
+                    conversation_id=conversation_id,
+                    sender_type="assistant",
+                    source_agent="BudgetMaker",
+                    content=json.dumps(budget_payload),
+                    content_type="json",
+                    created_at=now,
+                )
+
+            cursor.execute(
+                """
+                UPDATE chat_conversations
+                SET last_message_at = %s
+                WHERE conversation_id = %s
+            """,
+                [now, conversation_id],
+            )
+            connection.commit()
+
+        response: Dict[str, Any] = {
+            "conversation_id": conversation_id,
+            "message": budget_result.message,
+            "budget_name": budget_result.budget_name,
+            "total_limit": budget_result.total_limit,
+            "description": budget_result.description,
+            "priority_level_int": budget_result.priority_level_int,
+            "is_done": getattr(budget_result, "is_done", False),
+        }
+        return 200, response
+
+    except Exception as exc:
+        logger.error("Error in budget_assist: %s", exc, exc_info=True)
+        return 500, {
+            "error": "BUDGET_MAKER_ERROR",
+            "message": str(exc),
+            "timestamp": datetime.now(),
+        }
+
+
+@router.post("transaction/assist", response={200: TransactionMakerResponseSchema, 400: AnalysisErrorSchema, 500: AnalysisErrorSchema})
+def transaction_assist(request, payload: TransactionMakerRequestSchema):
+    """
+    Handle a transaction-making conversation with memory using the Transaction Maker agent.
+    """
+    try:
+        if not payload.user_request or not payload.user_request.strip():
+            return 400, {
+                "error": "INVALID_REQUEST",
+                "message": "user_request cannot be empty",
+                "timestamp": datetime.now(),
+            }
+
+        conversation_id = payload.conversation_id
+
+        if conversation_id is None:
+            return 400, {
+                "error": "CONVERSATION_REQUIRED",
+                "message": "conversation_id is required. Call /personal_assistant/conversations/start first.",
+                "timestamp": datetime.now(),
+            }
+
+        # Build context for the agent
+        # Fetch active budgets and format them
+        active_budgets_list = fetch_active_budgets(payload.user_id)
+        active_budgets_str = ", ".join(
+            [f"{b['budget_name']} (ID: {b['budget_id']})" for b in active_budgets_list]
+        ) if active_budgets_list else "No active budgets found."
+
+        # Fetch conversation history
+        last_conversation = _get_conversation_summary(conversation_id)
+
+        agent_input = {
+            "active_budgets": active_budgets_str,
+            "current_date": datetime.now().date().isoformat(),
+            "last_conversation": last_conversation,
+            "user_request": payload.user_request,
+        }
+
+        transaction_result = Transaction_maker_agent.invoke(agent_input)
+
+        # Persist this turn
+        with connection.cursor() as cursor:
+            now = datetime.now()
+            # User message
+            _insert_chat_message(
+                cursor,
+                conversation_id=conversation_id,
+                sender_type="user",
+                source_agent="User",
+                content=payload.user_request,
+                created_at=now,
+            )
+
+            # TransactionMaker reply
+            _insert_chat_message(
+                cursor,
+                conversation_id=conversation_id,
+                sender_type="assistant",
+                source_agent="TransactionMaker",
+                content=transaction_result.message,
+                created_at=now,
+            )
+
+            # Optional structured transaction payload
+            transaction_payload: Dict[str, Any] = {
+                "amount": transaction_result.amount,
+                "budget_id": transaction_result.budget_id,
+                "store_name": transaction_result.store_name,
+                "date": transaction_result.date,
+                "time": transaction_result.time,
+                "city": transaction_result.city,
+                "neighbourhood": transaction_result.neighbourhood,
+                "type_spending": transaction_result.type_spending,
+                "is_done": transaction_result.is_done,
+            }
+            if any(transaction_payload.values()):
+                _insert_chat_message(
+                    cursor,
+                    conversation_id=conversation_id,
+                    sender_type="assistant",
+                    source_agent="TransactionMaker",
+                    content=json.dumps(transaction_payload),
+                    content_type="json",
+                    created_at=now,
+                )
+
+            cursor.execute(
+                """
+                UPDATE chat_conversations
+                SET last_message_at = %s
+                WHERE conversation_id = %s
+            """,
+                [now, conversation_id],
+            )
+            connection.commit()
+
+        response: Dict[str, Any] = {
+            "conversation_id": conversation_id,
+            "message": transaction_result.message,
+            "amount": transaction_result.amount,
+            "budget_id": transaction_result.budget_id,
+            "store_name": transaction_result.store_name,
+            "date": transaction_result.date,
+            "time": transaction_result.time,
+            "city": transaction_result.city,
+            "neighbourhood": transaction_result.neighbourhood,
+            "type_spending": transaction_result.type_spending,
+            "is_done": transaction_result.is_done,
+        }
+        return 200, response
+
+    except Exception as exc:
+        logger.error("Error in transaction_assist: %s", exc, exc_info=True)
+        return 500, {
+            "error": "TRANSACTION_MAKER_ERROR",
             "message": str(exc),
             "timestamp": datetime.now(),
         }

@@ -20,8 +20,20 @@ system_prompt = """
     3.  **Spot Anomalies & Outliers:** Find transactions that deviate from the norm (e.g., an unusually large purchase, spending in a new city). Hypothesize the reason for these outliers.
     4.  **Provide Actionable Insights:** Your analysis should empower the user. Suggest potential areas for budgeting or highlight habits they might not be aware of.
 
+    ### Psychological Profiling & Behavioral Economics (The "Why")
+    Go beyond the numbers. Try to infer the *psychology* behind the spending:
+    1.  **Emotional Spending (Retail Therapy):** Look for spikes in non-essential spending (Shopping, Entertainment) late at night, on weekends, or after typical work hours.
+    2.  **The "Latte Factor" (Habitual Leaks):** Identify small, frequent, daily transactions (coffee, snacks, subscriptions) that seem insignificant but sum up to a large amount.
+    3.  **Impulse Buying:** Look for clusters of unrelated purchases in a short time frame, or large purchases in categories not previously seen.
+    4.  **Social Spending:** High spending in "Food" or "Recreation" on Friday/Saturday nights often indicates social pressure or lifestyle choices.
+    5.  **Goal Alignment:** Explicitly check if their spending contradicts their stated `goals`. (e.g., "Saving for House" but spending 40% on "Travel").
+
     ### Interaction & Revision Logic
     -   **Revise, Don't Repeat:** Use the `previous_analysis` as your starting point. Your task is to integrate the `newly_acquired_data` to refine, deepen, or update your findings. Your `output` must be a new, more comprehensive analysis.
+    -   **Loop Prevention (CRITICAL):**
+        -   Before requesting data, CHECK `data_acquired`. If you see messages like "No results found" or "Database error" for a similar request, DO NOT ask for it again.
+        -   If the data is missing or unavailable, accept it. Finalize your analysis based on what you HAVE. Mention in your analysis that specific details were unavailable.
+        -   Do not get stuck in a loop of asking for the same missing thing.
     -   **Requesting More Data:** If the current data answers the main question but a deeper insight is possible, you must request more data. Your `message` to the orchestrator must be a clear, actionable instruction for the 'query_planner'.
         -   **CRITICAL: BE SPECIFIC WITH NAMES:** When requesting data, you MUST use exact names from the database schema:
             * Use exact column names: 'store_name', 'city', 'type_spending', 'budget_name', 'neighbourhood', 'amount', 'date', 'time'
@@ -43,40 +55,15 @@ system_prompt = """
     ### database schema
     PostgreSQL Database Metadata (with Column Descriptions)
 
-    Engine: PostgreSQL 18.0
-    Schema: public
-
-    ENUM TYPES
-    -----------
-    public.edu_level = ['High school','Associate degree','Bachelor degree','Masters Degree','PhD']
-    public.employment_categories = ['Employed Full-time','Employed Part-time','Unemployed','Retired']
-    public.gender_type = ['male','female']
-
-    TABLES
-    -------
-    USERS (public.users)
-    Purpose: Master record for each user/person.
     Columns:
     - user_id (bigint, PK)
     - first_name (text, not null)
     - last_name (text, not null)
     - job_title (text, not null)
     - address (text, not null)
-    - birthday (date, not null)
-    - gender (public.gender_type)
-    - employment_status (public.employment_categories)
-    - education_level (public.edu_level)
-    - created_at (timestamp without time zone, default now())
-    - updated_at (timestamp without time zone, default now())
-
-    BUDGET (public.budget)
-    Purpose: Budget categories/limits per user; referenced by transactions as category.
-    Columns:
-    - budget_id (bigint, PK)
-    - user_id (bigint, FK → users.user_id)
     - budget_name (text, not null)
     - description (text)
-    - total_limit (numeric(12,2) default 0, check total_limit >= 0)
+    - total_limit (numeric(12,2) default 0, check total_limit >= 0) -> NOTE: This is a MONTHLY limit.
     - priority_level_int (smallint, check 1..10)
     - is_active (boolean, default true)
     - created_at (timestamp without time zone, default now())
@@ -130,119 +117,15 @@ system_prompt = """
     users (1) → (N) income via income.user_id
     users (1) → (N) transactions via transactions.user_id
     budget (1) → (N) transactions via transactions.budget_id → budget.budget_id
-=======
-    You are the analyser Agent.
-    Your task is to analyze the spending behavior of a user based on text explain tables data acquired from previous queries.
-    You have to return a summary of the analysis and any insights you can derive from the data.
-    
-=======
-    You are the analyser Agent.
-    Your task is to analyze the spending behavior of a user based on text explain tables data acquired from previous queries.
-    You have to return a summary of the analysis and any insights you can derive from the data.
-    
->>>>>>> c5cc8a00b674920893a03711ccfe2a7e80167f20
-    ### Rules
-    1. Focus on the user's spending patterns, habits, and any anomalies you can identify.
-    2. Use the data acquired to provide a comprehensive analysis.
-    3. Ensure your analysis is clear, concise, and actionable.
-    4. If the data is insufficient, indicate what additional information would be helpful.
-    5. Try to understand user's behavior in terms of time, location, store, and category.
-    6. If their needed any further analysis, please indicate that in the message field.
-    7. Give message to the orchestrator telling them if you need more data or not and what you have done.
-    8. Provide your response in the following JSON format:
-    {{
-        "message": "<Any additional message or insights>"
-        "output": "<Your analysis here>",
-    }}
-    9. You have to request more data if needed for better analysis such as more analysis on specific category or store or location or time such as filter by specific store, location.
-    10. Revise your analysis based on the new data acquired to rewrite your output.
-    11. Do not request more analysis in the output field, only in the message field.
-<<<<<<< HEAD
->>>>>>> c5cc8a00b674920893a03711ccfe2a7e80167f20
-=======
->>>>>>> c5cc8a00b674920893a03711ccfe2a7e80167f20
 """
-metadata = """ 
-------------------------------------------------------------
-1. user_table
-------------------------------------------------------------
-Purpose: Stores demographic and socioeconomic information for each user.
 
-Columns:
-- User_ID (INT, PK, AUTO_INCREMENT): Unique identifier for each user.
-- Name (VARCHAR(100)): User's full name.
-- Age (INT): User's age in years.
-- Gender (ENUM('Male','Female','Other')): Gender of the user.
-- Job_Title (VARCHAR(100)): Current job title.
-- Employment_Status (ENUM('Full-time','Part-time','Unemployed','Freelancer','Student')): Employment type.
-- Education (VARCHAR(100)): Highest level of education completed.
-- Marital_Status (ENUM('Single','Married','Divorced','Widowed')): Marital status.
-- Address (VARCHAR(200)): Residential address (includes neighborhood and city).
-- Income_EGP (DECIMAL(10,2)): Monthly income in Egyptian Pounds.
+user_prompt = """
+Current Date: {current_date}
+Acquired Data till now: {data_acquired}
+Previous Analysis: {previous_analysis}
+user request: {user_request}
 
-------------------------------------------------------------
-2. transactions_table
-------------------------------------------------------------
-Purpose: Stores detailed records of every financial transaction for users.
-
-Columns:
-- Transaction_ID (INT, PK, AUTO_INCREMENT): Unique transaction identifier.
-- User_ID (INT, FK → user_table.User_ID): Linked user.
-- Category (VARCHAR(50)): Spending category (e.g., Groceries, Transport, Coffee).
-- Store_Name (VARCHAR(100)): Vendor or service provider name.
-- Day (TINYINT): Day of the month when the transaction occurred.
-- Month (TINYINT): Month of the year when the transaction occurred.
-- Year (SMALLINT): Year of the transaction.
-- Name_of_day (ENUM('Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday')): Weekday name.
-- Hour (TINYINT): Hour of the transaction (24-hour format).
-- Minute (TINYINT): Minute of the transaction.
-- Neighborhood (VARCHAR(100)): Neighborhood of the transaction.
-- City (VARCHAR(100)): City of the transaction (e.g., Cairo, Giza).
-- Amount_EGP (DECIMAL(10,2)): Transaction amount in Egyptian Pounds.
-- Type_spending (ENUM('Cash','Credit','Debit','E-Wallet','Bank Transfer')): Payment method.
-
-------------------------------------------------------------
-3. budget_table
-------------------------------------------------------------
-Purpose: Tracks spending limits and monitoring for each user and category.
-
-Columns:
-- user_id (INT, FK → user_table.User_ID): Linked user.
-- budget_name (VARCHAR(100)): Descriptive name for the budget (e.g., 'Groceries Budget Sep 2025').
-- priority_level (ENUM('low','mid','high')): Importance of this budget.
-- limit (DECIMAL(10,2)): Planned or allowed budget cap.
-- description (TEXT): Short status text describing spending performance or targets.
-
-------------------------------------------------------------
-4. goals_table
-------------------------------------------------------------
-Purpose: Tracks long-term financial goals and progress for each user.
-
-Columns:
-- user_id (INT, FK → user_table.User_ID): Linked user.
-- goal_name (VARCHAR(100)): Goal title (e.g., 'Emergency Fund').
-- target_date (DATE): Date by which the user wants to reach the goal.
-- target_saving (DECIMAL(10,2)): Total savings target in EGP.
-- current (DECIMAL(10,2)): Current amount saved.
-- objective (TEXT): Description of the goal.
-- query_saving (VARCHAR(255)): Optional computed formula or query for dynamic savings tracking.
-
-------------------------------------------------------------
-Relationships:
-- user_table (1) ───< transactions_table (many)
-- user_table (1) ───< budget_table (many)
-- user_table (1) ───< goals_table (many)
-
-------------------------------------------------------------
-Indexes and Keys:
-- PK: user_table.User_ID, transactions_table.Transaction_ID
-- FK: transactions_table.User_ID, budget_table.user_id, goals_table.user_id
-
-------------------------------------------------------------
-Notes:
-- All monetary values are stored in Egyptian Pounds (EGP).
-- Date and time fields enable fine-grained temporal analysis.
-- The schema supports both behavioral analytics and personalized financial storytelling.
+if there is new info in the Acquired Data till now update the previous analysis with it, DON'T RETURN THE SAME PREVIOUS ANALYSIS AS IT IS.
 """
 analyser_prompt = ChatPromptTemplate.from_messages([
     ("user", system_prompt),

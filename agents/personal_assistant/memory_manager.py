@@ -74,7 +74,7 @@ class ConversationMemory:
         self,
         user_id: str,
         conversation_id: Optional[str] = None
-    ):
+        ):
         """
         Initialize conversation memory.
 
