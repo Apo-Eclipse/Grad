@@ -1,19 +1,211 @@
+"""API endpoints for the Personal Assistant."""
+import logging
+import json
+from typing import Dict, Any, Optional
+from datetime import datetime
 from ninja import Router
-from personal_assistant_api.assistants.schemas import AnalysisRequestSchema, AnalysisResponseSchema
-from personal_assistant_api.assistants.services import PersonalAssistantService
+from django.db import connection
+from asgiref.sync import sync_to_async
+
+from personal_assistant_api.assistants.schemas import (
+    AnalysisRequestSchema,
+    AnalysisResponseSchema,
+    AnalysisErrorSchema,
+    ConversationStartSchema,
+    ConversationResponseSchema,
+)
+from personal_assistant_api.assistants.services import get_analyst_service
 from personal_assistant_api.core.responses import success_response, error_response
 
+logger = logging.getLogger(__name__)
 router = Router()
-service = PersonalAssistantService()
 
-@router.post("/analyze", response=AnalysisResponseSchema)
-def analyze_behavior(request, payload: AnalysisRequestSchema):
+
+def _insert_chat_message(
+    cursor,
+    *,
+    conversation_id: int,
+    sender_type: str,
+    source_agent: str,
+    content: str,
+    content_type: str = "text",
+    language: str = "en",
+    created_at: datetime,
+) -> None:
+    """Insert a single chat message row."""
+    cursor.execute(
+        """
+            INSERT INTO chat_messages (
+                conversation_id,
+                sender_type,
+                source_agent,
+                content,
+                content_type,
+                language,
+                created_at
+            )
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+        """,
+        [
+            conversation_id,
+            sender_type,
+            source_agent,
+            content,
+            content_type,
+            language,
+            created_at,
+        ],
+    )
+
+
+def _store_messages_sync(
+    conversation_id: int,
+    user_query: str,
+    assistant_output: str,
+    data: Optional[Dict[str, Any]],
+    agents_used: Optional[str] = None,
+) -> bool:
+    """Synchronous database operation to store messages for the main assistant."""
+    if agents_used is None:
+        agents_used = ""
+
     try:
-        result = service.analyze_behavior(payload.user_id, payload.user_prompt, payload.current_date)
-        return {"response": str(result), "data": None}
-    except Exception as e:
-        return {"response": f"Error: {str(e)}", "data": None}
+        with connection.cursor() as cursor:
+            now = datetime.now()
+            _insert_chat_message(
+                cursor,
+                conversation_id=conversation_id,
+                sender_type="user",
+                source_agent="User",
+                content=user_query,
+                created_at=now,
+            )
 
-@router.get("/health")
-def health_check(request):
-    return success_response(service.get_health())
+            agent_source_map = {
+                "behaviour_analyst": "BehaviourAnalyst",
+                "database_agent": "DatabaseAgent",
+            }
+            source_agent = agent_source_map.get(agents_used, "PersonalAssistant")
+            _insert_chat_message(
+                cursor,
+                conversation_id=conversation_id,
+                sender_type="assistant",
+                source_agent=source_agent,
+                content=assistant_output,
+                created_at=now,
+            )
+
+            if data:
+                _insert_chat_message(
+                    cursor,
+                    conversation_id=conversation_id,
+                    sender_type="assistant",
+                    source_agent="DatabaseAgent",
+                    content=json.dumps(data),
+                    content_type="json",
+                    created_at=now,
+                )
+
+            cursor.execute(
+                """
+                UPDATE chat_conversations SET last_message_at = %s WHERE conversation_id = %s
+            """,
+                [now, conversation_id],
+            )
+
+            connection.commit()
+            return True
+    except Exception as exc:
+        logger.warning("Could not store messages: %s", exc)
+        try:
+            connection.rollback()
+        except Exception:
+            pass
+        return False
+
+
+@router.post("conversations/start", response={200: ConversationResponseSchema, 400: AnalysisErrorSchema})
+def start_conversation(request, payload: ConversationStartSchema):
+    """Start a new conversation and return conversation ID."""
+    try:
+        with connection.cursor() as cursor:
+            now = datetime.now()
+            cursor.execute("""
+                INSERT INTO chat_conversations (user_id, channel, started_at, last_message_at)
+                VALUES (%s, %s, %s, %s)
+                RETURNING conversation_id
+            """, [payload.user_id, payload.channel, now, now])
+            
+            result = cursor.fetchone()
+            conversation_id = result[0] if result else None
+            connection.commit()
+            
+            return 200, {
+                "conversation_id": conversation_id,
+                "user_id": payload.user_id,
+                "channel": payload.channel,
+                "started_at": now
+            }
+    
+    except Exception as e:
+        logger.error(f"Error starting conversation: {str(e)}", exc_info=True)
+        return 400, {"error": "CONVERSATION_ERROR", "message": str(e), "timestamp": datetime.now()}
+
+
+@router.post("analyze", response={200: Dict[str, Any], 400: AnalysisErrorSchema, 500: AnalysisErrorSchema})
+async def analyze(request, payload: AnalysisRequestSchema):
+    """Submit request and get results synchronously. Stores message in conversation."""
+    try:
+        if not payload.query or not payload.query.strip():
+            return 400, {"error": "INVALID_QUERY", "message": "Query cannot be empty", "timestamp": datetime.now()}
+        
+        logger.info(f"Analyzing: {payload.query}")
+        
+        analyst_service = get_analyst_service()
+        
+        # Prepare metadata with conversation_id included
+        metadata = {
+            **(payload.metadata or {}),
+            "conversation_id": payload.conversation_id,
+            "user_id": payload.user_id,
+        }
+        
+        result = await analyst_service.run_analysis(
+            query=payload.query,
+            filters=payload.filters,
+            metadata=metadata,
+        )
+        
+        final_output = result.get("final_output") or result.get("message") or ""
+        data = result.get("data")
+        agents_used = result.get("agents_used", "")
+        conversation_id = payload.conversation_id
+        
+        if conversation_id:
+            await sync_to_async(_store_messages_sync)(
+                conversation_id=conversation_id,
+                user_query=payload.query,
+                assistant_output=final_output,
+                data=data,
+                agents_used=agents_used,
+            )
+        
+        response = {"final_output": final_output}
+        if data is not None and (not isinstance(data, list) or len(data) > 0):
+            response["data"] = data
+        if conversation_id:
+            response["conversation_id"] = conversation_id
+        
+        return 200, response
+    
+    except Exception as e:
+        logger.error(f"Error: {str(e)}", exc_info=True)
+        return 500, {"error": "ANALYSIS_ERROR", "message": str(e), "timestamp": datetime.now()}
+
+
+@router.get("health", response={200: dict})
+def health(request):
+    """Health check endpoint."""
+    analyst_service = get_analyst_service()
+    return 200, analyst_service.get_health()
+
