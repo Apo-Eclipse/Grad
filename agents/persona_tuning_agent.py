@@ -129,7 +129,7 @@ class FinancialPersona(BaseModel):
 
 
 # 2. The System Prompt (Formatted as an f-string to inject the date)
-system_prompt = f"""
+system_prompt = """
 You are an expert **Financial Behavioral Analyst & Memory Manager**. Your goal is to build a "Living Financial Profile" of a user to help them manage money better.
 
 ### GLOBAL CONTEXT
@@ -202,7 +202,7 @@ prompt = ChatPromptTemplate.from_messages([
     ("user", user_message)
 ])
 
-Persona_Tuning_agent = prompt | gpt_oss_llm.with_structured_output(Persona_Tuning)
+Persona_Tuning_agent = prompt | gpt_oss_llm.with_structured_output(FinancialPersona)
 
 
 # ---------------------------------------Test Case-------------------------------------------------
