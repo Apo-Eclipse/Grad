@@ -67,6 +67,7 @@ TABLE: goals
   - start_date (date)
   - due_date (date)
   - status (text, default 'active')
+  - plan (text)
   - created_at (timestamp without time zone)
   - updated_at (timestamp without time zone)
 

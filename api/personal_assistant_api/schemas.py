@@ -84,6 +84,7 @@ class GoalCreateSchema(BaseModel):
     start_date: Optional[date] = None
     due_date: Optional[date] = None
     status: str = Field(default="active")
+    plan: Optional[str] = None
 
 
 class UserCreateSchema(BaseModel):
@@ -120,6 +121,7 @@ class GoalMakerResponseSchema(BaseModel):
     target: Optional[float] = None
     goal_description: Optional[str] = None
     due_date: Optional[str] = None
+    plan: Optional[str] = None
     is_done: bool = False
 
 

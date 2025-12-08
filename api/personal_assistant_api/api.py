@@ -550,6 +550,7 @@ def goals_assist(request, payload: GoalMakerRequestSchema):
                 "target": goal_result.target,
                 "goal_description": goal_result.goal_description,
                 "due_date": goal_result.due_date,
+                "plan": goal_result.plan,
             }
             if any(goal_payload.values()):
                 _insert_chat_message(
@@ -579,6 +580,7 @@ def goals_assist(request, payload: GoalMakerRequestSchema):
             "target": goal_result.target,
             "goal_description": goal_result.goal_description,
             "due_date": goal_result.due_date,
+            "plan": goal_result.plan,
             "is_done": getattr(goal_result, "is_done", False),
         }
         return 200, response

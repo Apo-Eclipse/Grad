@@ -74,6 +74,7 @@ class PersonalAssistant:
         - goal_id (bigint, PK)
         - goal_name (text)
         - target (numeric)
+        - plan (text)
         
         TABLE: income
         - income_id (bigint, PK)

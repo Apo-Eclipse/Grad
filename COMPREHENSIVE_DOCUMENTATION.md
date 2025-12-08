@@ -249,6 +249,7 @@ erDiagram
         string goal_name
         float target
         date due_date
+        string plan
     }
     INCOME {
         int income_id PK
@@ -340,6 +341,7 @@ TABLE: goals
   - start_date (date)
   - due_date (date)
   - status (text, default 'active')
+  - plan (text)
   - created_at (timestamp without time zone)
   - updated_at (timestamp without time zone)
 
@@ -517,7 +519,8 @@ The API uses Pydantic models for request and response validation.
   "target": "decimal",
   "start_date": "YYYY-MM-DD (optional)",
   "due_date": "YYYY-MM-DD (optional)",
-  "status": "string (default: 'active')"
+  "status": "string (default: 'active')",
+  "plan": "string (optional)"
 }
 ```
 
