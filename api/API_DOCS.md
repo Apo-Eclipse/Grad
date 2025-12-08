@@ -148,6 +148,7 @@ sequenceDiagram
   "target": null,
   "goal_description": "Saving to buy a new car",
   "due_date": null,
+  "plan": null,
   "is_done": false
 }
 ```
@@ -450,10 +451,39 @@ Create a new budget.
 
 **Response (201 Created):**
 ```json
+  "budget_id": 5
+}
+```
+
+#### PUT /api/database/budget/{budget_id}
+Update an existing budget. Only provided fields will be updated.
+
+**Path Parameters:**
+- `budget_id` (int, required): ID of the budget to update
+
+**Request Body (all fields optional):**
+```json
+{
+  "total_limit": 600.00,
+  "priority_level_int": 2,
+  "budget_name": "Groceries",
+  "is_active": true
+}
+```
+
+**Response (200 OK):**
+```json
 {
   "success": true,
-  "message": "Budget created successfully",
-  "budget_id": 5
+  "message": "Budget updated successfully",
+  "budget": {
+    "budget_id": 1,
+    "budget_name": "Groceries",
+    "total_limit": 600.00,
+    "priority_level_int": 2,
+    "is_active": true,
+    "updated_at": "2024-01-02T10:00:00"
+  }
 }
 ```
 
@@ -485,7 +515,8 @@ Create a new goal.
   "target": 5000.00,
   "start_date": "2024-01-01",
   "due_date": "2024-12-31",
-  "status": "active"
+  "status": "active",
+  "plan": "Save 500 EGP/month"
 }
 ```
 

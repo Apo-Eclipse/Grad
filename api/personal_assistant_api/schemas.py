@@ -76,6 +76,20 @@ class BudgetCreateSchema(BaseModel):
     is_active: bool = Field(default=True)
 
 
+class BudgetUpdateSchema(BaseModel):
+    budget_name: Optional[str] = None
+    description: Optional[str] = None
+    total_limit: Optional[Decimal] = None
+    priority_level_int: Optional[int] = None
+    is_active: Optional[bool] = None
+
+    @root_validator(pre=True)
+    def at_least_one_field(cls, values: Dict[str, Any]) -> Dict[str, Any]:
+        if not values:
+            raise ValueError("At least one field must be provided for update.")
+        return values
+
+
 class GoalCreateSchema(BaseModel):
     user_id: int
     goal_name: str

@@ -37,20 +37,7 @@ The system follows a **Micro-Service inspired Monolithic Architecture**, where d
     *   **Async Handling**: Offloads heavy LLM tasks to background threads to keep the server responsive.
     *   **Persistence**: Automatically logs every request/response pair to the `chat_messages` table.
 
-```mermaid
-sequenceDiagram
-    participant Client
-    participant API as Django Ninja
-    participant Service as PA Service
-    participant DB as PostgreSQL
-
-    Client->>API: POST /analyze
-    API->>Service: Validate & Invoke
-    Service->>Service: Run Agents (LangGraph)
-    Service->>DB: Persist Chat History
-    Service-->>API: Return Result
-    API-->>Client: JSON Response
-```
+    *   **Persistence**: Automatically logs every request/response pair to the `chat_messages` table.
 
 3.  **Orchestration Layer**: Built with **LangGraph**, this layer manages the state of the conversation and routes tasks to specialized agents.
 4.  **Agent Layer**: Independent modules responsible for specific domains (SQL generation, Data Analysis, Chat).
@@ -434,6 +421,7 @@ This approach guarantees that:
 | :--- | :--- | :--- |
 | `GET` | `/api/database/budget` | List active budgets. |
 | `POST` | `/api/database/budget` | Create a new budget. |
+| `PUT` | `/api/database/budget/{id}` | Update a budget. |
 | `DELETE` | `/api/database/budget/{id}` | Soft delete a budget. |
 
 **Goals**
@@ -510,6 +498,17 @@ The API uses Pydantic models for request and response validation.
 }
 ```
 
+**BudgetUpdateSchema**
+```json
+{
+  "budget_name": "string (optional)",
+  "description": "string (optional)",
+  "total_limit": "decimal (optional)",
+  "priority_level_int": "int (optional)",
+  "is_active": "bool (optional)"
+}
+```
+
 **GoalCreateSchema**
 ```json
 {
@@ -575,21 +574,6 @@ The API uses Pydantic models for request and response validation.
   "user_request": "string",
   "conversation_id": "int (optional)"
 }
-```
-
-**TransactionMakerResponseSchema**
-```json
-{
-  "conversation_id": "int",
-  "message": "string",
-  "amount": "decimal (optional)",
-  "budget_id": "int (optional)",
-  "store_name": "string (optional)",
-  "date": "YYYY-MM-DD (optional)",
-  "time": "HH:MM:SS (optional)",
-  "city": "string (optional)",
-  "neighbourhood": "string (optional)",
-  "type_spending": "string (optional)",
   "is_done": "bool"
 }
 ```

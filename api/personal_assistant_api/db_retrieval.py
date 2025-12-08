@@ -9,6 +9,7 @@ from ninja import Query, Router
 
 from .schemas import (
     BudgetCreateSchema,
+    BudgetUpdateSchema,
     GoalCreateSchema,
     IncomeCreateSchema,
     TransactionCreateSchema,
@@ -385,6 +386,33 @@ def create_budget(request, payload: BudgetCreateSchema):
     if not success or row is None:
         return {"success": False, "error": "Failed to create budget"}
     return {"success": True, "budget": row}
+
+
+@db_router.put("budget/{budget_id}", response=Dict[str, Any])
+def update_budget(request, budget_id: int, payload: BudgetUpdateSchema):
+    """Update an existing budget."""
+    fields = payload.dict(exclude_unset=True)
+    if not fields:
+        return {"success": False, "error": "No fields provided for update"}
+
+    set_clauses = [f"{k} = %s" for k in fields.keys()]
+    params = list(fields.values())
+    params.append(budget_id)
+
+    query = f"""
+        UPDATE budget
+        SET {', '.join(set_clauses)}, updated_at = NOW()
+        WHERE budget_id = %s
+        RETURNING budget_id, budget_name, total_limit, priority_level_int, is_active, updated_at
+    """
+
+    success, _, row = _execute_modify(query, params, log_name="update_budget")
+    if not success:
+        return {"success": False, "error": "Failed to update budget"}
+    if row is None:
+         return {"success": False, "error": "Budget not found"}
+
+    return {"success": True, "message": "Budget updated successfully", "budget": row}
 
 
 @db_router.delete("budget/{budget_id}", response=Dict[str, Any])
