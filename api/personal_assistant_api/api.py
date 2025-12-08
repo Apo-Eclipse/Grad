@@ -383,7 +383,7 @@ def _get_conversation_summary(conversation_id: int, limit: int = 20) -> str:
                 SELECT sender_type, source_agent, content, content_type
                 FROM chat_messages
                 WHERE conversation_id = %s
-                ORDER BY created_at ASC
+                ORDER BY message_id ASC
                 LIMIT %s
             """,
                 [conversation_id, limit],
