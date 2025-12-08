@@ -506,6 +506,19 @@ def goals_assist(request, payload: GoalMakerRequestSchema):
                 "timestamp": datetime.now(),
             }
 
+        now = datetime.now()
+        # User message
+        with connection.cursor() as cursor:
+            _insert_chat_message(
+                cursor,
+                conversation_id=conversation_id,
+                sender_type="user",
+                source_agent="User",
+                content=payload.user_request,
+                created_at=now,
+            )
+            connection.commit()
+        
         # Build memory context for the agent
         user_info = _get_user_summary(payload.user_id)
         last_conversation = _get_conversation_summary(conversation_id)
@@ -521,17 +534,6 @@ def goals_assist(request, payload: GoalMakerRequestSchema):
 
         # Persist this turn
         with connection.cursor() as cursor:
-            now = datetime.now()
-            # User message
-            _insert_chat_message(
-                cursor,
-                conversation_id=conversation_id,
-                sender_type="user",
-                source_agent="User",
-                content=payload.user_request,
-                created_at=now,
-            )
-
             # GoalMaker reply
             _insert_chat_message(
                 cursor,
@@ -541,7 +543,7 @@ def goals_assist(request, payload: GoalMakerRequestSchema):
                 content=goal_result.message,
                 created_at=now,
             )
-
+            
             # Optional structured goal payload
             goal_payload: Dict[str, Any] = {
                 "goal_name": goal_result.goal_name,
@@ -612,6 +614,18 @@ def budget_assist(request, payload: BudgetMakerRequestSchema):
                 "timestamp": datetime.now(),
             }
 
+        # Persist User Message Immediately
+        with connection.cursor() as cursor:
+            _insert_chat_message(
+                cursor,
+                conversation_id=conversation_id,
+                sender_type="user",
+                source_agent="User",
+                content=payload.user_request,
+                created_at=datetime.now(),
+            )
+            connection.commit()
+
         # Build memory context for the agent
         user_info = _get_user_summary(payload.user_id)
         last_conversation = _get_conversation_summary(conversation_id)
@@ -628,15 +642,6 @@ def budget_assist(request, payload: BudgetMakerRequestSchema):
         # Persist this turn
         with connection.cursor() as cursor:
             now = datetime.now()
-            # User message
-            _insert_chat_message(
-                cursor,
-                conversation_id=conversation_id,
-                sender_type="user",
-                source_agent="User",
-                content=payload.user_request,
-                created_at=now,
-            )
 
             # BudgetMaker reply
             _insert_chat_message(
@@ -726,6 +731,17 @@ def transaction_assist(request, payload: TransactionMakerRequestSchema):
         ) if active_budgets_list else "No active budgets found."
 
         # Fetch conversation history
+        with connection.cursor() as cursor:
+            _insert_chat_message(
+                cursor,
+                conversation_id=conversation_id,
+                sender_type="user",
+                source_agent="User",
+                content=payload.user_request,
+                created_at=datetime.now(),
+            )
+            connection.commit()
+
         last_conversation = _get_conversation_summary(conversation_id)
 
         agent_input = {
@@ -739,17 +755,6 @@ def transaction_assist(request, payload: TransactionMakerRequestSchema):
 
         # Persist this turn
         with connection.cursor() as cursor:
-            now = datetime.now()
-            # User message
-            _insert_chat_message(
-                cursor,
-                conversation_id=conversation_id,
-                sender_type="user",
-                source_agent="User",
-                content=payload.user_request,
-                created_at=now,
-            )
-
             # TransactionMaker reply
             _insert_chat_message(
                 cursor,
