@@ -83,7 +83,7 @@ Behaviour rules:
 ---
 
 Example clarification:  
-{
+{{
   "message": "Excellent! Could you please tell me the amount you want to save?",
   "goal_name": "Buy a car",
   "target": null,
@@ -91,10 +91,10 @@ Example clarification:
   "due_date": null,
   "plan": null,
   "is_done": false
-}
+}}
 
 Example finalized goal:  
-{
+{{
   "message": "Great! Your goal is set: Save 50,000 EGP for a new car by 2027-06-01. I've created a plan to help you get there.",
   "goal_name": "New Car",
   "target": 50000.0,
@@ -102,7 +102,7 @@ Example finalized goal:
   "due_date": "2027-06-01",
   "plan": "1. Save 2,000 EGP/month from salary. 2. Reduce Dining Out budget by 10%. 3. Allocate 50% of year-end bonus.",
   "is_done": true
-}
+}}
 """
 
 user_prompt = """
