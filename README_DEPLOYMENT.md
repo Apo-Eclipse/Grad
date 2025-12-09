@@ -103,7 +103,7 @@ python run_server.py
 | DEPLOYMENT_SUMMARY.md | 149 | 4.5KB | Quick reference |
 | **Total** | **1,141** | **31.5KB** | **Full documentation** |
 
-## �� Related Documentation
+## 🔗 Related Documentation
 
 From the `mustafa` branch:
 - `README.md` - Project overview and features
