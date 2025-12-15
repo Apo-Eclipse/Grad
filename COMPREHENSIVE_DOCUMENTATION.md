@@ -162,7 +162,7 @@ Transaction addition is no longer handled by the main router or the Database Age
 *   **Budget Mapping**: Automatically maps natural language categories to active budget IDs.
 
 #### 2.3.6 Budget Maker Agent
-*   **Role**: Helps users define clear, realistic monthly budgets.
+*   **Role**: Helps users define clear, realistic monthly budgets AND update existing ones.
 *   **Features**:
     *   **Context Analysis**: Checks income vs. total budgets and recent spending to prevent over-budgeting.
     *   **Smart Categorization**: Standardizes vague categories (e.g., "fun money" -> "Entertainment").
@@ -564,6 +564,21 @@ The API uses Pydantic models for request and response validation.
   "user_id": "int",
   "user_request": "string",
   "conversation_id": "int (optional)"
+}
+```
+
+**BudgetMakerResponseSchema**
+```json
+{
+  "conversation_id": "int",
+  "message": "string",
+  "action": "string (create|update)",
+  "budget_name": "string (optional)",
+  "budget_id": "int (optional)",
+  "total_limit": "float (optional)",
+  "description": "string (optional)",
+  "priority_level_int": "int (optional)",
+  "is_done": "bool"
 }
 ```
 

@@ -211,6 +211,7 @@ def _get_user_summary(user_id: int) -> str:
             cursor.execute(
                 """
                 SELECT
+                    budget_id,
                     budget_name,
                     total_limit,
                     priority_level_int
@@ -331,8 +332,8 @@ def _get_user_summary(user_id: int) -> str:
 
         if active_budgets_count > 0:
             budget_bits = [f"{active_budgets_count} active budget(s):"]
-            for b_name, b_limit, b_prio in active_budgets_rows:
-                budget_bits.append(f"  - {b_name} ({float(b_limit):.2f} EGP, Prio {b_prio})")
+            for b_id, b_name, b_limit, b_prio in active_budgets_rows:
+                budget_bits.append(f"  - {b_name} (ID: {b_id}, Limit: {float(b_limit):.2f} EGP, Prio {b_prio})")
             parts.append("Active budgets: " + "; ".join(budget_bits))
         else:
             parts.append("Active budgets: no active budgets recorded yet")
@@ -657,7 +658,9 @@ def budget_assist(request, payload: BudgetMakerRequestSchema):
 
             # Optional structured budget payload
             budget_payload: Dict[str, Any] = {
+                "action": budget_result.action,
                 "budget_name": budget_result.budget_name,
+                "budget_id": budget_result.budget_id,
                 "total_limit": budget_result.total_limit,
                 "description": budget_result.description,
                 "priority_level_int": budget_result.priority_level_int,
@@ -686,7 +689,9 @@ def budget_assist(request, payload: BudgetMakerRequestSchema):
         response: Dict[str, Any] = {
             "conversation_id": conversation_id,
             "message": budget_result.message,
+            "action": budget_result.action,
             "budget_name": budget_result.budget_name,
+            "budget_id": budget_result.budget_id,
             "total_limit": budget_result.total_limit,
             "description": budget_result.description,
             "priority_level_int": budget_result.priority_level_int,

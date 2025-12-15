@@ -148,7 +148,9 @@ class BudgetMakerRequestSchema(BaseModel):
 class BudgetMakerResponseSchema(BaseModel):
     conversation_id: int
     message: str
+    action: Literal["create", "update"] = "create"
     budget_name: Optional[str] = None
+    budget_id: Optional[int] = None
     total_limit: Optional[float] = None
     description: Optional[str] = None
     priority_level_int: Optional[int] = None

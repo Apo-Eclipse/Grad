@@ -12,7 +12,7 @@ An advanced, conversational financial advisor powered by Large Language Models (
     *   **Database Agent**: Translates questions into SQL queries.
     *   **Behaviour Analyst**: Analyzes spending patterns, detects "emotional spending," and identifies habits.
     - **Goal Maker**: Specialized agent for setting SMART financial goals.
-    - **Budget Maker**: Interactive agent for defining monthly budgets with priority levels.
+    - **Budget Maker**: Interactive agent for defining and updating monthly budgets with priority levels.
     - **Transaction Maker**: Context-aware agent for recording detailed transactions (time, location, category) and mapping them to active budgets.
     - **Presentation Super Agent**: Generates visual reports and charts.
 *   **Psychological Profiling**: Understands the *why* behind your spending (Retail Therapy, Impulse Buying, Social Pressure).
@@ -39,13 +39,13 @@ graph TD
     Chat --> Final[Response]
     
     User2[User Goal Request] --> GoalMaker[Goal Maker Agent]
-    GoalMaker --> DB[(Database)]
+    GoalMaker --> API[REST API]
 
     User3[User Budget Request] --> BudgetMaker[Budget Maker Agent]
-    BudgetMaker --> DB
+    BudgetMaker --> API
 
     User4[User Transaction Request] --> TransactionMaker[Transaction Maker Agent]
-    TransactionMaker --> DB
+    TransactionMaker --> API
 ```
 
 ## 💻 Tech Stack

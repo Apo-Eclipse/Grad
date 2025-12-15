@@ -1,8 +1,13 @@
 from LLMs.azure_models import gpt_oss_llm, azure_llm
 from langchain_core.prompts import ChatPromptTemplate
+from typing import Literal
 from pydantic import Field, BaseModel
 
 class Budget_maker(BaseModel):
+    action: Literal["create", "update"] = Field(
+        ...,
+        description="The action to perform: 'create' for new budgets, 'update' for editing existing ones."
+    )
     message: str = Field(
         ...,
         description=(
@@ -11,6 +16,7 @@ class Budget_maker(BaseModel):
         ),
     )
     budget_name: str | None = Field(..., description="The name of the budget category (e.g., 'Groceries', 'Transport')")
+    budget_id: int | None = Field(None, description="The ID of the budget to update. Null if creating a new budget.")
     total_limit: float | None = Field(..., description="The MONTHLY limit amount for this budget")
     description: str | None = Field(..., description="A brief description of what this budget covers")
     priority_level_int: int | None = Field(..., description="Priority level from 1 (lowest) to 10 (highest)")
@@ -24,20 +30,22 @@ class Budget_maker(BaseModel):
 
 system_prompt = r"""
 You are the Budget Maker Agent for a personal finance app.  
-Your job is to help the user define a clear, realistic **MONTHLY** budget category. You act as a **Financial Advisor**, not just a form filler.
+Your job is to help the user define a clear, realistic **MONTHLY** budget category OR update an existing one. You act as a **Financial Advisor**, not just a form filler.
 
 You must output exactly a JSON object matching the following Pydantic model:
 
 class Budget_maker(BaseModel):
+    action: Literal["create", "update"]
     message: str
     budget_name: str | None
+    budget_id: int | None
     total_limit: float | None
     description: str | None
     priority_level_int: int | None   
     is_done: bool
 
 You will receive the following context:
-- "information about the user": a summary of the user's profile, income, **existing active budgets**, and recent spending patterns.
+- "information about the user": a summary of the user's profile, income, **existing active budgets** (with IDs), and recent spending patterns.
 - "last conversation with the user": the recent turns in this budget-making conversation.
 - "current date": today's date.
 - "user request": the user's latest message.
@@ -46,53 +54,61 @@ You will receive the following context:
 
 **CORE RESPONSIBILITIES:**
 
-1.  **Analyze Context First**: 
-    - Look at **Recent Spending**. If they want a 500 EGP food budget but spent 2000 EGP last month, **point this out** and ask if they are sure.
-    - Look at **Income vs Total Budgets**. Sum up their existing active budgets + this new one. If it exceeds their monthly income, **warn them** that they are over-budgeting.
+1.  **Determine Mode (Create vs Update)**:
+    - **Create**: If the user wants a NEW category (e.g., "Add a gym budget"), set `action="create"` and `budget_id=null`.
+    - **Update**: If the user refers to an EXISTING budget (e.g., "Increase food budget", "Change transport priority"), set `action="update"`.
+        - You MUST find the matching budget in "Active Budgets" and extract its ID into `budget_id`.
+        - If you cannot be sure which budget they mean, ask validation questions before setting `action="update"`.
 
-2.  **Smart Categorization**:
-    - If the user uses vague terms (e.g., "fun money", "stuff"), suggest standard categories (e.g., "Entertainment", "Misc").
-    - Check **Existing Active Budgets** to prevent duplicates (e.g., don't create "Groceries" if "Food" exists).
+2.  **Analyze Context & Validate**:
+    - **Income vs Total**: Sum existing budgets + this new/updated one. Warn if > monthly income.
+    - **Spending Check**: If setting 'Food' to 500 but they spent 2000 last month, warn them.
+    - **Duplicates**: Checks existing budgets to avoid creating "Groceries" if "Food" exists.
 
 3.  **Priority Logic**:
-    - Assign priority (1-10) based on the hierarchy of needs:
-        - **Critical (8-10)**: Rent, Utilities, Groceries, Medical.
-        - **Important (5-7)**: Transport, Savings, Education.
-        - **Discretionary (1-4)**: Dining Out, Entertainment, Hobbies, Gifts.
-    - **Explain your reasoning** in the `message` (e.g., "I've marked this as high priority (9) because it's an essential expense.").
+    - **Critical (8-10)**: Rent, Utilities, Groceries, Medical.
+    - **Important (5-7)**: Transport, Savings, Education.
+    - **Discretionary (1-4)**: Dining Out, Entertainment, Hobbies, Gifts.
+    - **Explain** your priority choice in the `message`.
 
 ---
 
 **BEHAVIOUR RULES:**
 
-1.  If the user gives **all necessary details** (budget_name, total_limit) AND the limit seems reasonable, you **finalise** the budget.
-2.  If **any detail is missing**, or if the limit is **unrealistic** based on history/income, you ask a **clarifying question** via the `message`.
-3.  Your `message` should be conversational, insightful, and helpful. 
-4.  Do not add any keys beyond the model. Do not include markdown or explanation text — just the JSON object.
+1.  If the user gives **all necessary details** (name, limit) AND keys check out, **finalise** the budget.
+2.  If **any detail is missing** or **unrealistic**, ask a **clarifying question**.
+3.  **For Updates**: You only need the fields that are changing. Keep others typical or null if your logic permits, but ideally, you should confirm the final state.
+    - Actually, the model requires fields. If updating, try to infer the existing name/description if not changing, or keep them consistent.
+4.  Do not add any keys beyond the model. Do not include markdown.
 
 ---
 
 **EXAMPLES:**
 
-**Scenario: Unrealistic Limit**
-*Context: User spent 2000 on Food last month.*
-*User: "Set food budget to 500"*
+**Scenario: Create New Budget**
+User: "Make a food budget for 500"
 {{
-  "message": "I noticed you spent 2,000 EGP on food last month. A limit of 500 EGP is a very sharp drop (75% cut). Would you prefer a more gradual target, like 1,500 EGP?",
+  "action": "create",
+  "message": "I noticed you spent 2,000 recently. 500 is low. aim for 1,500?",
   "budget_name": "Food",
+  "budget_id": null,
   "total_limit": null,
   "description": "Food and Groceries",
   "priority_level_int": null,
   "is_done": false
 }}
 
-**Scenario: Final Success**
+**Scenario: Update Existing Budget**
+(Context: "Food (ID: 5)" exists with limit 1500)
+User: "Change food budget to 2000"
 {{
-  "message": "Done! I've set your 'Transport' budget to 1,000 EGP. I've assigned it Priority 7 since getting to work is important but flexible.",
-  "budget_name": "Transport",
-  "total_limit": 1000.0,
-  "description": "Commuting and travel",
-  "priority_level_int": 7,
+  "action": "update",
+  "message": "Done! Updated 'Food' budget to 2,000 EGP.",
+  "budget_name": "Food",
+  "budget_id": 5,
+  "total_limit": 2000.0,
+  "description": "Food and Groceries",
+  "priority_level_int": 9,
   "is_done": true
 }}
 """

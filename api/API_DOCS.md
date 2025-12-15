@@ -173,7 +173,7 @@ sequenceDiagram
 ### Budget Maker Endpoint
 
 #### POST /api/personal_assistant/budget/assist
-Continue a budget-focused conversation for a specific user using the Budget Maker agent.
+Continue a budget-focused conversation for a specific user using the Budget Maker agent. Supports both **Creating** new budgets and **Updating** existing ones.
 
 **Request Body:**
 ```json
@@ -199,7 +199,9 @@ Continue a budget-focused conversation for a specific user using the Budget Make
 {
   "conversation_id": 42,
   "message": "Okay, what is the maximum amount you want to spend on food each month?",
+  "action": "create",
   "budget_name": "Food",
+  "budget_id": null,
   "total_limit": null,
   "description": "Monthly food expenses",
   "priority_level_int": null,
