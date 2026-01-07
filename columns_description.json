@@ -149,48 +149,6 @@
   "is_nullable": "YES",
   "column_description": null
 }, {
-  "table_name": "django_content_type",
-  "column_name": "id",
-  "data_type": "integer",
-  "is_nullable": "NO",
-  "column_description": null
-}, {
-  "table_name": "django_content_type",
-  "column_name": "app_label",
-  "data_type": "character varying",
-  "is_nullable": "NO",
-  "column_description": null
-}, {
-  "table_name": "django_content_type",
-  "column_name": "model",
-  "data_type": "character varying",
-  "is_nullable": "NO",
-  "column_description": null
-}, {
-  "table_name": "django_migrations",
-  "column_name": "id",
-  "data_type": "bigint",
-  "is_nullable": "NO",
-  "column_description": null
-}, {
-  "table_name": "django_migrations",
-  "column_name": "app",
-  "data_type": "character varying",
-  "is_nullable": "NO",
-  "column_description": null
-}, {
-  "table_name": "django_migrations",
-  "column_name": "name",
-  "data_type": "character varying",
-  "is_nullable": "NO",
-  "column_description": null
-}, {
-  "table_name": "django_migrations",
-  "column_name": "applied",
-  "data_type": "timestamp with time zone",
-  "is_nullable": "NO",
-  "column_description": null
-}, {
   "table_name": "goals",
   "column_name": "goal_id",
   "data_type": "bigint",
