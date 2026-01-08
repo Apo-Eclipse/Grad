@@ -1,12 +1,11 @@
+import os
 from langchain_google_genai import ChatGoogleGenerativeAI
-from helpers import settings, get_setting
-
-app_settings = get_setting()
+from langchain_google_genai import GoogleGenerativeAIEmbeddings
 
 gemini_llm = ChatGoogleGenerativeAI(
-    api_key=app_settings.GEMINI_API_KEY,
+    api_key=os.getenv("GEMINI_API_KEY"),
     model="gemini-2.5-flash-lite",
-    temperature=1,
-    timeout=None,
-    max_retries=2,
+    temperature=0.6,
+    timeout=300,
+    max_retries=3,
 )
