@@ -1,4 +1,5 @@
 from LLMs.azure_models import gpt_oss_llm, azure_llm
+from LLMs.digital_ocean import gpt_oss_120b_digital_ocean
 from langchain_core.prompts import ChatPromptTemplate
 from typing import Literal
 from pydantic import Field, BaseModel
@@ -125,4 +126,4 @@ prompt = ChatPromptTemplate.from_messages([
     ("user", user_prompt),
 ])
 
-Budget_maker_agent = prompt | gpt_oss_llm.with_structured_output(Budget_maker)
+Budget_maker_agent = prompt | gpt_oss_120b_digital_ocean.with_structured_output(Budget_maker)

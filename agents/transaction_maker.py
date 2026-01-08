@@ -1,4 +1,5 @@
 from LLMs.azure_models import gpt_oss_llm
+from LLMs.digital_ocean import gpt_oss_120b_digital_ocean
 from langchain_core.prompts import ChatPromptTemplate
 from pydantic import Field, BaseModel
 from typing import Optional
@@ -93,4 +94,4 @@ prompt = ChatPromptTemplate.from_messages([
     ("user", user_prompt),
 ])
 
-Transaction_maker_agent = prompt | gpt_oss_llm.with_structured_output(TransactionMakerOutput)
+Transaction_maker_agent = prompt | gpt_oss_120b_digital_ocean.with_structured_output(TransactionMakerOutput)

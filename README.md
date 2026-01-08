@@ -63,7 +63,7 @@ The system exposes a robust REST API built with **Django Ninja**. It acts as the
 
 ### Request Lifecycle
 1.  **Validation**: Pydantic schemas ensure all requests are well-formed.
-2.  **Orchestration**: The API calls the `PersonalAssistantService`, which spins up the LangGraph agents.
+2.  **Orchestration**: The API lazily loads and invokes the Graph Orchestrator (`graphs.main_graph`).
 3.  **Async Execution**: Long-running analysis tasks are handled asynchronously to keep the server responsive.
 4.  **Persistence**: Every interaction is automatically logged to the PostgreSQL database for memory and auditing.
 
@@ -71,14 +71,11 @@ The system exposes a robust REST API built with **Django Ninja**. It acts as the
 sequenceDiagram
     participant Client
     participant API as Django Ninja
-    participant Service as PA Service
     participant DB as PostgreSQL
 
     Client->>API: POST /analyze
-    API->>Service: Validate & Invoke
-    Service->>Service: Run Agents (LangGraph)
-    Service->>DB: Persist Chat History
-    Service-->>API: Return Result
+    API->>API: Validate & Invoke Graph
+    API->>DB: Persist Chat History
     API-->>Client: JSON Response
 ```
 

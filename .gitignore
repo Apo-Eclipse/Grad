@@ -4,7 +4,8 @@ data/
 .env
 .github/
 __pycache__/
-**/__pycache__/
+*.py[cod]
 .dockerignore
 goal_main.py
-main.py
+AGENT_PROMPTS.md
+# main.py

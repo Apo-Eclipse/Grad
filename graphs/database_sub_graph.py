@@ -5,7 +5,7 @@ from django.db import connection
 from langgraph.graph import StateGraph, END, START
 
 from agents import DatabaseAgent
-from api.personal_assistant_api.db_retrieval import dictfetchall
+from api.personal_assistant_api.core.database import dictfetchall
 
 
 def _prepare_select_sql(query: str, *, limit: int = 100) -> str:

@@ -6,10 +6,10 @@ from datetime import datetime
 from typing import TypedDict, List
 
 from agents import Explainer_agent, Analyser, Behaviour_analyser_orchestrator, Query_planner, ValidationAgent
+from LLMs.digital_ocean import gpt_oss_120b_digital_ocean
 from graphs.database_sub_graph import database_agent_super_agent
 from langgraph.graph import StateGraph, END, START
 
-# --- Setup Logging and Warnings ---
 warnings.filterwarnings("ignore", message=".*missing ScriptRunContext.*")
 logging.getLogger().setLevel(logging.ERROR)
 
@@ -42,6 +42,8 @@ def analyser(state: BehaviourAnalystState) -> dict:
         "previous_analysis": analysis,
         "current_date": datetime.now().strftime("%Y-%m-%d")
     })
+    
+    print("Analyser Output:", Output)
     
     analysis = Output.output
     message = Output.message
@@ -84,6 +86,8 @@ def query_planner(state: BehaviourAnalystState) -> dict:
         "user": state.get("user_id", ""),
         "current_date": datetime.now().strftime("%Y-%m-%d")
     })
+    
+    print("Query Planner Output:", Output)
     
     message = Output.message
     steps_output = Output.output

@@ -5,9 +5,11 @@ Adds the API package to sys.path, loads environment variables, and serves the
 application via Waitress. This mirrors the previous api/run_server.py script so
 existing deployment instructions continue to work.
 """
+import sys
+sys.dont_write_bytecode = True
+
 import logging
 import os
-import sys
 from pathlib import Path
 
 from dotenv import load_dotenv

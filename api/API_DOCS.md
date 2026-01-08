@@ -17,15 +17,13 @@
 sequenceDiagram
     participant Client
     participant API as Django Ninja
-    participant Service as PA Service
     participant DB as PostgreSQL
 
     Client->>API: POST /api/personal_assistant/analyze
-    API->>Service: run_analysis()
-    Service->>DB: Fetch Context (History/Profile)
-    Service->>Service: Run LangGraph Orchestrator
-    Service->>DB: Store Result (Chat Messages)
-    Service-->>API: Result
+    API->>DB: Fetch Context (History/Profile)
+    API->>API: Run LangGraph Orchestrator
+    API->>DB: Store Result (Chat Messages)
+    API-->>Client: JSON Response
     API-->>Client: JSON Response
 ```
 
@@ -38,14 +36,11 @@ sequenceDiagram
 **Modules**
 - `api/personal_assistant_api/api.py`
   - Conversation endpoints: start session, analyze query, health.
+  - Handles **Graph Orchestration**: lazily loads `graphs.main_graph` and executes the analysis flow (`run_analysis` logic merged here).
   - `_insert_chat_message` centralizes `chat_messages` inserts.
   - `_store_messages_sync` records user/assistant messages and optional JSON data; updates `chat_conversations.last_message_at`.
   - `_get_user_summary` and `_get_conversation_summary` build goal-aware context (profile, income, goals, and recent spending patterns) for specialized agents.
   - Goal Maker endpoint `/api/personal_assistant/goals/assist` provides a structured goal-setting conversation with per-conversation memory.
-- `api/personal_assistant_api/services.py`
-  - `PersonalAssistantService` lazily loads `graphs.main_graph.main_orchestrator_graph`.
-  - `run_analysis` handles async (`ainvoke`) and sync (`invoke` in executor) orchestrators and normalizes results.
-  - Includes comprehensive error handling and performance timing.
 - `api/personal_assistant_api/db_retrieval.py`
   - `_run_select` and `_execute_modify` centralize database I/O; `_safe_json_body` only backs the generic SQL helpers.
   - `fetch_active_budgets` is a reusable helper that retrieves active budgets for both the API and the Router.
@@ -57,7 +52,7 @@ sequenceDiagram
 - `graphs/main_graph.py`
   - Main orchestrator with `personal_assistant_orchestrator`, `database_agent_node`, `behaviour_analyst_node`, and `personal_assistant_response`.
   - `database_agent_node` includes 10-second timeout protection and enhanced error handling.
-  - PersonalAssistant instance management ensures proper context isolation across conversations.
+  - Stateless **Personal Assistant** logic ensures proper context isolation across conversations.
   - Database agent receives combined user ask and routing instruction for better context.
   - **Budget Validation**: The orchestrator now fetches active budgets and validates transaction requests (checking amount/category) before routing. It also resolves category names to `budget_id` for the Database Agent.
 - `agents/behaviour_analyst/analyser.py`

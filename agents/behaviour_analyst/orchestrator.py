@@ -1,5 +1,6 @@
 from typing import Literal,TypedDict
 from LLMs.azure_models import large_azure_llm, gpt_oss_llm
+from LLMs.digital_ocean import gpt_oss_120b_digital_ocean
 from langgraph.graph import StateGraph, END
 from typing import Dict, Any
 from langchain_core.prompts import ChatPromptTemplate
@@ -67,4 +68,4 @@ prompt = ChatPromptTemplate.from_messages([
     ("user", user_prompt)
 ])
 
-Behaviour_analyser_orchestrator = prompt | gpt_oss_llm.with_structured_output(orchestratorOutput)
+Behaviour_analyser_orchestrator = prompt | gpt_oss_120b_digital_ocean.with_structured_output(orchestratorOutput)

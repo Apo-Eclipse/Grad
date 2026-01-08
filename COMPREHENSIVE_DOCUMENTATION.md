@@ -72,7 +72,7 @@ The system utilizes a **Supervisor/Router** pattern implemented in `graphs/main_
     *   *Complex Analysis* $\rightarrow$ **Behaviour Analyst**
     *   *General Chat* $\rightarrow$ **Personal Assistant**
 *   **Execution**: The selected agent executes its task, potentially calling sub-graphs.
-*   **Response**: The result is fed back to the `PersonalAssistant` agent to generate a natural language response, ensuring a consistent persona.
+*   **Response**: The result is fed back to the `PersonalAssistant` functional module to generate a natural language response, ensuring a consistent persona.
 
 ```mermaid
 graph TD
@@ -92,7 +92,7 @@ graph TD
 
 #### 2.3.1 Personal Assistant (The "Face")
 *   **Role**: Manages the conversation flow, maintains memory, and humanizes technical outputs.
-*   **Memory**: Stateless architecture. Fetches conversation history from the database for every request to ensure thread safety and context continuity.
+*   **Memory**: Stateless functional design. The `invoke_personal_assistant` function executes a single turn, fetching conversation history (`get_conversation_summary`) for every request.
 *   **Persona**: Configured via system prompts to be empathetic, professional, and proactive.
 
 #### 2.3.2 Database Agent (The "Analyst")

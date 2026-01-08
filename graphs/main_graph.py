@@ -14,18 +14,18 @@ from langchain_core.prompts import ChatPromptTemplate
 from pydantic import BaseModel, Field
 from graphs.database_sub_graph import database_agent_super_agent
 from graphs.behaviour_analyst_sub_graph import behaviour_analyst_super_agent
-from agents.personal_assistant import PersonalAssistant
-from agents.personal_assistant.memory_manager import ConversationMemory
-from LLMs.azure_models import gpt_oss_llm
+from agents.personal_assistant.assistant import invoke_personal_assistant
+from api.personal_assistant_api.assistants.helpers import get_conversation_summary
+from LLMs.digital_ocean import gpt_oss_120b_digital_ocean
 
 
 class RoutingDecision(BaseModel):
     """Structured output for routing decision."""
-    agent: str = Field(..., description="Which agent to route to: 'database_agent', 'behaviour_analyst', or 'conversation'")
+    agent: str = Field(..., description="Which agent to route to: 'database_agent', 'behaviour_analyst', or 'personal_assistant_response'")
     message: str = Field(..., description="Message to send to the user about this routing decision")
 
 
-from api.personal_assistant_api.db_retrieval import fetch_active_budgets
+from api.personal_assistant_api.database.budgets import fetch_active_budgets
 
 class OrchestratorState(TypedDict):
     """State for the orchestrator graph."""
@@ -64,37 +64,120 @@ def personal_assistant_orchestrator(state: OrchestratorState) -> dict:
         available_budgets = "Error fetching budgets."
     
     # 1. Fetch Memory Externally (Stateless Pattern)
-    memory = ConversationMemory(user_id=user_id, conversation_id=conversation_id)
-    memory.retrieve_conversation(conversation_id)
-    conversation_memory_str = memory.get_context_summary()
+    conversation_memory_str = get_conversation_summary(int(conversation_id)) if str(conversation_id).isdigit() else "No history."
     
     user_message = state.get("user_message", "")
     
     # System prompt for routing decision
     system_prompt = f"""
-    last conversations : {conversation_memory_str}
-    
+    last conversations: {conversation_memory_str}
     Available Budgets: {available_budgets}
-    
-    You are a Personal Assistant's routing system. Your job is to:
-    1. Analyze the user's request
-    2. Decide which agent should handle it:
-        - "database_agent": For queries about transactions, spending, budget, income, account data, balance, history
-        - "behaviour_analyst": For requests about analysis, trends, recommendations, insights, patterns, comparisons
-        - "personal_assistant": For general chat that doesn't need any agent OR if data is missing for a transaction.
-    3. Generate a message telling the agent/assistant what to do, the message should be clear and specific and.
-    4. If the user request is related to the memory or previous conversations, when generating the message, you must include relevant context from the conversation history to help the agent understand the user's needs better.
-    
-    # No specific transaction management rules.
-    # Proceed with standard routing for analysis, retrieval, or general chat.
 
-    For example:
-    
-    Assistant: The most recent analysis you requested was about your budget category "Dining Out" for last month.
-    User: "Base on my last request i want analysis of the same budget category"
-    Message to agent: "Please analyze the budget category 'Dining Out' for last month and provide insights based on that."
+    You are the Personal Assistant Orchestrator (Router).
 
-    Be concise and helpful. The message should acknowledge the user's request and explain what action you're taking.
+    Your responsibility is to:
+    1) Analyze the user's message.
+    2) Decide which agent should handle it.
+    3) Output a SINGLE valid JSON object with EXACTLY two keys:
+    - "agent": one of ["database_agent", "behaviour_analyst", "personal_assistant_response"]
+    - "message": a clear, specific instruction for the chosen agent.
+
+    --------------------------------------------------
+    CRITICAL OUTPUT RULES
+    --------------------------------------------------
+    - Return ONLY valid JSON.
+    - Do NOT include markdown, comments, or explanations.
+    - Use double quotes and valid JSON syntax.
+    - Do NOT add extra keys.
+    - Do NOT invent data or assumptions.
+
+    --------------------------------------------------
+    AVAILABLE AGENTS
+    --------------------------------------------------
+
+    1) "database_agent"
+    - STRICTLY READ-ONLY.
+    - Used ONLY for retrieving or aggregating existing data.
+    - NEVER performs insert, update, or delete operations.
+
+    2) "behaviour_analyst"
+    - Used for insights, trends, patterns, comparisons, explanations, and recommendations.
+    - Answers questions that ask WHY something happened or HOW to improve.
+
+    3) "personal_assistant_response"
+    - Used for general chatting, clarifications, explanations, and redirection.
+    - NEVER reads from the database.
+    - NEVER writes to the database.
+    - ONLY talks to the user.
+
+    --------------------------------------------------
+    ROUTING RULES
+    --------------------------------------------------
+
+    A) Route to "database_agent" if the user asks for factual data retrieval, such as:
+    - Spending totals or balances
+    - Transaction history
+    - Budget usage or limits
+    - Income totals
+    - Time-based queries (current month, last month, last year)
+
+    Message MUST specify:
+    - Time window (explicit or inferred)
+    - Budget/category if mentioned
+    - Aggregation required (e.g., total, grouped by month/category)
+
+    --------------------------------------------------
+
+    B) Route to "behaviour_analyst" if the user asks for:
+    - Reasons ("why am I overspending?")
+    - Trends or patterns
+    - Comparisons between periods
+    - Recommendations or behavioral insights
+
+    Message MUST specify:
+    - The analytical goal
+    - The time window(s) to analyze
+    - If critical info is missing, instruct the analyst to ask ONE clarification question.
+
+    --------------------------------------------------
+
+    C) Route to "personal_assistant_response" if:
+    - The user is greeting or chatting
+    - The user asks about capabilities or help
+    - The request is ambiguous and needs clarification
+    - The user expresses emotions or concerns
+    - The user requests any create/update/delete action (write operations not supported in this graph)
+
+    IMPORTANT:
+    - The assistant must NEVER claim that data was saved or changed.
+
+    =======================================================================
+    EXAMPLES (ONE PER AGENT)
+    =======================================================================
+    Example 1 — Database Agent  
+    User: "How much did I spend on Food last month?"
+
+    output:
+
+    "agent": "database_agent", 
+    "message": "Compute total spending for the Food category for last month and return the total." 
+    =======================================================================
+    Example 2 — Behaviour Analyst  
+    User: "Why am I overspending on Dining Out?"
+
+    output:
+
+    "agent": "behaviour_analyst",
+    "message": "Analyze Dining Out spending for the current month versus last month; explain the reasons and provide recommendations." 
+    =======================================================================
+    Example 3 — General Chat  
+    User: "I feel like I’m always broke"
+    
+    output:
+
+    "agent": "personal_assistant_response", 
+    "message": "Respond empathetically and ask if the user would like help reviewing spending or getting advice." 
+    =======================================================================
     """
 
     user_prompt = f"""
@@ -107,11 +190,16 @@ def personal_assistant_orchestrator(state: OrchestratorState) -> dict:
         ("human", user_prompt)
     ])
     formatted_prompt = prompt_template.format_prompt()
-    
-    routing_output = gpt_oss_llm.with_structured_output(RoutingDecision).invoke(formatted_prompt)
-
+    routing_output = gpt_oss_120b_digital_ocean.with_structured_output(RoutingDecision).invoke(formatted_prompt)
+    if routing_output is None:
+        return {
+            "routing_decision": "personal_assistant_response",
+            "routing_message": "Respond to the user directly."
+        }
     agent = routing_output.agent
     message = routing_output.message
+    print("agent",agent)
+    print("message",message)
     return {
         "routing_decision": agent,
         "routing_message": message
@@ -193,16 +281,7 @@ def personal_assistant_response(state: OrchestratorState) -> dict:
     user_name = state.get("user_name", "User")
     
     # 1. Fetch Memory Externally
-    memory = ConversationMemory(user_id=user_id, conversation_id=conversation_id)
-    memory.retrieve_conversation(conversation_id)
-    conversation_memory_str = memory.get_context_summary()
-    
-    # 2. Instantiate Stateless Assistant
-    personal_assistant = PersonalAssistant(
-        user_id=user_id,
-        conversation_id=conversation_id,
-        user_name=user_name
-    )
+    conversation_memory_str = get_conversation_summary(int(conversation_id)) if str(conversation_id).isdigit() else "No history."
     
     routing_decision = state.get("routing_decision", "personal_assistant")
     routing_message = state.get("routing_message", "")
@@ -212,10 +291,10 @@ def personal_assistant_response(state: OrchestratorState) -> dict:
     if routing_decision == "database_agent":
         if is_awaiting_data:
             confirmation_prompt = f"The user ({state.get('user_name','User')}) asked: {state.get('user_message')}. Give a very brief one-sentence confirmation that you're showing them the results."
-            confirmation = personal_assistant.invoke(confirmation_prompt, conversation_history=conversation_memory_str, context={
+            confirmation = invoke_personal_assistant(confirmation_prompt, conversation_history=conversation_memory_str, context={
                                                         "routing_decision": routing_decision,
                                                         "routing_message": routing_message
-                                                    })
+                                                    }, user_id=user_id, user_name=user_name)
             return {
                 "has_data": True,
                 "data": state.get("data", []),
@@ -223,10 +302,10 @@ def personal_assistant_response(state: OrchestratorState) -> dict:
                 "agents_used": agents_used  # Preserve agents_used
             }
         confirmation_prompt = f"The user ({state.get('user_name','User')}) asked: {state.get('user_message')}. Give a very brief one-sentence confirmation."
-        confirmation = personal_assistant.invoke(confirmation_prompt, conversation_history=conversation_memory_str, context={
+        confirmation = invoke_personal_assistant(confirmation_prompt, conversation_history=conversation_memory_str, context={
             "routing_decision": routing_decision,
             "routing_message": routing_message
-        })
+        }, user_id=user_id, user_name=user_name)
         return {
             "final_output": confirmation.get("response","no confirmation"),
             "data": [],
@@ -241,7 +320,7 @@ def personal_assistant_response(state: OrchestratorState) -> dict:
             "routing_message": routing_message,
             "type": state.get("user_message")
         }    
-        response = personal_assistant.invoke(state.get("user_message",""), conversation_history=conversation_memory_str, context=context).get("response","no response")
+        response = invoke_personal_assistant(state.get("user_message",""), conversation_history=conversation_memory_str, context=context, user_id=user_id, user_name=user_name).get("response","no response")
         return {
             "final_output": response,
             "data": [],
@@ -255,7 +334,7 @@ def personal_assistant_response(state: OrchestratorState) -> dict:
             "type": state.get("user_message")
     }
     
-    response = personal_assistant.invoke(state.get("user_message",""), conversation_history=conversation_memory_str, context=context)
+    response = invoke_personal_assistant(state.get("user_message",""), conversation_history=conversation_memory_str, context=context, user_id=user_id, user_name=user_name)
     return {
         "final_output": response.get("response","no response"),
         "data": [],

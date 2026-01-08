@@ -1,6 +1,6 @@
 from typing import TypedDict
-from LLMs.azure_models import large_azure_llm  # Assuming you're using the Azure LLM
 from langchain_core.prompts import ChatPromptTemplate
+from LLMs.digital_ocean import gpt_oss_120b_digital_ocean
 from pydantic import BaseModel, Field
 
 # 1. Define the Structured Output using Pydantic
@@ -116,4 +116,4 @@ validation_prompt = ChatPromptTemplate.from_messages([
 ])
 
 # 4. Build the final agent chain using LangChain Expression Language (LCEL)
-ValidationAgent = validation_prompt | large_azure_llm.with_structured_output(ValidationAgentOutput, method="function_calling")
+ValidationAgent = validation_prompt | gpt_oss_120b_digital_ocean.with_structured_output(ValidationAgentOutput, method="function_calling")
