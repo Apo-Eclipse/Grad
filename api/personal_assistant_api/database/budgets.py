@@ -1,10 +1,12 @@
 """Budgets database operations."""
+
 import logging
-from typing import Any, Dict, List, Optional
+from datetime import datetime
+from typing import Any, Dict, List
 
 from ninja import Router, Query
 
-from ..core.database import run_select, execute_modify, execute_modify_returning
+from ..models import Budget
 from ..core.responses import success_response, error_response
 from .schemas import BudgetCreateSchema, BudgetUpdateSchema
 
@@ -12,80 +14,77 @@ logger = logging.getLogger(__name__)
 router = Router()
 
 
+def _budget_to_dict(budget: Budget) -> Dict[str, Any]:
+    """Convert Budget model instance to dictionary."""
+    return {
+        "id": budget.id,
+        "user_id": budget.user_id,
+        "budget_name": budget.budget_name,
+        "description": budget.description,
+        "total_limit": float(budget.total_limit) if budget.total_limit else 0.0,
+        "priority_level_int": budget.priority_level_int,
+        "is_active": budget.is_active,
+        "created_at": budget.created_at,
+        "updated_at": budget.updated_at,
+    }
+
+
 def fetch_active_budgets(user_id: int) -> List[Dict[str, Any]]:
     """Retrieve all active budgets for a user (helper)."""
-    query = """
-        SELECT
-            budget_id,
-            budget_name,
-            total_limit,
-            priority_level_int
-        FROM budget
-        WHERE user_id = %s
-          AND is_active = true
-        ORDER BY priority_level_int DESC
-    """
-    return run_select(query, [user_id], log_name="fetch_active_budgets")
+    budgets = (
+        Budget.objects.filter(user_id=user_id, is_active=True)
+        .order_by("-priority_level_int")
+        .values("id", "budget_name", "total_limit", "priority_level_int")
+    )
+    return list(budgets)
 
 
-@router.get("/", response=List[Dict[str, Any]])
+@router.get("/", response=Dict[str, Any])
 def get_budgets(request, user_id: int = Query(...)):
     """Retrieve active budgets for a user."""
-    query = """
-        SELECT
-            budget_id,
-            budget_name,
-            description,
-            total_limit,
-            priority_level_int,
-            is_active,
-            created_at,
-            updated_at
-        FROM budget
-        WHERE user_id = %s AND is_active = true
-        ORDER BY priority_level_int DESC
-    """
-    return run_select(query, [user_id], log_name="get_budgets")
+    budgets = (
+        Budget.objects.filter(user_id=user_id, is_active=True)
+        .order_by("-priority_level_int")
+        .values(
+            "id",
+            "budget_name",
+            "description",
+            "total_limit",
+            "priority_level_int",
+            "is_active",
+            "created_at",
+            "updated_at",
+        )
+    )
+    return success_response(list(budgets))
+
+
+@router.get("/{budget_id}", response=Dict[str, Any])
+def get_budget(request, budget_id: int):
+    """Get a single budget."""
+    try:
+        budget = Budget.objects.get(id=budget_id)
+        return success_response(_budget_to_dict(budget))
+    except Budget.DoesNotExist:
+        return error_response("Budget not found", code=404)
 
 
 @router.post("/", response=Dict[str, Any])
 def create_budget(request, payload: BudgetCreateSchema):
     """Create a new budget."""
-    query = """
-        INSERT INTO budget (
-            user_id,
-            budget_name,
-            description,
-            total_limit,
-            priority_level_int,
-            is_active,
-            created_at,
-            updated_at
+    try:
+        budget = Budget.objects.create(
+            user_id=payload.user_id,
+            budget_name=payload.budget_name,
+            description=payload.description,
+            total_limit=payload.total_limit,
+            priority_level_int=payload.priority_level_int,
+            is_active=payload.is_active,
         )
-        VALUES (%s, %s, %s, %s, %s, %s, NOW(), NOW())
-        RETURNING
-            budget_id,
-            user_id,
-            budget_name,
-            total_limit,
-            priority_level_int,
-            is_active,
-            created_at
-    """
-    params = [
-        payload.user_id,
-        payload.budget_name,
-        payload.description,
-        payload.total_limit,
-        payload.priority_level_int,
-        payload.is_active,
-    ]
-    
-    success, _, row = execute_modify_returning(query, params, log_name="create_budget")
-    if not success or row is None:
-        return error_response("Failed to create budget")
-    
-    return success_response(row, "Budget created successfully")
+        return success_response(_budget_to_dict(budget), "Budget created successfully")
+    except Exception as e:
+        logger.exception("Failed to create budget")
+        return error_response(f"Failed to create budget: {e}")
 
 
 @router.put("/{budget_id}", response=Dict[str, Any])
@@ -95,50 +94,33 @@ def update_budget(request, budget_id: int, payload: BudgetUpdateSchema):
     if not updates:
         return error_response("No fields provided for update")
 
-    # Add updated_at timestamp
-    updates['updated_at'] = 'NOW()'
-    
-    # We need to handle NOW() properly since it's SQL not a param
-    # simpler approach: remove updated_at from params and inject it in query string
-    set_parts = []
-    params = []
-    
-    for key, val in updates.items():
-        if key == 'updated_at':
-            set_parts.append("updated_at = NOW()")
-        else:
-            set_parts.append(f"{key} = %s")
-            params.append(val)
-    
-    params.append(budget_id)
-    set_clause = ", ".join(set_parts)
+    updates["updated_at"] = datetime.now()
 
-    query = f"""
-        UPDATE budget
-        SET {set_clause}
-        WHERE budget_id = %s
-        RETURNING *
-    """
+    try:
+        rows_affected = Budget.objects.filter(id=budget_id).update(**updates)
+        if rows_affected == 0:
+            return error_response("Budget not found", code=404)
 
-    success, rows_affected, row = execute_modify_returning(query, params, log_name="update_budget")
-    if not success:
-        return error_response("Failed to update budget")
-    if rows_affected == 0 or row is None:
+        budget = Budget.objects.get(id=budget_id)
+        return success_response(_budget_to_dict(budget), "Budget updated successfully")
+    except Budget.DoesNotExist:
         return error_response("Budget not found", code=404)
-        
-    return success_response(row, "Budget updated successfully")
+    except Exception as e:
+        logger.exception("Failed to update budget")
+        return error_response(f"Failed to update budget: {e}")
 
 
 @router.delete("/{budget_id}", response=Dict[str, Any])
 def delete_budget(request, budget_id: int):
     """Soft delete a budget."""
-    query = """
-        UPDATE budget
-        SET is_active = false, updated_at = NOW()
-        WHERE budget_id = %s
-    """
-    rows_affected = execute_modify(query, [budget_id], log_name="delete_budget")
-    if rows_affected == 0:
-        return error_response("Budget not found", code=404)
-    
-    return success_response(None, "Budget deactivated successfully")
+    try:
+        rows_affected = Budget.objects.filter(id=budget_id).update(
+            is_active=False, updated_at=datetime.now()
+        )
+        if rows_affected == 0:
+            return error_response("Budget not found", code=404)
+
+        return success_response(None, "Budget deactivated successfully")
+    except Exception as e:
+        logger.exception("Failed to delete budget")
+        return error_response(f"Failed to delete budget: {e}")

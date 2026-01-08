@@ -1,10 +1,12 @@
 """Transactions database operations."""
+
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 from ninja import Router, Query
+from django.db.models import Q
 
-from ..core.database import run_select, execute_modify
+from ..models import Transaction
 from ..core.responses import success_response, error_response
 from .schemas import TransactionCreateSchema, TransactionUpdateSchema
 
@@ -12,7 +14,29 @@ logger = logging.getLogger(__name__)
 router = Router()
 
 
-@router.get("/", response=List[Dict[str, Any]])
+def _transaction_to_dict(
+    txn: Transaction, include_budget_name: bool = False
+) -> Dict[str, Any]:
+    """Convert Transaction model instance to dictionary."""
+    result = {
+        "id": txn.id,
+        "user_id": txn.user_id,
+        "date": txn.date,
+        "amount": float(txn.amount) if txn.amount else 0.0,
+        "time": str(txn.time) if txn.time else None,
+        "store_name": txn.store_name,
+        "city": txn.city,
+        "type_spending": txn.type_spending,
+        "budget_id": txn.budget_id,
+        "neighbourhood": txn.neighbourhood,
+        "created_at": txn.created_at,
+    }
+    if include_budget_name and txn.budget:
+        result["budget_name"] = txn.budget.budget_name
+    return result
+
+
+@router.get("/", response=Dict[str, Any])
 def get_transactions(
     request,
     user_id: int = Query(...),
@@ -21,160 +45,87 @@ def get_transactions(
     limit: int = Query(100, le=1000),
 ):
     """Retrieve transactions for a user."""
-    query = """
-        SELECT
-            t.transaction_id,
-            t.user_id,
-            t.date,
-            t.amount,
-            t.time,
-            t.store_name,
-            t.city,
-            t.type_spending,
-            t.budget_id,
-            b.budget_name,
-            t.neighbourhood,
-            t.created_at
-        FROM transactions t
-        LEFT JOIN budget b ON t.budget_id = b.budget_id
-        WHERE t.user_id = %s
-    """
-    params: List[Any] = [user_id]
+    queryset = Transaction.objects.filter(user_id=user_id).select_related("budget")
 
     if start_date:
-        query += " AND t.date >= %s"
-        params.append(start_date)
+        queryset = queryset.filter(date__gte=start_date)
     if end_date:
-        query += " AND t.date <= %s"
-        params.append(end_date)
+        queryset = queryset.filter(date__lte=end_date)
 
-    query += " ORDER BY t.date DESC, t.time DESC NULLS LAST LIMIT %s"
-    params.append(limit)
+    queryset = queryset.order_by("-date", "-time")[:limit]
 
-    return run_select(query, params, log_name="transactions")
+    result = [_transaction_to_dict(txn, include_budget_name=True) for txn in queryset]
+    return success_response(result)
 
 
 @router.post("/", response=Dict[str, Any])
 def create_transaction(request, payload: TransactionCreateSchema):
     """Create a new transaction row."""
-    query = """
-        INSERT INTO transactions (
-            user_id,
-            date,
-            amount,
-            time,
-            store_name,
-            city,
-            type_spending,
-            budget_id,
-            neighbourhood
+    try:
+        txn = Transaction.objects.create(
+            user_id=payload.user_id,
+            date=payload.date,
+            amount=payload.amount,
+            time=payload.time,
+            store_name=payload.store_name,
+            city=payload.city,
+            type_spending=payload.type_spending,
+            budget_id=payload.budget_id,
+            neighbourhood=payload.neighbourhood,
         )
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-        RETURNING
-            transaction_id,
-            user_id,
-            date,
-            amount,
-            time,
-            store_name,
-            city,
-            type_spending,
-            budget_id,
-            neighbourhood,
-            created_at
-    """
-    params = [
-        payload.user_id,
-        payload.date,
-        payload.amount,
-        payload.time,
-        payload.store_name,
-        payload.city,
-        payload.type_spending,
-        payload.budget_id,
-        payload.neighbourhood,
-    ]
-    
-    # We use run_select for INSERT...RETURNING as strict execute_modify returns rowcount
-    # To keep consistent with requested structure using core.database utils:
-    # We can use execute_modify_returning if available, or run_select (since it returns rows)
-    # The user manual Step 1 asked for execute_modify_returning, let's use it if defined in core
-    # (Checking my previous step: yes, I added execute_modify_returning in core/database.py)
-    
-    from ..core.database import execute_modify_returning
-    
-    success, _, row = execute_modify_returning(query, params, log_name="create_transaction")
-    if not success or row is None:
-        return error_response("Failed to create transaction")
-    
-    return success_response(row, "Transaction created successfully")
+        return success_response(
+            _transaction_to_dict(txn), "Transaction created successfully"
+        )
+    except Exception as e:
+        logger.exception("Failed to create transaction")
+        return error_response(f"Failed to create transaction: {e}")
 
 
 @router.get("/{transaction_id}", response=Dict[str, Any])
 def get_transaction(request, transaction_id: int):
     """Get a single transaction."""
-    from ..core.database import run_select_single
-    
-    query = """
-        SELECT * FROM transactions WHERE transaction_id = %s
-    """
-    row = run_select_single(query, [transaction_id], log_name="get_transaction")
-    if not row:
+    try:
+        txn = Transaction.objects.get(id=transaction_id)
+        return success_response(_transaction_to_dict(txn))
+    except Transaction.DoesNotExist:
         return error_response("Transaction not found", code=404)
-    return success_response(row)
 
 
 @router.put("/{transaction_id}", response=Dict[str, Any])
 def update_transaction(request, transaction_id: int, payload: TransactionUpdateSchema):
     """Update an existing transaction."""
-    from ..core.database import execute_modify_returning
-
     updates = payload.dict(exclude_unset=True)
     if not updates:
         return error_response("No fields provided for update")
 
-    set_clause = ", ".join(f"{field} = %s" for field in updates)
-    params = list(updates.values()) + [transaction_id]
+    try:
+        rows_affected = Transaction.objects.filter(id=transaction_id).update(**updates)
+        if rows_affected == 0:
+            return error_response("Transaction not found", code=404)
 
-    query = f"""
-        UPDATE transactions
-        SET {set_clause}
-        WHERE transaction_id = %s
-        RETURNING
-            transaction_id,
-            user_id,
-            date,
-            amount,
-            time,
-            store_name,
-            city,
-            type_spending,
-            budget_id,
-            neighbourhood,
-            created_at
-    """
-
-    success, rows_affected, row = execute_modify_returning(query, params, log_name="update_transaction")
-    if not success:
-        return error_response("Failed to update transaction")
-    if rows_affected == 0 or row is None:
+        txn = Transaction.objects.get(id=transaction_id)
+        return success_response(
+            _transaction_to_dict(txn), "Transaction updated successfully"
+        )
+    except Transaction.DoesNotExist:
         return error_response("Transaction not found", code=404)
-        
-    return success_response(row, "Transaction updated successfully")
+    except Exception as e:
+        logger.exception("Failed to update transaction")
+        return error_response(f"Failed to update transaction: {e}")
 
 
 @router.delete("/{transaction_id}", response=Dict[str, Any])
 def delete_transaction(request, transaction_id: int):
     """Delete a transaction permanently."""
-    query = """
-        DELETE FROM transactions
-        WHERE transaction_id = %s
-    """
-    rows_affected = execute_modify(query, [transaction_id], log_name="delete_transaction")
-    if rows_affected == 0:
-        return error_response("Transaction not found", code=404)
-    
-    return success_response(None, "Transaction deleted successfully")
+    try:
+        rows_affected, _ = Transaction.objects.filter(id=transaction_id).delete()
+        if rows_affected == 0:
+            return error_response("Transaction not found", code=404)
+
+        return success_response(None, "Transaction deleted successfully")
+    except Exception as e:
+        logger.exception("Failed to delete transaction")
+        return error_response(f"Failed to delete transaction: {e}")
 
 
 @router.get("/search/", response=Dict[str, Any])
@@ -192,61 +143,37 @@ def search_transactions(
     limit: int = Query(100, le=1000),
 ):
     """Advanced transaction search."""
-    sql_query = """
-        SELECT
-            t.transaction_id,
-            t.user_id,
-            t.date,
-            t.amount,
-            t.time,
-            t.store_name,
-            t.city,
-            t.type_spending,
-            t.budget_id,
-            b.budget_name,
-            t.neighbourhood,
-            t.created_at
-        FROM transactions t
-        LEFT JOIN budget b ON t.budget_id = b.budget_id
-        WHERE t.user_id = %s
-    """
-    params: List[Any] = [user_id]
+    queryset = Transaction.objects.filter(user_id=user_id).select_related("budget")
 
     if query_text:
-        sql_query += " AND (t.store_name ILIKE %s OR t.type_spending ILIKE %s)"
-        search_term = f"%{query_text}%"
-        params.extend([search_term, search_term])
+        queryset = queryset.filter(
+            Q(store_name__icontains=query_text) | Q(type_spending__icontains=query_text)
+        )
 
     if category:
-        sql_query += " AND (t.type_spending = %s OR b.budget_name ILIKE %s)"
-        params.extend([category, f"%{category}%"])
+        queryset = queryset.filter(
+            Q(type_spending=category) | Q(budget__budget_name__icontains=category)
+        )
 
     if min_amount is not None:
-        sql_query += " AND t.amount >= %s"
-        params.append(min_amount)
+        queryset = queryset.filter(amount__gte=min_amount)
 
     if max_amount is not None:
-        sql_query += " AND t.amount <= %s"
-        params.append(max_amount)
+        queryset = queryset.filter(amount__lte=max_amount)
 
     if start_date:
-        sql_query += " AND t.date >= %s"
-        params.append(start_date)
+        queryset = queryset.filter(date__gte=start_date)
 
     if end_date:
-        sql_query += " AND t.date <= %s"
-        params.append(end_date)
-        
+        queryset = queryset.filter(date__lte=end_date)
+
     if city:
-        sql_query += " AND t.city ILIKE %s"
-        params.append(f"%{city}%")
-        
+        queryset = queryset.filter(city__icontains=city)
+
     if neighbourhood:
-        sql_query += " AND t.neighbourhood ILIKE %s"
-        params.append(f"%{neighbourhood}%")
+        queryset = queryset.filter(neighbourhood__icontains=neighbourhood)
 
-    sql_query += " ORDER BY t.date DESC LIMIT %s"
-    params.append(limit)
+    queryset = queryset.order_by("-date")[:limit]
 
-    rows = run_select(sql_query, params, log_name="search_transactions")
-    return {"status": "success", "count": len(rows), "data": rows}
+    result = [_transaction_to_dict(txn, include_budget_name=True) for txn in queryset]
+    return success_response(result, count=len(result))

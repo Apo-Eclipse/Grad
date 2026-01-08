@@ -15,20 +15,28 @@ from pydantic import BaseModel, Field
 from graphs.database_sub_graph import database_agent_super_agent
 from graphs.behaviour_analyst_sub_graph import behaviour_analyst_super_agent
 from agents.personal_assistant.assistant import invoke_personal_assistant
-from api.personal_assistant_api.assistants.helpers import get_conversation_summary
+from personal_assistant_api.assistants.helpers import get_conversation_summary
 from LLMs.digital_ocean import gpt_oss_120b_digital_ocean
 
 
 class RoutingDecision(BaseModel):
     """Structured output for routing decision."""
-    agent: str = Field(..., description="Which agent to route to: 'database_agent', 'behaviour_analyst', or 'personal_assistant_response'")
-    message: str = Field(..., description="Message to send to the user about this routing decision")
+
+    agent: str = Field(
+        ...,
+        description="Which agent to route to: 'database_agent', 'behaviour_analyst', or 'personal_assistant_response'",
+    )
+    message: str = Field(
+        ..., description="Message to send to the user about this routing decision"
+    )
 
 
-from api.personal_assistant_api.database.budgets import fetch_active_budgets
+from personal_assistant_api.database.budgets import fetch_active_budgets
+
 
 class OrchestratorState(TypedDict):
     """State for the orchestrator graph."""
+
     user_id: str
     conversation_id: str
     user_name: str
@@ -37,37 +45,45 @@ class OrchestratorState(TypedDict):
     sender: str
     analysis: str
     routing_decision: str
-    routing_message: str # message from the router till the agent what to do
+    routing_message: str  # message from the router till the agent what to do
     final_output: str  # Final message from PersonalAssistant
     message: str  # Plain text message from PersonalAssistant
     has_data: bool  # True if data is available to display, False if only message
     data: dict  # Actual data to display (if has_data is True)
     is_awaiting_data: bool  # True if waiting for data from agent to embed in next round, False if table ready to display
-    agents_used: str  # Track which agent was called: 'database_agent', 'behaviour_analyst', etc.
+    agents_used: (
+        str  # Track which agent was called: 'database_agent', 'behaviour_analyst', etc.
+    )
 
 
 def personal_assistant_orchestrator(state: OrchestratorState) -> dict:
     """PersonalAssistant uses LLM to decide routing and generate message."""
-    
+
     conversation_id = state.get("conversation_id", "")
     user_id = state.get("user_id", "default")
     user_name = state.get("user_name", "User")
-    
+
     # Fetch active budgets directly
     try:
         budgets = fetch_active_budgets(int(user_id)) if str(user_id).isdigit() else []
         if budgets:
-            available_budgets = ", ".join([f"{b['budget_name']} (ID: {b['budget_id']})" for b in budgets])
+            available_budgets = ", ".join(
+                [f"{b['budget_name']} (ID: {b['budget_id']})" for b in budgets]
+            )
         else:
             available_budgets = "No active budgets found."
     except Exception:
         available_budgets = "Error fetching budgets."
-    
+
     # 1. Fetch Memory Externally (Stateless Pattern)
-    conversation_memory_str = get_conversation_summary(int(conversation_id)) if str(conversation_id).isdigit() else "No history."
-    
+    conversation_memory_str = (
+        get_conversation_summary(int(conversation_id))
+        if str(conversation_id).isdigit()
+        else "No history."
+    )
+
     user_message = state.get("user_message", "")
-    
+
     # System prompt for routing decision
     system_prompt = f"""
     last conversations: {conversation_memory_str}
@@ -184,26 +200,24 @@ def personal_assistant_orchestrator(state: OrchestratorState) -> dict:
     User: {user_message} User Name: {user_name}
     Please analyze this request and decide which agent should handle it. and the message to be sent to the selected agent.
     """
-    
-    prompt_template = ChatPromptTemplate.from_messages([
-        ("system", system_prompt),
-        ("human", user_prompt)
-    ])
+
+    prompt_template = ChatPromptTemplate.from_messages(
+        [("system", system_prompt), ("human", user_prompt)]
+    )
     formatted_prompt = prompt_template.format_prompt()
-    routing_output = gpt_oss_120b_digital_ocean.with_structured_output(RoutingDecision).invoke(formatted_prompt)
+    routing_output = gpt_oss_120b_digital_ocean.with_structured_output(
+        RoutingDecision
+    ).invoke(formatted_prompt)
     if routing_output is None:
         return {
             "routing_decision": "personal_assistant_response",
-            "routing_message": "Respond to the user directly."
+            "routing_message": "Respond to the user directly.",
         }
     agent = routing_output.agent
     message = routing_output.message
-    print("agent",agent)
-    print("message",message)
-    return {
-        "routing_decision": agent,
-        "routing_message": message
-    }
+    print("agent", agent)
+    print("message", message)
+    return {"routing_decision": agent, "routing_message": message}
 
 
 async def database_agent_node(state: OrchestratorState) -> dict:
@@ -225,8 +239,7 @@ async def database_agent_node(state: OrchestratorState) -> dict:
     }
     try:
         result = await asyncio.wait_for(
-            database_agent_super_agent.ainvoke(db_state),
-            timeout=20.0
+            database_agent_super_agent.ainvoke(db_state), timeout=20.0
         )
         agent_result = result.get("result", {})
         data = agent_result.get("data", [])
@@ -235,7 +248,7 @@ async def database_agent_node(state: OrchestratorState) -> dict:
             "is_awaiting_data": not edit,
             "data": data,
             "routing_decision": "database_agent",
-            "agents_used": "database_agent"
+            "agents_used": "database_agent",
         }
     except asyncio.TimeoutError:
         print(f"[Database Agent] Timeout after 10 seconds while handling request")
@@ -243,7 +256,7 @@ async def database_agent_node(state: OrchestratorState) -> dict:
             "is_awaiting_data": False,
             "data": [],
             "routing_decision": "database_agent",
-            "agents_used": "database_agent"
+            "agents_used": "database_agent",
         }
     except Exception as e:
         print(f"[Database Agent] Error while handling request: {e}")
@@ -251,66 +264,84 @@ async def database_agent_node(state: OrchestratorState) -> dict:
             "is_awaiting_data": False,
             "data": [],
             "routing_decision": "database_agent",
-            "agents_used": "database_agent"
+            "agents_used": "database_agent",
         }
 
 
 async def behaviour_analyst_node(state: OrchestratorState) -> dict:
     """Execute Behaviour Analyst and return results asynchronously."""
-    
+
     analysis_state = {
         "request": state.get("routing_message"),
-        "user_id": state.get("user_id")
+        "user_id": state.get("user_id"),
     }
-    
-    result = await behaviour_analyst_super_agent.ainvoke(analysis_state, {"recursion_limit": 100})
+
+    result = await behaviour_analyst_super_agent.ainvoke(
+        analysis_state, {"recursion_limit": 100}
+    )
     result = result.get("analysis", {})
     return {
         "analysis": result,
         "routing_decision": "behaviour_analyst",
         "is_awaiting_data": False,
-        "agents_used": "behaviour_analyst"
+        "agents_used": "behaviour_analyst",
     }
 
 
 def personal_assistant_response(state: OrchestratorState) -> dict:
     """PersonalAssistant generates final response using memory and context."""
-    
+
     conversation_id = state.get("conversation_id", "")
     user_id = state.get("user_id", "default")
     user_name = state.get("user_name", "User")
-    
+
     # 1. Fetch Memory Externally
-    conversation_memory_str = get_conversation_summary(int(conversation_id)) if str(conversation_id).isdigit() else "No history."
-    
+    conversation_memory_str = (
+        get_conversation_summary(int(conversation_id))
+        if str(conversation_id).isdigit()
+        else "No history."
+    )
+
     routing_decision = state.get("routing_decision", "personal_assistant")
     routing_message = state.get("routing_message", "")
     is_awaiting_data = state.get("is_awaiting_data", False)
     agents_used = state.get("agents_used", "")  # Preserve agents_used from state
-    
+
     if routing_decision == "database_agent":
         if is_awaiting_data:
-            confirmation_prompt = f"The user ({state.get('user_name','User')}) asked: {state.get('user_message')}. Give a very brief one-sentence confirmation that you're showing them the results."
-            confirmation = invoke_personal_assistant(confirmation_prompt, conversation_history=conversation_memory_str, context={
-                                                        "routing_decision": routing_decision,
-                                                        "routing_message": routing_message
-                                                    }, user_id=user_id, user_name=user_name)
+            confirmation_prompt = f"The user ({state.get('user_name', 'User')}) asked: {state.get('user_message')}. Give a very brief one-sentence confirmation that you're showing them the results."
+            confirmation = invoke_personal_assistant(
+                confirmation_prompt,
+                conversation_history=conversation_memory_str,
+                context={
+                    "routing_decision": routing_decision,
+                    "routing_message": routing_message,
+                },
+                user_id=user_id,
+                user_name=user_name,
+            )
             return {
                 "has_data": True,
                 "data": state.get("data", []),
-                "final_output": confirmation.get("response","no confirmation"),
-                "agents_used": agents_used  # Preserve agents_used
+                "final_output": confirmation.get("response", "no confirmation"),
+                "agents_used": agents_used,  # Preserve agents_used
             }
-        confirmation_prompt = f"The user ({state.get('user_name','User')}) asked: {state.get('user_message')}. Give a very brief one-sentence confirmation."
-        confirmation = invoke_personal_assistant(confirmation_prompt, conversation_history=conversation_memory_str, context={
-            "routing_decision": routing_decision,
-            "routing_message": routing_message
-        }, user_id=user_id, user_name=user_name)
+        confirmation_prompt = f"The user ({state.get('user_name', 'User')}) asked: {state.get('user_message')}. Give a very brief one-sentence confirmation."
+        confirmation = invoke_personal_assistant(
+            confirmation_prompt,
+            conversation_history=conversation_memory_str,
+            context={
+                "routing_decision": routing_decision,
+                "routing_message": routing_message,
+            },
+            user_id=user_id,
+            user_name=user_name,
+        )
         return {
-            "final_output": confirmation.get("response","no confirmation"),
+            "final_output": confirmation.get("response", "no confirmation"),
             "data": [],
             "has_data": False,
-            "agents_used": agents_used  # Preserve agents_used
+            "agents_used": agents_used,  # Preserve agents_used
         }
     elif routing_decision == "behaviour_analyst":
         analysis = state.get("analysis", {})
@@ -318,28 +349,40 @@ def personal_assistant_response(state: OrchestratorState) -> dict:
             "analysis": analysis,
             "routing_decision": routing_decision,
             "routing_message": routing_message,
-            "type": state.get("user_message")
-        }    
-        response = invoke_personal_assistant(state.get("user_message",""), conversation_history=conversation_memory_str, context=context, user_id=user_id, user_name=user_name).get("response","no response")
+            "type": state.get("user_message"),
+        }
+        response = invoke_personal_assistant(
+            state.get("user_message", ""),
+            conversation_history=conversation_memory_str,
+            context=context,
+            user_id=user_id,
+            user_name=user_name,
+        ).get("response", "no response")
         return {
             "final_output": response,
             "data": [],
             "has_data": False,
-            "agents_used": agents_used  # Preserve agents_used
+            "agents_used": agents_used,  # Preserve agents_used
         }
-    
+
     context = {
-            "user_message": state.get("user_message"),
-            "routing_message": routing_message,
-            "type": state.get("user_message")
+        "user_message": state.get("user_message"),
+        "routing_message": routing_message,
+        "type": state.get("user_message"),
     }
-    
-    response = invoke_personal_assistant(state.get("user_message",""), conversation_history=conversation_memory_str, context=context, user_id=user_id, user_name=user_name)
+
+    response = invoke_personal_assistant(
+        state.get("user_message", ""),
+        conversation_history=conversation_memory_str,
+        context=context,
+        user_id=user_id,
+        user_name=user_name,
+    )
     return {
-        "final_output": response.get("response","no response"),
+        "final_output": response.get("response", "no response"),
         "data": [],
         "has_data": False,
-        "agents_used": agents_used  # Preserve agents_used
+        "agents_used": agents_used,  # Preserve agents_used
     }
 
 
@@ -371,7 +414,7 @@ builder.add_conditional_edges(
         "database_agent": "database_agent",
         "behaviour_analyst": "behaviour_analyst",
         "personal_assistant_response": "personal_assistant_response",
-    }
+    },
 )
 
 builder.add_edge("database_agent", "personal_assistant_response")

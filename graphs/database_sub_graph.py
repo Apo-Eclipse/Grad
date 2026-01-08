@@ -5,7 +5,7 @@ from django.db import connection
 from langgraph.graph import StateGraph, END, START
 
 from agents import DatabaseAgent
-from api.personal_assistant_api.core.database import dictfetchall
+from personal_assistant_api.core.database import dictfetchall
 
 
 def _prepare_select_sql(query: str, *, limit: int = 100) -> str:
@@ -53,8 +53,10 @@ async def execute_single_query(request: str, user_id: object) -> dict:
     Execute a single database query: LLM generation + API execution.
     """
     try:
-        # Generate SQL query using LLM        
-        out = await asyncio.to_thread(DatabaseAgent.invoke, {"request": request, "user_id": user_id})
+        # Generate SQL query using LLM
+        out = await asyncio.to_thread(
+            DatabaseAgent.invoke, {"request": request, "user_id": user_id}
+        )
         query = out.query
         edit = out.edit
         message = getattr(out, "message", "")
@@ -69,20 +71,46 @@ async def execute_single_query(request: str, user_id: object) -> dict:
                 results = await asyncio.to_thread(_execute_select_query, query)
                 # Append confirmation message if available
                 final_data = results
-                return {"step": request, "query": query, "data": final_data, "edit": False, "message": message}
+                return {
+                    "step": request,
+                    "query": query,
+                    "data": final_data,
+                    "edit": False,
+                    "message": message,
+                }
             except Exception as e:
-                return {"step": request, "query": query, "data": f"Database error: {str(e)}", "edit": False}
+                return {
+                    "step": request,
+                    "query": query,
+                    "data": f"Database error: {str(e)}",
+                    "edit": False,
+                }
         else:
             try:
                 db_message = await asyncio.to_thread(_execute_modify_query, query)
                 # Combine DB result with Agent message
                 final_message = f"{message}\n{db_message}" if message else db_message
-                return {"step": request, "query": query, "data": final_message, "edit": True}
+                return {
+                    "step": request,
+                    "query": query,
+                    "data": final_message,
+                    "edit": True,
+                }
             except Exception as e:
-                return {"step": request, "query": query, "data": f"Error Executing Edit Query: {str(e)}", "edit": True}
-    
+                return {
+                    "step": request,
+                    "query": query,
+                    "data": f"Error Executing Edit Query: {str(e)}",
+                    "edit": True,
+                }
+
     except Exception as e:
-        return {"step": request, "query": None, "data": f"LLM Error: {str(e)}", "edit": False}
+        return {
+            "step": request,
+            "query": None,
+            "data": f"LLM Error: {str(e)}",
+            "edit": False,
+        }
 
 
 async def database_agent(state: DatabaseAgentState) -> dict:
@@ -92,7 +120,7 @@ async def database_agent(state: DatabaseAgentState) -> dict:
     """
     user = state.get("user_id")
     step_text = state.get("request", "")
-    
+
     result = await execute_single_query(step_text, user)
     return {"result": result, "edit": result.get("edit", False)}
 

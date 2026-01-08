@@ -20,16 +20,40 @@ ALLOWED_HOSTS = ['*']
 
 # Application definition
 INSTALLED_APPS = [
-    'django.contrib.contenttypes',  # Needed by Django ORM
-    'corsheaders',
+    # --- 1. CORE DJANGO APPS (REQUIRED) ---
+    'django.contrib.admin',          # Interface to manage your DB (highly recommended)
+    'django.contrib.auth',           # <--- CRITICAL: Handles Users, Login, & Password Hashing
+    'django.contrib.contenttypes',   # Tracks models (you had this one)
+    'django.contrib.sessions',       # Required by Admin and Auth
+    'django.contrib.messages',       # Required by Admin
+    'django.contrib.staticfiles',    # Required to show CSS for the Admin panel
+
+    # --- 2. THIRD PARTY APPS ---
+    'corsheaders',                   # Handles Cross-Origin Resource Sharing (React/Vue/etc)
+    'ninja',                         # Django Ninja (Don't forget this!)
+
+    # --- 3. YOUR APPS ---
     'personal_assistant_api',
 ]
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    
+    # 1. Sessions (REQUIRED for Auth & Admin)
+    'django.contrib.sessions.middleware.SessionMiddleware', 
+
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
+
+    # 2. Authentication (REQUIRED to populate request.user)
+    'django.contrib.auth.middleware.AuthenticationMiddleware',
+
+    # 3. Messages (REQUIRED for Admin popups/errors)
+    'django.contrib.messages.middleware.MessageMiddleware',
+
+    # 4. Clickjacking Protection (Standard Security)
+    'django.middleware.clickjacking.XFrameOptionsMiddleware', 
 ]
 
 # CORS Configuration for mobile app
@@ -75,6 +99,10 @@ TEMPLATES = [
             'context_processors': [
                 'django.template.context_processors.debug',
                 'django.template.context_processors.request',
+                
+                # --- ADD THESE TWO LINES ---
+                'django.contrib.auth.context_processors.auth',     # Required for Admin login
+                'django.contrib.messages.context_processors.messages', # Required for Admin popups
             ],
         },
     },

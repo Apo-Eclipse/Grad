@@ -1,93 +1,124 @@
 """Goals database operations."""
+
 import logging
-from typing import Any, Dict, List, Optional
+from datetime import datetime
+from typing import Any, Dict, Optional
 
 from ninja import Router, Query
 
-from ..core.database import run_select, execute_modify, execute_modify_returning
+from ..models import Goal
 from ..core.responses import success_response, error_response
-from .schemas import GoalCreateSchema
+from .schemas import GoalCreateSchema, GoalUpdateSchema
 
 logger = logging.getLogger(__name__)
 router = Router()
 
 
-@router.get("/", response=List[Dict[str, Any]])
+def _goal_to_dict(goal: Goal) -> Dict[str, Any]:
+    """Convert Goal model instance to dictionary."""
+    return {
+        "id": goal.id,
+        "user_id": goal.user_id,
+        "goal_name": goal.goal_name,
+        "description": goal.description,
+        "target": float(goal.target) if goal.target else None,
+        "start_date": goal.start_date,
+        "due_date": goal.due_date,
+        "status": goal.status,
+        "plan": goal.plan,
+        "created_at": goal.created_at,
+        "updated_at": goal.updated_at,
+    }
+
+
+@router.get("/", response=Dict[str, Any])
 def get_goals(request, user_id: int = Query(...), status: Optional[str] = Query(None)):
     """Retrieve goals for a user."""
-    query = """
-        SELECT
-            goal_id,
-            user_id,
-            goal_name,
-            description,
-            target,
-            start_date,
-            due_date,
-            status,
-            plan,
-            created_at,
-            updated_at
-        FROM goals
-        WHERE user_id = %s
-    """
-    params: List[Any] = [user_id]
+    queryset = Goal.objects.filter(user_id=user_id)
+
     if status:
-        query += " AND status = %s"
-        params.append(status)
-    
-    query += " ORDER BY created_at DESC"
-    
-    return run_select(query, params, log_name="get_goals")
+        queryset = queryset.filter(status=status)
+
+    goals = queryset.order_by("-created_at").values(
+        "id",
+        "user_id",
+        "goal_name",
+        "description",
+        "target",
+        "start_date",
+        "due_date",
+        "status",
+        "plan",
+        "created_at",
+        "updated_at",
+    )
+    return success_response(list(goals))
+
+
+@router.get("/{goal_id}", response=Dict[str, Any])
+def get_goal(request, goal_id: int):
+    """Get a single goal."""
+    try:
+        goal = Goal.objects.get(id=goal_id)
+        return success_response(_goal_to_dict(goal))
+    except Goal.DoesNotExist:
+        return error_response("Goal not found", code=404)
 
 
 @router.post("/", response=Dict[str, Any])
 def create_goal(request, payload: GoalCreateSchema):
     """Create a new goal."""
-    query = """
-        INSERT INTO goals (
-            user_id,
-            goal_name,
-            description,
-            target,
-            start_date,
-            due_date,
-            status,
-            plan,
-            created_at,
-            updated_at
+    try:
+        goal = Goal.objects.create(
+            user_id=payload.user_id,
+            goal_name=payload.goal_name,
+            description=payload.description,
+            target=payload.target,
+            start_date=payload.start_date,
+            due_date=payload.due_date,
+            status=payload.status,
+            plan=payload.plan,
         )
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, NOW(), NOW())
-        RETURNING goal_id
-    """
-    params = [
-        payload.user_id,
-        payload.goal_name,
-        payload.description,
-        payload.target,
-        payload.start_date,
-        payload.due_date,
-        payload.status,
-        payload.plan,
-    ]
-    
-    success, _, row = execute_modify_returning(query, params, log_name="create_goal")
-    if not success or row is None:
-        return error_response("Failed to create goal")
-    
-    return success_response(row, "Goal created successfully")
+        return success_response(_goal_to_dict(goal), "Goal created successfully")
+    except Exception as e:
+        logger.exception("Failed to create goal")
+        return error_response(f"Failed to create goal: {e}")
+
+
+@router.put("/{goal_id}", response=Dict[str, Any])
+def update_goal(request, goal_id: int, payload: GoalUpdateSchema):
+    """Update an existing goal."""
+    updates = payload.dict(exclude_unset=True)
+    if not updates:
+        return error_response("No fields provided for update")
+
+    updates["updated_at"] = datetime.now()
+
+    try:
+        rows_affected = Goal.objects.filter(id=goal_id).update(**updates)
+        if rows_affected == 0:
+            return error_response("Goal not found", code=404)
+
+        goal = Goal.objects.get(id=goal_id)
+        return success_response(_goal_to_dict(goal), "Goal updated successfully")
+    except Goal.DoesNotExist:
+        return error_response("Goal not found", code=404)
+    except Exception as e:
+        logger.exception("Failed to update goal")
+        return error_response(f"Failed to update goal: {e}")
 
 
 @router.delete("/{goal_id}", response=Dict[str, Any])
 def delete_goal(request, goal_id: int):
     """Soft delete a goal."""
-    query = """
-        UPDATE goals
-        SET status = 'inactive', updated_at = NOW()
-        WHERE goal_id = %s
-    """
-    rows_affected = execute_modify(query, [goal_id], log_name="delete_goal")
-    if rows_affected == 0:
-        return error_response("Goal not found", code=404)
-    
-    return success_response(None, "Goal deactivated successfully")
+    try:
+        rows_affected = Goal.objects.filter(id=goal_id).update(
+            status="inactive", updated_at=datetime.now()
+        )
+        if rows_affected == 0:
+            return error_response("Goal not found", code=404)
+
+        return success_response(None, "Goal deactivated successfully")
+    except Exception as e:
+        logger.exception("Failed to delete goal")
+        return error_response(f"Failed to delete goal: {e}")

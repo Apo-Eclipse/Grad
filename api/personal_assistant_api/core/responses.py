@@ -1,10 +1,16 @@
 """Standardized API response helpers."""
+
 from typing import Any, Dict, Optional
 
 
-def success_response(data: Any = None, message: str = "Success") -> Dict[str, Any]:
+def success_response(
+    data: Any = None, message: str = "Success", count: Optional[int] = None
+) -> Dict[str, Any]:
     """Return a standardized success response."""
-    return {"status": "success", "message": message, "data": data}
+    response = {"status": "success", "message": message, "data": data}
+    if count is not None:
+        response["count"] = count
+    return response
 
 
 def error_response(message: str, code: int = 400) -> Dict[str, Any]:

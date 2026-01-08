@@ -1,13 +1,16 @@
 """Database schemas."""
+
 from datetime import date, datetime
-from typing import Any, Dict, Literal, Optional
+from typing import Any, Dict, Optional
 
 from ninja import Schema
-from pydantic import Field, root_validator
+from pydantic import Field, root_validator, validator
+
+from ..models import EMPLOYMENT_OPTIONS, EDUCATION_OPTIONS, GENDER_OPTIONS
 
 
 class TransactionSchema(Schema):
-    transaction_id: int
+    id: int
     user_id: int
     date: date
     amount: float
@@ -50,7 +53,7 @@ class TransactionUpdateSchema(Schema):
 
 
 class BudgetSchema(Schema):
-    budget_id: int
+    id: int
     user_id: int
     budget_name: str
     description: Optional[str] = None
@@ -85,7 +88,7 @@ class BudgetUpdateSchema(Schema):
 
 
 class GoalSchema(Schema):
-    goal_id: int
+    id: int
     user_id: int
     goal_name: str
     description: Optional[str] = None
@@ -108,8 +111,24 @@ class GoalCreateSchema(Schema):
     plan: Optional[str] = None
 
 
+class GoalUpdateSchema(Schema):
+    goal_name: Optional[str] = None
+    description: Optional[str] = None
+    target: Optional[float] = None
+    start_date: Optional[date] = None
+    due_date: Optional[date] = None
+    status: Optional[str] = None
+    plan: Optional[str] = None
+
+    @root_validator(pre=True)
+    def at_least_one_field(cls, values: Dict[str, Any]) -> Dict[str, Any]:
+        if not values:
+            raise ValueError("At least one field must be provided for update.")
+        return values
+
+
 class UserSchema(Schema):
-    user_id: int
+    id: int
     first_name: str
     last_name: str
     job_title: Optional[str] = None
@@ -122,21 +141,42 @@ class UserSchema(Schema):
 
 
 class UserCreateSchema(Schema):
-    user_id: Optional[int] = None
     first_name: str
     last_name: str
     job_title: Optional[str] = None
     address: str
     birthday: date
     gender: str
-    employment_status: Literal[
-        "Employed Full-time", "Employed Part-time", "Unemployed", "Retired", "Student"
-    ]
+    employment_status: str
     education_level: str
+
+    @validator("gender")
+    def validate_gender(cls, v):
+        if v not in GENDER_OPTIONS:
+            raise ValueError(
+                f"Invalid gender. Must be one of: {list(GENDER_OPTIONS.keys())}"
+            )
+        return v
+
+    @validator("employment_status")
+    def validate_employment_status(cls, v):
+        if v not in EMPLOYMENT_OPTIONS:
+            raise ValueError(
+                f"Invalid employment_status. Must be one of: {list(EMPLOYMENT_OPTIONS.keys())}"
+            )
+        return v
+
+    @validator("education_level")
+    def validate_education_level(cls, v):
+        if v not in EDUCATION_OPTIONS:
+            raise ValueError(
+                f"Invalid education_level. Must be one of: {list(EDUCATION_OPTIONS.keys())}"
+            )
+        return v
 
 
 class IncomeSchema(Schema):
-    income_id: int
+    id: int
     user_id: int
     type_income: str
     amount: float
@@ -149,6 +189,18 @@ class IncomeCreateSchema(Schema):
     type_income: str
     amount: float
     description: Optional[str] = None
+
+
+class IncomeUpdateSchema(Schema):
+    type_income: Optional[str] = None
+    amount: Optional[float] = None
+    description: Optional[str] = None
+
+    @root_validator(pre=True)
+    def at_least_one_field(cls, values: Dict[str, Any]) -> Dict[str, Any]:
+        if not values:
+            raise ValueError("At least one field must be provided for update.")
+        return values
 
 
 class ConversationSchema(Schema):
