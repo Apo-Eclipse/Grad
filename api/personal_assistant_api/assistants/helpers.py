@@ -57,21 +57,24 @@ def get_conversation_summary(conversation_id: int, limit: int = 20) -> str:
     Useful for LLM memory context.
     """
     try:
-        messages = ChatMessage.objects.filter(conversation_id=conversation_id).order_by(
-            "id"
-        )[:limit]
+        # Use .values() for faster loading
+        messages = (
+            ChatMessage.objects.filter(conversation_id=conversation_id)
+            .order_by("id")
+            .values("content_type", "source_agent", "sender_type", "content")[:limit]
+        )
 
-        if not messages.exists():
+        if not messages:
             return "No previous messages in this conversation."
 
         lines: List[str] = []
         for idx, msg in enumerate(messages, start=1):
-            if msg.content_type == "json":
+            if msg["content_type"] == "json":
                 continue
 
             # Label by source_agent if possible, else sender_type
-            sender_label = msg.source_agent or msg.sender_type or "Unknown"
-            lines.append(f"{idx}. [{sender_label}] {msg.content}")
+            sender_label = msg["source_agent"] or msg["sender_type"] or "Unknown"
+            lines.append(f"{idx}. [{sender_label}] {msg['content']}")
 
         return (
             "\n".join(lines)
@@ -92,15 +95,19 @@ def get_user_summary(user_id: int) -> str:
     Includes profile, income, active goals, active budgets, and recent spending.
     """
     try:
-        # Basic user profile - get User and Profile
-        try:
-            user = User.objects.get(id=user_id)
-            try:
-                profile = Profile.objects.get(user_id=user_id)
-            except Profile.DoesNotExist:
-                profile = None
-        except User.DoesNotExist:
+        # Basic user profile - use .values() for faster loading
+        user_data = (
+            User.objects.filter(id=user_id).values("first_name", "last_name").first()
+        )
+
+        if not user_data:
             return f"User {user_id} (no profile found)."
+
+        profile_data = (
+            Profile.objects.filter(user_id=user_id)
+            .values("job_title", "employment_status")
+            .first()
+        )
 
         # Income - total amount
         income_total = Income.objects.filter(user_id=user_id).aggregate(
@@ -108,16 +115,15 @@ def get_user_summary(user_id: int) -> str:
         )["total"]
         total_income = float(income_total) if income_total else 0.0
 
-        # Goals (active)
-        goals = (
+        # Goals (active) - already uses .values()
+        goals_rows = list(
             Goal.objects.filter(user_id=user_id)
             .filter(Q(status__isnull=True) | Q(status="active"))
             .order_by("due_date")
             .values("goal_name", "target", "due_date")
         )
-        goals_rows = list(goals)
 
-        # Active Budgets
+        # Active Budgets - already uses .values()
         budgets_rows = fetch_active_budgets(user_id)
 
         # Spending (90 days)
@@ -131,16 +137,16 @@ def get_user_summary(user_id: int) -> str:
         ).aggregate(total=Coalesce(Sum("amount"), 0.0))["total"]
         total_spent_90d = float(spend_total) if spend_total else 0.0
 
-        # Top Categories (90 days)
-        top_cats = (
+        # Top Categories (90 days) - already uses .values()
+        top_cats = list(
             Transaction.objects.filter(user_id=user_id, date__gte=ninety_days_ago)
             .values("type_spending")
             .annotate(total=Sum("amount"))
             .order_by("-total")[:3]
         )
 
-        # Top Stores (90 days)
-        top_stores = (
+        # Top Stores (90 days) - already uses .values()
+        top_stores = list(
             Transaction.objects.filter(user_id=user_id, date__gte=ninety_days_ago)
             .values("store_name")
             .annotate(total=Sum("amount"))
@@ -148,17 +154,17 @@ def get_user_summary(user_id: int) -> str:
         )
 
         # Formatting
-        name = f"{user.first_name} {user.last_name}"
+        name = f"{user_data['first_name']} {user_data['last_name']}"
         parts = [
             f"Name: {name}",
             f"User ID: {user_id}",
         ]
 
-        if profile:
+        if profile_data:
             parts.extend(
                 [
-                    f"Job: {profile.job_title or 'N/A'}",
-                    f"Employment: {profile.employment_status or 'N/A'}",
+                    f"Job: {profile_data['job_title'] or 'N/A'}",
+                    f"Employment: {profile_data['employment_status'] or 'N/A'}",
                 ]
             )
 

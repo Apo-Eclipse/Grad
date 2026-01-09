@@ -14,21 +14,26 @@ logger = logging.getLogger(__name__)
 router = Router()
 
 
-def _goal_to_dict(goal: Goal) -> Dict[str, Any]:
-    """Convert Goal model instance to dictionary."""
-    return {
-        "id": goal.id,
-        "user_id": goal.user_id,
-        "goal_name": goal.goal_name,
-        "description": goal.description,
-        "target": float(goal.target) if goal.target else None,
-        "start_date": goal.start_date,
-        "due_date": goal.due_date,
-        "status": goal.status,
-        "plan": goal.plan,
-        "created_at": goal.created_at,
-        "updated_at": goal.updated_at,
-    }
+# Fields for goal queries
+GOAL_FIELDS = (
+    "id",
+    "user_id",
+    "goal_name",
+    "description",
+    "target",
+    "start_date",
+    "due_date",
+    "status",
+    "plan",
+    "created_at",
+    "updated_at",
+)
+
+
+def _format_goal(goal: Dict[str, Any]) -> Dict[str, Any]:
+    """Format goal dict for JSON response."""
+    goal["target"] = float(goal["target"]) if goal["target"] else None
+    return goal
 
 
 @router.get("/", response=Dict[str, Any])
@@ -58,11 +63,29 @@ def get_goals(request, user_id: int = Query(...), status: Optional[str] = Query(
 @router.get("/{goal_id}", response=Dict[str, Any])
 def get_goal(request, goal_id: int):
     """Get a single goal."""
-    try:
-        goal = Goal.objects.get(id=goal_id)
-        return success_response(_goal_to_dict(goal))
-    except Goal.DoesNotExist:
+    goal = (
+        Goal.objects.filter(id=goal_id)
+        .values(
+            "id",
+            "user_id",
+            "goal_name",
+            "description",
+            "target",
+            "start_date",
+            "due_date",
+            "status",
+            "plan",
+            "created_at",
+            "updated_at",
+        )
+        .first()
+    )
+    if not goal:
         return error_response("Goal not found", code=404)
+
+    # Format target
+    goal["target"] = float(goal["target"]) if goal["target"] else None
+    return success_response(goal)
 
 
 @router.post("/", response=Dict[str, Any])
@@ -79,7 +102,9 @@ def create_goal(request, payload: GoalCreateSchema):
             status=payload.status,
             plan=payload.plan,
         )
-        return success_response(_goal_to_dict(goal), "Goal created successfully")
+        # Fetch created goal as dict
+        created = Goal.objects.filter(id=goal.id).values(*GOAL_FIELDS).first()
+        return success_response(_format_goal(created), "Goal created successfully")
     except Exception as e:
         logger.exception("Failed to create goal")
         return error_response(f"Failed to create goal: {e}")
@@ -99,10 +124,8 @@ def update_goal(request, goal_id: int, payload: GoalUpdateSchema):
         if rows_affected == 0:
             return error_response("Goal not found", code=404)
 
-        goal = Goal.objects.get(id=goal_id)
-        return success_response(_goal_to_dict(goal), "Goal updated successfully")
-    except Goal.DoesNotExist:
-        return error_response("Goal not found", code=404)
+        goal = Goal.objects.filter(id=goal_id).values(*GOAL_FIELDS).first()
+        return success_response(_format_goal(goal), "Goal updated successfully")
     except Exception as e:
         logger.exception("Failed to update goal")
         return error_response(f"Failed to update goal: {e}")

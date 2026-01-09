@@ -1,14 +1,23 @@
 """Transaction Maker Agent endpoints."""
+
 import json
 import logging
 from datetime import datetime
 
 from ninja import Router
-from django.db import connection
+from django.db import transaction
 
 from agents.transaction_maker import Transaction_maker_agent
-from ..assistants.maker_schemas import TransactionMakerRequestSchema, TransactionMakerResponseSchema
-from ..assistants.helpers import get_conversation_summary, fetch_active_budgets, _insert_chat_message
+from ..assistants.maker_schemas import (
+    TransactionMakerRequestSchema,
+    TransactionMakerResponseSchema,
+)
+from ..assistants.helpers import (
+    get_conversation_summary,
+    fetch_active_budgets,
+    _insert_chat_message,
+)
+from ..models import ChatConversation
 
 logger = logging.getLogger(__name__)
 router = Router()
@@ -24,15 +33,19 @@ def transaction_assist(request, payload: TransactionMakerRequestSchema):
     user_request = payload.user_request
 
     # 1. Fetch Context
-    conversation_summary = get_conversation_summary(
-        conversation_id, limit=10
-    ) if conversation_id else "No history."
-    
+    conversation_summary = (
+        get_conversation_summary(conversation_id, limit=10)
+        if conversation_id
+        else "No history."
+    )
+
     active_budgets = fetch_active_budgets(user_id)
     # Format budgets for prompt
-    budgets_str = "\n".join(
-        [f"- {b['budget_name']} (ID: {b['budget_id']})" for b in active_budgets]
-    ) if active_budgets else "No active budgets."
+    budgets_str = (
+        "\n".join([f"- {b['budget_name']} (ID: {b['id']})" for b in active_budgets])
+        if active_budgets
+        else "No active budgets."
+    )
 
     # 2. Invoke Agent
     try:
@@ -60,54 +73,50 @@ def transaction_assist(request, payload: TransactionMakerRequestSchema):
             "is_done": True,
         }
 
-    # 3. Store interaction
+    # 3. Store interaction using Django ORM
     if conversation_id:
         try:
-            with connection.cursor() as cursor:
-                now = datetime.now()
+            with transaction.atomic():
                 # User Msg
                 _insert_chat_message(
-                    cursor,
                     conversation_id=conversation_id,
                     sender_type="user",
                     source_agent="User",
                     content=user_request,
-                    created_at=now,
                 )
                 # Assistant Msg
                 _insert_chat_message(
-                    cursor,
                     conversation_id=conversation_id,
                     sender_type="assistant",
                     source_agent="TransactionMaker",
                     content=txn_result.message,
-                    created_at=now,
                 )
-                
+
                 # Structured Payload
                 txn_payload = {
-                     "amount": txn_result.amount,
-                     "budget_id": txn_result.budget_id,
-                     "store_name": txn_result.store_name,
-                     "date": txn_result.date,
-                     "time": txn_result.time,
-                     "city": txn_result.city,
-                     "neighbourhood": txn_result.neighbourhood,
-                     "type_spending": txn_result.type_spending,
+                    "amount": txn_result.amount,
+                    "budget_id": txn_result.budget_id,
+                    "store_name": txn_result.store_name,
+                    "date": txn_result.date,
+                    "time": txn_result.time,
+                    "city": txn_result.city,
+                    "neighbourhood": txn_result.neighbourhood,
+                    "type_spending": txn_result.type_spending,
                 }
-                
+
                 if any(txn_payload.values()):
                     _insert_chat_message(
-                        cursor,
                         conversation_id=conversation_id,
                         sender_type="assistant",
                         source_agent="TransactionMaker",
                         content=json.dumps(txn_payload),
                         content_type="json",
-                        created_at=now,
                     )
-                
-                connection.commit()
+
+                # Update conversation timestamp
+                ChatConversation.objects.filter(id=conversation_id).update(
+                    last_message_at=datetime.now()
+                )
         except Exception:
             logger.exception("Failed to store TransactionMaker interaction")
 

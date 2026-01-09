@@ -26,20 +26,14 @@ def get_conversations(request, user_id: int = Query(...), limit: int = Query(50)
 @router.get("/{conversation_id}", response=Dict[str, Any])
 def get_conversation(request, conversation_id: int):
     """Get a single conversation."""
-    try:
-        conv = ChatConversation.objects.get(id=conversation_id)
-        return success_response(
-            {
-                "id": conv.id,
-                "user_id": conv.user_id,
-                "title": conv.title,
-                "channel": conv.channel,
-                "started_at": conv.started_at,
-                "last_message_at": conv.last_message_at,
-            }
-        )
-    except ChatConversation.DoesNotExist:
+    conv = (
+        ChatConversation.objects.filter(id=conversation_id)
+        .values("id", "user_id", "title", "channel", "started_at", "last_message_at")
+        .first()
+    )
+    if not conv:
         return error_response("Conversation not found", code=404)
+    return success_response(conv)
 
 
 @router.get("/{conversation_id}/messages", response=Dict[str, Any])

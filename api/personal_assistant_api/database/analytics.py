@@ -1,11 +1,15 @@
 """Analytics and administration database operations."""
+
 import logging
-from typing import Any, Dict, List
+from typing import Any, Dict
 
 from ninja import Router, Query
-from django.db import connection
+from django.db.models import Sum
+from django.db.models.functions import Coalesce, TruncMonth
+from django.utils import timezone
 
-from ..core.database import run_select, run_select_single, execute_modify, safe_json_body
+from ..core.database import run_select, execute_modify, safe_json_body
+from ..models import Transaction, Budget, Income
 
 logger = logging.getLogger(__name__)
 router = Router()
@@ -14,83 +18,108 @@ router = Router()
 @router.get("/monthly-spend", response=Dict[str, Any])
 def get_monthly_spend(request, user_id: int = Query(...)):
     """Aggregate spending by user's budgets for the current month."""
-    query = """
-       SELECT
-           b.budget_name,
-           DATE_TRUNC('month', t.date) as month,
-           SUM(t.amount) as total_spent
-       FROM transactions t
-       JOIN budget b ON t.budget_id = b.budget_id
-       WHERE t.user_id = %s
-         AND t.date >= DATE_TRUNC('month', CURRENT_DATE)
-       GROUP BY b.budget_name, DATE_TRUNC('month', t.date)
-       ORDER BY total_spent DESC
-    """
-    rows = run_select(query, [user_id], log_name="monthly_spend")
-    return {"data": rows}
+    current_month_start = timezone.now().replace(
+        day=1, hour=0, minute=0, second=0, microsecond=0
+    )
+
+    rows = (
+        Transaction.objects.filter(user_id=user_id, date__gte=current_month_start)
+        .select_related("budget")
+        .values("budget__budget_name")
+        .annotate(month=TruncMonth("date"), total_spent=Coalesce(Sum("amount"), 0.0))
+        .order_by("-total_spent")
+    )
+
+    # Format to match original response structure
+    data = [
+        {
+            "budget_name": r["budget__budget_name"],
+            "month": r["month"],
+            "total_spent": float(r["total_spent"]),
+        }
+        for r in rows
+    ]
+
+    return {"data": data}
 
 
 @router.get("/overspend", response=Dict[str, Any])
 def get_overspend(request, user_id: int = Query(...)):
     """Identify categories where spending exceeds the budget limit."""
-    # 1. Spend vs Limit per budget
-    query_budgets = """
-        SELECT
-            b.budget_name,
-            COALESCE(SUM(t.amount), 0) as spent,
-            b.total_limit
-        FROM budget b
-        LEFT JOIN transactions t
-          ON b.budget_id = t.budget_id
-          AND t.date >= DATE_TRUNC('month', CURRENT_DATE)
-        WHERE b.user_id = %s AND b.is_active = true
-        GROUP BY b.budget_id
-    """
-    rows = run_select(query_budgets, [user_id], log_name="overspend_budgets")
-    
+    current_month_start = timezone.now().replace(
+        day=1, hour=0, minute=0, second=0, microsecond=0
+    )
+
+    # 1. Spend vs Limit per budget - using Django ORM
+    from django.db.models import Q
+
+    budgets = (
+        Budget.objects.filter(user_id=user_id, is_active=True)
+        .annotate(
+            spent=Coalesce(
+                Sum(
+                    "transaction__amount",
+                    filter=Q(transaction__date__gte=current_month_start),
+                ),
+                0.0,
+            )
+        )
+        .values("budget_name", "spent", "total_limit")
+    )
+
     overspend_data = []
     total_spent_all = 0.0
-    
-    for r in rows:
+
+    for r in budgets:
         spent = float(r["spent"])
         limit = float(r["total_limit"])
         total_spent_all += spent
-        
+
         pct = (spent / limit * 100) if limit > 0 else 0
-        r["pct_of_limit"] = round(pct, 2)
-        r["spent"] = spent
-        r["total_limit"] = limit
-        
+        row_data = {
+            "budget_name": r["budget_name"],
+            "spent": spent,
+            "total_limit": limit,
+            "pct_of_limit": round(pct, 2),
+        }
+
         if pct > 100:
-            overspend_data.append(r)
-            
+            overspend_data.append(row_data)
+
     # 2. Total Income
-    query_income = "SELECT SUM(amount) FROM income WHERE user_id = %s"
-    row_inc = run_select_single(query_income, [user_id], log_name="overspend_income")
-    total_income = float(row_inc["sum"]) if row_inc and row_inc["sum"] else 0.0
-    
+    income_total = Income.objects.filter(user_id=user_id).aggregate(
+        total=Coalesce(Sum("amount"), 0.0)
+    )["total"]
+    total_income = float(income_total) if income_total else 0.0
+
     summary = {
         "total_income": total_income,
         "total_spent": total_spent_all,
         "net_position": total_income - total_spent_all,
-        "is_deficit": (total_spent_all > total_income)
+        "is_deficit": (total_spent_all > total_income),
     }
-    
+
     return {"data": overspend_data, "summary": summary}
 
 
 @router.get("/income-total", response=Dict[str, Any])
 def get_total_income(request, user_id: int = Query(...)):
     """Aggregate active income items by type."""
-    query = """
-        SELECT type_income, SUM(amount) as total
-        FROM income
-        WHERE user_id = %s
-        GROUP BY type_income
-        ORDER BY total DESC
-    """
-    rows = run_select(query, [user_id], log_name="income_total")
-    return {"data": rows}
+    rows = (
+        Income.objects.filter(user_id=user_id)
+        .values("type_income")
+        .annotate(total=Coalesce(Sum("amount"), 0.0))
+        .order_by("-total")
+    )
+
+    data = [{"type_income": r["type_income"], "total": float(r["total"])} for r in rows]
+
+    return {"data": data}
+
+
+# ============================================================================
+# Admin/Debug endpoints - kept as raw SQL intentionally
+# ============================================================================
 
 
 @router.post("/execute/select", response=Dict[str, Any])
@@ -106,7 +135,7 @@ def execute_select_query(request):
 
     if not raw_query:
         return {"error": "No query provided"}
-    
+
     # Basic keyword check
     lower_q = raw_query.lower()
     if not lower_q.startswith("select") and not lower_q.startswith("with"):

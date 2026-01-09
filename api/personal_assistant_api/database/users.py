@@ -14,57 +14,60 @@ logger = logging.getLogger(__name__)
 router = Router()
 
 
-def _user_to_dict(user: User, profile: Profile = None) -> Dict[str, Any]:
-    """Convert User + Profile to dictionary matching expected API format."""
+# Fields to retrieve for user queries
+USER_FIELDS = ("id", "first_name", "last_name")
+PROFILE_FIELDS = (
+    "job_title",
+    "address",
+    "birthday",
+    "gender",
+    "employment_status",
+    "education_level",
+    "created_at",
+)
+
+
+def _format_user_response(
+    user_data: Dict[str, Any], profile_data: Dict[str, Any] = None
+) -> Dict[str, Any]:
+    """Format user + profile data for JSON response."""
     result = {
-        "user_id": user.id,
-        "first_name": user.first_name,
-        "last_name": user.last_name,
+        "user_id": user_data["id"],
+        "first_name": user_data["first_name"],
+        "last_name": user_data["last_name"],
     }
-    if profile:
-        result.update(
-            {
-                "job_title": profile.job_title,
-                "address": profile.address,
-                "birthday": profile.birthday,
-                "gender": profile.gender,
-                "employment_status": profile.employment_status,
-                "education_level": profile.education_level,
-                "created_at": profile.created_at,
-            }
-        )
+    if profile_data:
+        result.update(profile_data)
     return result
 
 
 @router.get("/{user_id}", response=Dict[str, Any])
 def get_user(request, user_id: int):
     """Get user profile details."""
-    try:
-        user = User.objects.get(id=user_id)
-        try:
-            profile = Profile.objects.get(user_id=user_id)
-        except Profile.DoesNotExist:
-            profile = None
-        return _user_to_dict(user, profile)
-    except User.DoesNotExist:
+    user_data = User.objects.filter(id=user_id).values(*USER_FIELDS).first()
+    if not user_data:
         return error_response("User not found", code=404)
+
+    profile_data = (
+        Profile.objects.filter(user_id=user_id).values(*PROFILE_FIELDS).first()
+    )
+    return _format_user_response(user_data, profile_data)
 
 
 @router.get("/{user_id}/exists", response=Dict[str, Any])
 def check_user_exists(request, user_id: int):
     """Check if a user ID exists."""
-    try:
-        user = User.objects.get(id=user_id)
+    user_data = User.objects.filter(id=user_id).values(*USER_FIELDS).first()
+    if user_data:
         return {
             "exists": True,
             "user": {
-                "user_id": user.id,
-                "first_name": user.first_name,
-                "last_name": user.last_name,
+                "user_id": user_data["id"],
+                "first_name": user_data["first_name"],
+                "last_name": user_data["last_name"],
             },
         }
-    except User.DoesNotExist:
-        return {"exists": False}
+    return {"exists": False}
 
 
 @router.post("/", response=Dict[str, Any])
@@ -81,7 +84,7 @@ def create_user(request, payload: UserCreateSchema):
         )
 
         # Create the Profile
-        profile = Profile.objects.create(
+        Profile.objects.create(
             user=user,
             job_title=payload.job_title,
             address=payload.address,
@@ -91,13 +94,23 @@ def create_user(request, payload: UserCreateSchema):
             education_level=payload.education_level,
         )
 
+        # Return using values for consistency
+        user_data = User.objects.filter(id=user.id).values(*USER_FIELDS).first()
+        profile_data = (
+            Profile.objects.filter(user_id=user.id)
+            .values("job_title", "employment_status")
+            .first()
+        )
+
         return success_response(
             {
-                "user_id": user.id,
-                "first_name": user.first_name,
-                "last_name": user.last_name,
-                "job_title": profile.job_title,
-                "employment_status": profile.employment_status,
+                "user_id": user_data["id"],
+                "first_name": user_data["first_name"],
+                "last_name": user_data["last_name"],
+                "job_title": profile_data["job_title"] if profile_data else None,
+                "employment_status": profile_data["employment_status"]
+                if profile_data
+                else None,
             },
             "User created successfully",
         )

@@ -114,7 +114,7 @@ async def db_agent(state: BehaviourAnalystState) -> dict:
         return {"db_results": [], "sender": "db_agent"}
 
     # Create a list of async tasks for the database agent subgraph
-    tasks = [database_agent_super_agent.ainvoke({"request": step, "user_id": state.get("user_id")}) for step in steps]
+    tasks = [f.ainvoke({"request": step, "user_id": state.get("user_id")}) for step in steps]
     
     # Execute all tasks concurrently
     results = await asyncio.gather(*tasks, return_exceptions=True)

@@ -1,14 +1,20 @@
 """Goal Maker Agent endpoints."""
+
 import json
 import logging
 from datetime import datetime
 
 from ninja import Router
-from django.db import connection
+from django.db import transaction
 
 from agents.goal_maker import Goal_maker_agent
 from ..assistants.maker_schemas import GoalMakerRequestSchema, GoalMakerResponseSchema
-from ..assistants.helpers import get_user_summary, get_conversation_summary, _insert_chat_message
+from ..assistants.helpers import (
+    get_user_summary,
+    get_conversation_summary,
+    _insert_chat_message,
+)
+from ..models import ChatConversation
 
 logger = logging.getLogger(__name__)
 router = Router()
@@ -26,9 +32,11 @@ def goals_assist(request, payload: GoalMakerRequestSchema):
 
     # 1. Fetch Context
     user_summary = get_user_summary(user_id)
-    conversation_summary = get_conversation_summary(
-        conversation_id, limit=10
-    ) if conversation_id else "No history."
+    conversation_summary = (
+        get_conversation_summary(conversation_id, limit=10)
+        if conversation_id
+        else "No history."
+    )
 
     # 2. Invoke Agent
     try:
@@ -56,31 +64,25 @@ def goals_assist(request, payload: GoalMakerRequestSchema):
             "is_done": True,
         }
 
-    # 3. Store interaction (optional but recommended if we want persistence)
-    # The original api.py implementation did manual insertion.
+    # 3. Store interaction using Django ORM
     if conversation_id:
         try:
-            with connection.cursor() as cursor:
-                now = datetime.now()
+            with transaction.atomic():
                 # User Msg
                 _insert_chat_message(
-                    cursor,
                     conversation_id=conversation_id,
                     sender_type="user",
                     source_agent="User",
                     content=user_request,
-                    created_at=now,
                 )
                 # Assistant Msg
                 _insert_chat_message(
-                    cursor,
                     conversation_id=conversation_id,
                     sender_type="assistant",
                     source_agent="GoalMaker",
                     content=goal_result.message,
-                    created_at=now,
                 )
-                
+
                 # Structured Payload (if any)
                 goal_payload = {
                     "goal_name": goal_result.goal_name,
@@ -92,16 +94,17 @@ def goals_assist(request, payload: GoalMakerRequestSchema):
                 # Only insert if there's meaningful data
                 if any(goal_payload.values()):
                     _insert_chat_message(
-                        cursor,
                         conversation_id=conversation_id,
                         sender_type="assistant",
                         source_agent="GoalMaker",
                         content=json.dumps(goal_payload),
                         content_type="json",
-                        created_at=now,
                     )
-                    
-                connection.commit()
+
+                # Update conversation timestamp
+                ChatConversation.objects.filter(id=conversation_id).update(
+                    last_message_at=datetime.now()
+                )
         except Exception:
             logger.exception("Failed to store GoalMaker interaction")
 

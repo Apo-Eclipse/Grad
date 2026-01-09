@@ -14,19 +14,26 @@ logger = logging.getLogger(__name__)
 router = Router()
 
 
-def _budget_to_dict(budget: Budget) -> Dict[str, Any]:
-    """Convert Budget model instance to dictionary."""
-    return {
-        "id": budget.id,
-        "user_id": budget.user_id,
-        "budget_name": budget.budget_name,
-        "description": budget.description,
-        "total_limit": float(budget.total_limit) if budget.total_limit else 0.0,
-        "priority_level_int": budget.priority_level_int,
-        "is_active": budget.is_active,
-        "created_at": budget.created_at,
-        "updated_at": budget.updated_at,
-    }
+# Fields for budget queries
+BUDGET_FIELDS = (
+    "id",
+    "user_id",
+    "budget_name",
+    "description",
+    "total_limit",
+    "priority_level_int",
+    "is_active",
+    "created_at",
+    "updated_at",
+)
+
+
+def _format_budget(budget: Dict[str, Any]) -> Dict[str, Any]:
+    """Format budget dict for JSON response."""
+    budget["total_limit"] = (
+        float(budget["total_limit"]) if budget["total_limit"] else 0.0
+    )
+    return budget
 
 
 def fetch_active_budgets(user_id: int) -> List[Dict[str, Any]]:
@@ -62,11 +69,29 @@ def get_budgets(request, user_id: int = Query(...)):
 @router.get("/{budget_id}", response=Dict[str, Any])
 def get_budget(request, budget_id: int):
     """Get a single budget."""
-    try:
-        budget = Budget.objects.get(id=budget_id)
-        return success_response(_budget_to_dict(budget))
-    except Budget.DoesNotExist:
+    budget = (
+        Budget.objects.filter(id=budget_id)
+        .values(
+            "id",
+            "user_id",
+            "budget_name",
+            "description",
+            "total_limit",
+            "priority_level_int",
+            "is_active",
+            "created_at",
+            "updated_at",
+        )
+        .first()
+    )
+    if not budget:
         return error_response("Budget not found", code=404)
+
+    # Format total_limit
+    budget["total_limit"] = (
+        float(budget["total_limit"]) if budget["total_limit"] else 0.0
+    )
+    return success_response(budget)
 
 
 @router.post("/", response=Dict[str, Any])
@@ -81,7 +106,9 @@ def create_budget(request, payload: BudgetCreateSchema):
             priority_level_int=payload.priority_level_int,
             is_active=payload.is_active,
         )
-        return success_response(_budget_to_dict(budget), "Budget created successfully")
+        # Fetch created budget as dict
+        created = Budget.objects.filter(id=budget.id).values(*BUDGET_FIELDS).first()
+        return success_response(_format_budget(created), "Budget created successfully")
     except Exception as e:
         logger.exception("Failed to create budget")
         return error_response(f"Failed to create budget: {e}")
@@ -101,10 +128,8 @@ def update_budget(request, budget_id: int, payload: BudgetUpdateSchema):
         if rows_affected == 0:
             return error_response("Budget not found", code=404)
 
-        budget = Budget.objects.get(id=budget_id)
-        return success_response(_budget_to_dict(budget), "Budget updated successfully")
-    except Budget.DoesNotExist:
-        return error_response("Budget not found", code=404)
+        budget = Budget.objects.filter(id=budget_id).values(*BUDGET_FIELDS).first()
+        return success_response(_format_budget(budget), "Budget updated successfully")
     except Exception as e:
         logger.exception("Failed to update budget")
         return error_response(f"Failed to update budget: {e}")

@@ -14,17 +14,22 @@ logger = logging.getLogger(__name__)
 router = Router()
 
 
-def _income_to_dict(income: Income) -> Dict[str, Any]:
-    """Convert Income model instance to dictionary."""
-    return {
-        "id": income.id,
-        "user_id": income.user_id,
-        "type_income": income.type_income,
-        "amount": float(income.amount) if income.amount else None,
-        "description": income.description,
-        "created_at": income.created_at,
-        "updated_at": income.updated_at,
-    }
+# Fields for income queries
+INCOME_FIELDS = (
+    "id",
+    "user_id",
+    "type_income",
+    "amount",
+    "description",
+    "created_at",
+    "updated_at",
+)
+
+
+def _format_income(income: Dict[str, Any]) -> Dict[str, Any]:
+    """Format income dict for JSON response."""
+    income["amount"] = float(income["amount"]) if income["amount"] else None
+    return income
 
 
 @router.get("/", response=Dict[str, Any])
@@ -49,11 +54,25 @@ def get_income(request, user_id: int = Query(...)):
 @router.get("/{income_id}", response=Dict[str, Any])
 def get_single_income(request, income_id: int):
     """Get a single income source."""
-    try:
-        income = Income.objects.get(id=income_id)
-        return success_response(_income_to_dict(income))
-    except Income.DoesNotExist:
+    income = (
+        Income.objects.filter(id=income_id)
+        .values(
+            "id",
+            "user_id",
+            "type_income",
+            "amount",
+            "description",
+            "created_at",
+            "updated_at",
+        )
+        .first()
+    )
+    if not income:
         return error_response("Income not found", code=404)
+
+    # Format amount
+    income["amount"] = float(income["amount"]) if income["amount"] else None
+    return success_response(income)
 
 
 @router.post("/", response=Dict[str, Any])
@@ -66,8 +85,10 @@ def create_income(request, payload: IncomeCreateSchema):
             amount=payload.amount,
             description=payload.description,
         )
+        # Fetch created income as dict
+        created = Income.objects.filter(id=income.id).values(*INCOME_FIELDS).first()
         return success_response(
-            _income_to_dict(income), "Income source created successfully"
+            _format_income(created), "Income source created successfully"
         )
     except Exception as e:
         logger.exception("Failed to create income source")
@@ -88,10 +109,8 @@ def update_income(request, income_id: int, payload: IncomeUpdateSchema):
         if rows_affected == 0:
             return error_response("Income not found", code=404)
 
-        income = Income.objects.get(id=income_id)
-        return success_response(_income_to_dict(income), "Income updated successfully")
-    except Income.DoesNotExist:
-        return error_response("Income not found", code=404)
+        income = Income.objects.filter(id=income_id).values(*INCOME_FIELDS).first()
+        return success_response(_format_income(income), "Income updated successfully")
     except Exception as e:
         logger.exception("Failed to update income")
         return error_response(f"Failed to update income: {e}")
