@@ -122,47 +122,47 @@ def get_total_income(request, user_id: int = Query(...)):
 # ============================================================================
 
 
-@router.post("/execute/select", response=Dict[str, Any])
-def execute_select_query(request):
-    """
-    Safe(-ish) endpoint for read-only SQL queries.
-    Expects JSON: {"query": "SELECT ...", "params": [...]}
-    """
-    body = safe_json_body(request)
-    raw_query = body.get("query", "").strip()
-    params = body.get("params", [])
-    limit = body.get("limit", 100)
+# @router.post("/execute/select", response=Dict[str, Any])
+# def execute_select_query(request):
+#     """
+#     Safe(-ish) endpoint for read-only SQL queries.
+#     Expects JSON: {"query": "SELECT ...", "params": [...]}
+#     """
+#     body = safe_json_body(request)
+#     raw_query = body.get("query", "").strip()
+#     params = body.get("params", [])
+#     limit = body.get("limit", 100)
 
-    if not raw_query:
-        return {"error": "No query provided"}
+#     if not raw_query:
+#         return {"error": "No query provided"}
 
-    # Basic keyword check
-    lower_q = raw_query.lower()
-    if not lower_q.startswith("select") and not lower_q.startswith("with"):
-        return {"error": "Only SELECT or CTE queries allowed"}
-    if ";" in raw_query:
-        return {"error": "Multiple statements not allowed"}
+#     # Basic keyword check
+#     lower_q = raw_query.lower()
+#     if not lower_q.startswith("select") and not lower_q.startswith("with"):
+#         return {"error": "Only SELECT or CTE queries allowed"}
+#     if ";" in raw_query:
+#         return {"error": "Multiple statements not allowed"}
 
-    # Force LIMIT if not present
-    if "limit" not in lower_q:
-        raw_query += f" LIMIT {int(limit)}"
+#     # Force LIMIT if not present
+#     if "limit" not in lower_q:
+#         raw_query += f" LIMIT {int(limit)}"
 
-    rows = run_select(raw_query, params, log_name="execute_select")
-    return {"data": rows}
+#     rows = run_select(raw_query, params, log_name="execute_select")
+#     return {"data": rows}
 
 
-@router.post("/execute/modify", response=Dict[str, Any])
-def execute_modify_query(request):
-    """
-    Endpoint for INSERT/UPDATE/DELETE queries.
-    Expects JSON: {"query": "INSERT ...", "params": [...]}
-    """
-    body = safe_json_body(request)
-    raw_query = body.get("query", "").strip()
-    params = body.get("params", [])
+# @router.post("/execute/modify", response=Dict[str, Any])
+# def execute_modify_query(request):
+#     """
+#     Endpoint for INSERT/UPDATE/DELETE queries.
+#     Expects JSON: {"query": "INSERT ...", "params": [...]}
+#     """
+#     body = safe_json_body(request)
+#     raw_query = body.get("query", "").strip()
+#     params = body.get("params", [])
 
-    if not raw_query:
-        return {"error": "No query provided"}
+#     if not raw_query:
+#         return {"error": "No query provided"}
 
-    rows_affected = execute_modify(raw_query, params, log_name="execute_modify")
-    return {"success": True, "rows_affected": rows_affected}
+#     rows_affected = execute_modify(raw_query, params, log_name="execute_modify")
+#     return {"success": True, "rows_affected": rows_affected}

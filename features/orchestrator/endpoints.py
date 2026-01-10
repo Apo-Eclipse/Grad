@@ -11,8 +11,6 @@ from django.db import transaction
 from features.orchestrator.schemas import (
     AnalysisRequestSchema,
     AnalysisResponseSchema,
-    ConversationStartSchema,
-    ConversationResponseSchema,
 )
 from features.crud.conversations.service import insert_chat_message
 from core.models import ChatConversation
@@ -79,26 +77,6 @@ def _store_messages_sync(
     except Exception as exc:
         logger.warning("Could not store messages: %s", exc)
         return False
-
-
-@router.post("/conversations/start", response=ConversationResponseSchema)
-def start_conversation(request, payload: ConversationStartSchema):
-    """Start a new conversation thread."""
-    try:
-        conversation = ChatConversation.objects.create(
-            user_id=payload.user_id,
-            channel=payload.channel,
-            last_message_at=timezone.now(),
-        )
-        return {
-            "conversation_id": conversation.id,
-            "user_id": conversation.user_id,
-            "channel": conversation.channel,
-            "started_at": conversation.started_at,
-        }
-    except Exception as e:
-        logger.exception("Failed to start conversation")
-        raise Exception(f"Failed to start conversation: {e}")
 
 
 @router.post("/analyze", response=AnalysisResponseSchema)
