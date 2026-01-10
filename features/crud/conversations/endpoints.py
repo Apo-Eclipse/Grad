@@ -7,6 +7,8 @@ from ninja import Router, Query
 
 from core.models import ChatConversation, ChatMessage
 from core.utils.responses import success_response, error_response
+from django.utils import timezone
+from .schemas import ConversationStartSchema, ConversationResponseSchema
 from .service import insert_chat_message
 
 logger = logging.getLogger(__name__)
@@ -75,3 +77,23 @@ def add_message(request, conversation_id: int, role: str, content: str):
     except Exception as e:
         logger.exception("Failed to add message")
         return {"success": False, "error": str(e)}
+
+
+@router.post("/start", response=ConversationResponseSchema)
+def start_conversation(request, payload: ConversationStartSchema):
+    """Start a new conversation thread."""
+    try:
+        conversation = ChatConversation.objects.create(
+            user_id=payload.user_id,
+            channel=payload.channel,
+            last_message_at=timezone.now(),
+        )
+        return {
+            "conversation_id": conversation.id,
+            "user_id": conversation.user_id,
+            "channel": conversation.channel,
+            "started_at": conversation.started_at,
+        }
+    except Exception as e:
+        logger.exception("Failed to start conversation")
+        raise Exception(f"Failed to start conversation: {e}")

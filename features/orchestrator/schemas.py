@@ -28,18 +28,6 @@ class AnalysisErrorSchema(Schema):
     timestamp: datetime = Field(default_factory=timezone.now)
 
 
-class ConversationStartSchema(Schema):
-    user_id: int
-    channel: str = Field(default="web")
-
-
-class ConversationResponseSchema(Schema):
-    conversation_id: int
-    user_id: int
-    channel: str
-    started_at: datetime
-
-
 """Schemas for specialized Maker agents."""
 
 
