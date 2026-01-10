@@ -20,5 +20,5 @@ EXPOSE 8080
 
 # Default command: production server via Waitress (WSGI)
 # For async-first serving, you can alternatively use Uvicorn:
-#   CMD ["uvicorn", "api_config.asgi:application", "--host", "0.0.0.0", "--port", "8080"]
+#   CMD ["uvicorn", "config.asgi:application", "--host", "0.0.0.0", "--port", "8080"]
 CMD ["python", "run_server.py"]
