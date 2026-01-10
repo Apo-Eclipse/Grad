@@ -57,22 +57,6 @@ def get_user(request):
     return _format_user_response(user_data, profile_data)
 
 
-@router.get("/{user_id}/exists", response=Dict[str, Any])
-def check_user_exists(request, user_id: int):
-    """Check if a user ID exists."""
-    user_data = User.objects.filter(id=user_id).values(*USER_FIELDS).first()
-    if user_data:
-        return {
-            "exists": True,
-            "user": {
-                "user_id": user_data["id"],
-                "first_name": user_data["first_name"],
-                "last_name": user_data["last_name"],
-            },
-        }
-    return {"exists": False}
-
-
 @router.post("/", response=Dict[str, Any], auth=None)
 def create_user(request, payload: UserCreateSchema):
     """Create a new user."""

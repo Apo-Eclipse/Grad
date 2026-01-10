@@ -18,7 +18,6 @@ class BudgetSchema(Schema):
 
 
 class BudgetCreateSchema(Schema):
-    user_id: int
     budget_name: str
     description: Optional[str] = None
     total_limit: float = Field(default=0.0)

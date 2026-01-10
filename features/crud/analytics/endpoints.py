@@ -4,7 +4,7 @@ import logging
 from typing import Any, Dict
 
 from ninja import Router
-from django.db.models import Sum
+from django.db.models import Sum, DecimalField
 from django.db.models.functions import Coalesce, TruncMonth
 from django.utils import timezone
 
@@ -30,7 +30,10 @@ def get_monthly_spend(request):
         )
         .select_related("budget")
         .values("budget__budget_name")
-        .annotate(month=TruncMonth("date"), total_spent=Coalesce(Sum("amount"), 0.0))
+        .annotate(
+            month=TruncMonth("date"),
+            total_spent=Coalesce(Sum("amount"), 0, output_field=DecimalField()),
+        )
         .order_by("-total_spent")
     )
 
@@ -65,7 +68,8 @@ def get_overspend(request):
                     "transaction__amount",
                     filter=Q(transaction__date__gte=current_month_start),
                 ),
-                0.0,
+                0,
+                output_field=DecimalField(),
             )
         )
         .values("budget_name", "spent", "total_limit")
@@ -88,11 +92,15 @@ def get_overspend(request):
         }
 
         if pct > 100:
-            overspend_data.append(row_data)
+            row_data["is_overspent"] = True
+        else:
+            row_data["is_overspent"] = False
+
+        overspend_data.append(row_data)
 
     # 2. Total Income
     income_total = Income.objects.filter(user_id=request.user.id).aggregate(
-        total=Coalesce(Sum("amount"), 0.0)
+        total=Coalesce(Sum("amount"), 0, output_field=DecimalField())
     )["total"]
     total_income = float(income_total) if income_total else 0.0
 
@@ -112,7 +120,7 @@ def get_total_income(request):
     rows = (
         Income.objects.filter(user_id=request.user.id)
         .values("type_income")
-        .annotate(total=Coalesce(Sum("amount"), 0.0))
+        .annotate(total=Coalesce(Sum("amount"), 0, output_field=DecimalField()))
         .order_by("-total")
     )
 

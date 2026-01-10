@@ -56,7 +56,7 @@ def get_income(request):
 def get_single_income(request, income_id: int):
     """Get a single income source."""
     income = (
-        Income.objects.filter(id=income_id)
+        Income.objects.filter(id=income_id, user_id=request.user.id)
         .values(
             "id",
             "user_id",
@@ -68,6 +68,7 @@ def get_single_income(request, income_id: int):
         )
         .first()
     )
+
     if not income:
         return error_response("Income not found", code=404)
 
@@ -81,7 +82,7 @@ def create_income(request, payload: IncomeCreateSchema):
     """Add a new income source."""
     try:
         income = Income.objects.create(
-            user_id=payload.user_id,
+            user_id=request.user.id,
             type_income=payload.type_income,
             amount=payload.amount,
             description=payload.description,
@@ -106,7 +107,9 @@ def update_income(request, income_id: int, payload: IncomeUpdateSchema):
     updates["updated_at"] = timezone.now()
 
     try:
-        rows_affected = Income.objects.filter(id=income_id).update(**updates)
+        rows_affected = Income.objects.filter(
+            id=income_id, user_id=request.user.id
+        ).update(**updates)
         if rows_affected == 0:
             return error_response("Income not found", code=404)
 
@@ -121,7 +124,9 @@ def update_income(request, income_id: int, payload: IncomeUpdateSchema):
 def delete_income(request, income_id: int):
     """Delete an income source permanently."""
     try:
-        rows_affected, _ = Income.objects.filter(id=income_id).delete()
+        rows_affected, _ = Income.objects.filter(
+            id=income_id, user_id=request.user.id
+        ).delete()
         if rows_affected == 0:
             return error_response("Income not found", code=404)
 

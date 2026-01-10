@@ -20,7 +20,6 @@ class TransactionSchema(Schema):
 
 
 class TransactionCreateSchema(Schema):
-    user_id: int
     date: date
     amount: float
     time: Optional[str] = None

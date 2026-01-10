@@ -19,7 +19,6 @@ class GoalSchema(Schema):
 
 
 class GoalCreateSchema(Schema):
-    user_id: int
     goal_name: str
     description: Optional[str] = None
     target: float = Field(default=0.0)

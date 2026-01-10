@@ -7,7 +7,6 @@ from pydantic import Field
 
 
 class ConversationStartSchema(Schema):
-    user_id: int
     channel: str = Field(default="web")
 
 

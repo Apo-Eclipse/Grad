@@ -15,7 +15,6 @@ class IncomeSchema(Schema):
 
 
 class IncomeCreateSchema(Schema):
-    user_id: int
     type_income: str
     amount: float
     description: Optional[str] = None
