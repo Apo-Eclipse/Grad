@@ -4,14 +4,15 @@ import logging
 from django.utils import timezone
 from typing import Any, Dict
 
-from ninja import Router, Query
+from ninja import Router
 
 from core.models import Income
 from core.utils.responses import success_response, error_response
-from core.schemas.database import IncomeCreateSchema, IncomeUpdateSchema
+from .schemas import IncomeCreateSchema, IncomeUpdateSchema
+from features.auth.api import AuthBearer
 
 logger = logging.getLogger(__name__)
-router = Router()
+router = Router(auth=AuthBearer())
 
 
 # Fields for income queries
@@ -33,10 +34,10 @@ def _format_income(income: Dict[str, Any]) -> Dict[str, Any]:
 
 
 @router.get("/", response=Dict[str, Any])
-def get_income(request, user_id: int = Query(...)):
+def get_income(request):
     """Retrieve all income sources for a user."""
     incomes = (
-        Income.objects.filter(user_id=user_id)
+        Income.objects.filter(user_id=request.user.id)
         .order_by("-created_at")
         .values(
             "id",

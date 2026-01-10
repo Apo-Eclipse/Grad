@@ -4,14 +4,16 @@ import logging
 from django.utils import timezone
 from typing import Any, Dict, List
 
-from ninja import Router, Query
+from ninja import Router
 
 from core.models import Budget
 from core.utils.responses import success_response, error_response
-from core.schemas.database import BudgetCreateSchema, BudgetUpdateSchema
+from .schemas import BudgetCreateSchema, BudgetUpdateSchema
+
+from features.auth.api import AuthBearer
 
 logger = logging.getLogger(__name__)
-router = Router()
+router = Router(auth=AuthBearer())
 
 
 # Fields for budget queries
@@ -47,10 +49,10 @@ def fetch_active_budgets(user_id: int) -> List[Dict[str, Any]]:
 
 
 @router.get("/", response=Dict[str, Any])
-def get_budgets(request, user_id: int = Query(...)):
+def get_budgets(request):
     """Retrieve active budgets for a user."""
     budgets = (
-        Budget.objects.filter(user_id=user_id, is_active=True)
+        Budget.objects.filter(user_id=request.user.id, is_active=True)
         .order_by("-priority_level_int")
         .values(
             "id",
@@ -70,7 +72,7 @@ def get_budgets(request, user_id: int = Query(...)):
 def get_budget(request, budget_id: int):
     """Get a single budget."""
     budget = (
-        Budget.objects.filter(id=budget_id)
+        Budget.objects.filter(id=budget_id, user_id=request.user.id)
         .values(
             "id",
             "user_id",
@@ -99,7 +101,7 @@ def create_budget(request, payload: BudgetCreateSchema):
     """Create a new budget."""
     try:
         budget = Budget.objects.create(
-            user_id=payload.user_id,
+            user_id=request.user.id,
             budget_name=payload.budget_name,
             description=payload.description,
             total_limit=payload.total_limit,
@@ -124,7 +126,9 @@ def update_budget(request, budget_id: int, payload: BudgetUpdateSchema):
     updates["updated_at"] = timezone.now()
 
     try:
-        rows_affected = Budget.objects.filter(id=budget_id).update(**updates)
+        rows_affected = Budget.objects.filter(
+            id=budget_id, user_id=request.user.id
+        ).update(**updates)
         if rows_affected == 0:
             return error_response("Budget not found", code=404)
 
@@ -139,9 +143,9 @@ def update_budget(request, budget_id: int, payload: BudgetUpdateSchema):
 def delete_budget(request, budget_id: int):
     """Soft delete a budget."""
     try:
-        rows_affected = Budget.objects.filter(id=budget_id).update(
-            is_active=False, updated_at=timezone.now()
-        )
+        rows_affected = Budget.objects.filter(
+            id=budget_id, user_id=request.user.id
+        ).update(is_active=False, updated_at=timezone.now())
         if rows_affected == 0:
             return error_response("Budget not found", code=404)
 

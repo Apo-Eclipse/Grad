@@ -11,17 +11,19 @@ from django.utils import timezone
 from .schemas import ConversationStartSchema, ConversationResponseSchema
 from .service import insert_chat_message
 
+from features.auth.api import AuthBearer
+
 logger = logging.getLogger(__name__)
-router = Router()
+router = Router(auth=AuthBearer())
 
 # --- CRUD Endpoints ---
 
 
 @router.get("/", response=Dict[str, Any])
-def get_conversations(request, user_id: int = Query(...), limit: int = Query(50)):
+def get_conversations(request, limit: int = Query(50)):
     """Retrieve chat conversations for a user."""
     conversations = (
-        ChatConversation.objects.filter(user_id=user_id)
+        ChatConversation.objects.filter(user_id=request.user.id)
         .order_by("-last_message_at")
         .values("id", "title", "channel", "started_at", "last_message_at")[:limit]
     )
@@ -32,7 +34,7 @@ def get_conversations(request, user_id: int = Query(...), limit: int = Query(50)
 def get_conversation(request, conversation_id: int):
     """Get a single conversation."""
     conv = (
-        ChatConversation.objects.filter(id=conversation_id)
+        ChatConversation.objects.filter(id=conversation_id, user_id=request.user.id)
         .values("id", "user_id", "title", "channel", "started_at", "last_message_at")
         .first()
     )
@@ -44,6 +46,12 @@ def get_conversation(request, conversation_id: int):
 @router.get("/{conversation_id}/messages", response=Dict[str, Any])
 def get_messages(request, conversation_id: int, limit: int = Query(100)):
     """Retrieve messages for a conversation."""
+    # Ensure conversation belongs to user
+    if not ChatConversation.objects.filter(
+        id=conversation_id, user_id=request.user.id
+    ).exists():
+        return error_response("Conversation not found", code=404)
+
     messages = (
         ChatMessage.objects.filter(conversation_id=conversation_id)
         .order_by("id")
@@ -66,6 +74,12 @@ def get_messages(request, conversation_id: int, limit: int = Query(100)):
 @router.post("/{conversation_id}/message", response=Dict[str, Any])
 def add_message(request, conversation_id: int, role: str, content: str):
     """Manually add a message to history (useful for testing or external inputs)."""
+    # Ensure conversation belongs to user
+    if not ChatConversation.objects.filter(
+        id=conversation_id, user_id=request.user.id
+    ).exists():
+        return {"success": False, "error": "Conversation not found"}
+
     try:
         insert_chat_message(
             conversation_id=conversation_id,
@@ -84,7 +98,7 @@ def start_conversation(request, payload: ConversationStartSchema):
     """Start a new conversation thread."""
     try:
         conversation = ChatConversation.objects.create(
-            user_id=payload.user_id,
+            user_id=request.user.id,
             channel=payload.channel,
             last_message_at=timezone.now(),
         )
