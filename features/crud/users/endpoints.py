@@ -8,10 +8,12 @@ from django.contrib.auth.models import User
 
 from core.models import Profile
 from core.utils.responses import success_response, error_response
-from core.schemas.database import UserCreateSchema
+from .schemas import UserCreateSchema
+
+from features.auth.api import AuthBearer
 
 logger = logging.getLogger(__name__)
-router = Router()
+router = Router(auth=AuthBearer())
 
 
 # Fields to retrieve for user queries
@@ -41,9 +43,10 @@ def _format_user_response(
     return result
 
 
-@router.get("/{user_id}", response=Dict[str, Any])
-def get_user(request, user_id: int):
+@router.get("/", response=Dict[str, Any])
+def get_user(request):
     """Get user profile details."""
+    user_id = request.user.id
     user_data = User.objects.filter(id=user_id).values(*USER_FIELDS).first()
     if not user_data:
         return error_response("User not found", code=404)
@@ -54,23 +57,7 @@ def get_user(request, user_id: int):
     return _format_user_response(user_data, profile_data)
 
 
-@router.get("/{user_id}/exists", response=Dict[str, Any])
-def check_user_exists(request, user_id: int):
-    """Check if a user ID exists."""
-    user_data = User.objects.filter(id=user_id).values(*USER_FIELDS).first()
-    if user_data:
-        return {
-            "exists": True,
-            "user": {
-                "user_id": user_data["id"],
-                "first_name": user_data["first_name"],
-                "last_name": user_data["last_name"],
-            },
-        }
-    return {"exists": False}
-
-
-@router.post("/", response=Dict[str, Any])
+@router.post("/", response=Dict[str, Any], auth=None)
 def create_user(request, payload: UserCreateSchema):
     """Create a new user."""
     try:

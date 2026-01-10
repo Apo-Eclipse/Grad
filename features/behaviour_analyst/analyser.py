@@ -1,5 +1,3 @@
-from typing import TypedDict
-from core.llm_providers.gemini_models import gemini_llm
 from core.llm_providers.digital_ocean import gpt_oss_120b_digital_ocean
 from langchain_core.prompts import ChatPromptTemplate
 from pydantic import Field, BaseModel

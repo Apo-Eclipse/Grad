@@ -8,10 +8,12 @@ from django.db.models import Q
 
 from core.models import Transaction
 from core.utils.responses import success_response, error_response
-from core.schemas.database import TransactionCreateSchema, TransactionUpdateSchema
+from .schemas import TransactionCreateSchema, TransactionUpdateSchema
+
+from features.auth.api import AuthBearer
 
 logger = logging.getLogger(__name__)
-router = Router()
+router = Router(auth=AuthBearer())
 
 
 # Fields to retrieve for transaction queries
@@ -57,13 +59,12 @@ def _format_transaction(
 @router.get("/", response=Dict[str, Any])
 def get_transactions(
     request,
-    user_id: int = Query(...),
     start_date: Optional[str] = Query(None),
     end_date: Optional[str] = Query(None),
     limit: int = Query(100, le=1000),
 ):
     """Retrieve transactions for a user."""
-    queryset = Transaction.objects.filter(user_id=user_id)
+    queryset = Transaction.objects.filter(user_id=request.user.id)
 
     if start_date:
         queryset = queryset.filter(date__gte=start_date)
@@ -85,7 +86,7 @@ def create_transaction(request, payload: TransactionCreateSchema):
     """Create a new transaction row."""
     try:
         txn = Transaction.objects.create(
-            user_id=payload.user_id,
+            user_id=request.user.id,
             date=payload.date,
             amount=payload.amount,
             time=payload.time,
@@ -111,7 +112,7 @@ def create_transaction(request, payload: TransactionCreateSchema):
 def get_transaction(request, transaction_id: int):
     """Get a single transaction."""
     txn = (
-        Transaction.objects.filter(id=transaction_id)
+        Transaction.objects.filter(id=transaction_id, user_id=request.user.id)
         .values(*TRANSACTION_FIELDS)
         .first()
     )
@@ -128,12 +129,14 @@ def update_transaction(request, transaction_id: int, payload: TransactionUpdateS
         return error_response("No fields provided for update")
 
     try:
-        rows_affected = Transaction.objects.filter(id=transaction_id).update(**updates)
+        rows_affected = Transaction.objects.filter(
+            id=transaction_id, user_id=request.user.id
+        ).update(**updates)
         if rows_affected == 0:
             return error_response("Transaction not found", code=404)
 
         txn = (
-            Transaction.objects.filter(id=transaction_id)
+            Transaction.objects.filter(id=transaction_id, user_id=request.user.id)
             .values(*TRANSACTION_FIELDS)
             .first()
         )
@@ -149,7 +152,9 @@ def update_transaction(request, transaction_id: int, payload: TransactionUpdateS
 def delete_transaction(request, transaction_id: int):
     """Delete a transaction permanently."""
     try:
-        rows_affected, _ = Transaction.objects.filter(id=transaction_id).delete()
+        rows_affected, _ = Transaction.objects.filter(
+            id=transaction_id, user_id=request.user.id
+        ).delete()
         if rows_affected == 0:
             return error_response("Transaction not found", code=404)
 
@@ -162,7 +167,6 @@ def delete_transaction(request, transaction_id: int):
 @router.get("/search/", response=Dict[str, Any])
 def search_transactions(
     request,
-    user_id: int = Query(...),
     query_text: Optional[str] = Query(None, alias="query"),
     category: Optional[str] = Query(None),
     min_amount: Optional[float] = Query(None),
@@ -174,7 +178,7 @@ def search_transactions(
     limit: int = Query(100, le=1000),
 ):
     """Advanced transaction search."""
-    queryset = Transaction.objects.filter(user_id=user_id)
+    queryset = Transaction.objects.filter(user_id=request.user.id)
 
     if query_text:
         queryset = queryset.filter(

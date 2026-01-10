@@ -13,7 +13,8 @@ class AnalysisRequestSchema(Schema):
     filters: Optional[Dict[str, Any]] = None
     metadata: Dict[str, Any] = Field(default_factory=dict)
     conversation_id: Optional[int] = None
-    user_id: Optional[int] = None
+    conversation_id: Optional[int] = None
+    # user_id is now derived from auth token
 
 
 class AnalysisResponseSchema(Schema):
@@ -33,7 +34,7 @@ class AnalysisErrorSchema(Schema):
 
 # --- Goal Maker ---
 class GoalMakerRequestSchema(Schema):
-    user_id: int
+    # user_id removed
     user_request: str
     conversation_id: Optional[int] = None
 
@@ -51,7 +52,7 @@ class GoalMakerResponseSchema(Schema):
 
 # --- Budget Maker ---
 class BudgetMakerRequestSchema(Schema):
-    user_id: int
+    # user_id removed
     user_request: str
     conversation_id: Optional[int] = None
 
@@ -70,7 +71,7 @@ class BudgetMakerResponseSchema(Schema):
 
 # --- Transaction Maker ---
 class TransactionMakerRequestSchema(Schema):
-    user_id: int
+    # user_id removed
     user_request: str
     conversation_id: Optional[int] = None
 

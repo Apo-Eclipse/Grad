@@ -8,4 +8,5 @@ __pycache__/
 .dockerignore
 goal_main.py
 AGENT_PROMPTS.md
+venv
 # main.py

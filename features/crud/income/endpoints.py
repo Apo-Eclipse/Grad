@@ -4,14 +4,15 @@ import logging
 from django.utils import timezone
 from typing import Any, Dict
 
-from ninja import Router, Query
+from ninja import Router
 
 from core.models import Income
 from core.utils.responses import success_response, error_response
-from core.schemas.database import IncomeCreateSchema, IncomeUpdateSchema
+from .schemas import IncomeCreateSchema, IncomeUpdateSchema
+from features.auth.api import AuthBearer
 
 logger = logging.getLogger(__name__)
-router = Router()
+router = Router(auth=AuthBearer())
 
 
 # Fields for income queries
@@ -33,10 +34,10 @@ def _format_income(income: Dict[str, Any]) -> Dict[str, Any]:
 
 
 @router.get("/", response=Dict[str, Any])
-def get_income(request, user_id: int = Query(...)):
+def get_income(request):
     """Retrieve all income sources for a user."""
     incomes = (
-        Income.objects.filter(user_id=user_id)
+        Income.objects.filter(user_id=request.user.id)
         .order_by("-created_at")
         .values(
             "id",
@@ -55,7 +56,7 @@ def get_income(request, user_id: int = Query(...)):
 def get_single_income(request, income_id: int):
     """Get a single income source."""
     income = (
-        Income.objects.filter(id=income_id)
+        Income.objects.filter(id=income_id, user_id=request.user.id)
         .values(
             "id",
             "user_id",
@@ -67,6 +68,7 @@ def get_single_income(request, income_id: int):
         )
         .first()
     )
+
     if not income:
         return error_response("Income not found", code=404)
 
@@ -80,7 +82,7 @@ def create_income(request, payload: IncomeCreateSchema):
     """Add a new income source."""
     try:
         income = Income.objects.create(
-            user_id=payload.user_id,
+            user_id=request.user.id,
             type_income=payload.type_income,
             amount=payload.amount,
             description=payload.description,
@@ -105,7 +107,9 @@ def update_income(request, income_id: int, payload: IncomeUpdateSchema):
     updates["updated_at"] = timezone.now()
 
     try:
-        rows_affected = Income.objects.filter(id=income_id).update(**updates)
+        rows_affected = Income.objects.filter(
+            id=income_id, user_id=request.user.id
+        ).update(**updates)
         if rows_affected == 0:
             return error_response("Income not found", code=404)
 
@@ -120,7 +124,9 @@ def update_income(request, income_id: int, payload: IncomeUpdateSchema):
 def delete_income(request, income_id: int):
     """Delete an income source permanently."""
     try:
-        rows_affected, _ = Income.objects.filter(id=income_id).delete()
+        rows_affected, _ = Income.objects.filter(
+            id=income_id, user_id=request.user.id
+        ).delete()
         if rows_affected == 0:
             return error_response("Income not found", code=404)
 

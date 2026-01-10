@@ -19,8 +19,10 @@ from features.crud.conversations.service import (
 from features.crud.budgets.service import fetch_active_budgets
 from core.models import ChatConversation
 
+from features.auth.api import AuthBearer
+
 logger = logging.getLogger(__name__)
-router = Router()
+router = Router(auth=AuthBearer())
 
 
 @router.post("/assist", response=TransactionMakerResponseSchema)
@@ -28,7 +30,7 @@ def transaction_assist(request, payload: TransactionMakerRequestSchema):
     """
     Direct endpoint for the Transaction Maker Agent.
     """
-    user_id = payload.user_id
+    user_id = request.user.id
     conversation_id = payload.conversation_id or 0
     user_request = payload.user_request
 

@@ -19,17 +19,18 @@ from features.crud.conversations.service import (
 )
 from core.models import ChatConversation
 
+from features.auth.api import AuthBearer
+
 logger = logging.getLogger(__name__)
-router = Router()
+router = Router(auth=AuthBearer())
 
 
 @router.post("/assist", response=GoalMakerResponseSchema)
 def goals_assist(request, payload: GoalMakerRequestSchema):
     """
-    Direct endpoint for the Goal Maker Agent.
     Manages its own chat history subset or links to main conversation.
     """
-    user_id = payload.user_id
+    user_id = request.user.id
     conversation_id = payload.conversation_id or 0
     user_request = payload.user_request
 

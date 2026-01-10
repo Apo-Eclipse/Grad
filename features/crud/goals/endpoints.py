@@ -8,10 +8,12 @@ from ninja import Router, Query
 
 from core.models import Goal
 from core.utils.responses import success_response, error_response
-from core.schemas.database import GoalCreateSchema, GoalUpdateSchema
+from .schemas import GoalCreateSchema, GoalUpdateSchema
+
+from features.auth.api import AuthBearer
 
 logger = logging.getLogger(__name__)
-router = Router()
+router = Router(auth=AuthBearer())
 
 
 # Fields for goal queries
@@ -37,9 +39,9 @@ def _format_goal(goal: Dict[str, Any]) -> Dict[str, Any]:
 
 
 @router.get("/", response=Dict[str, Any])
-def get_goals(request, user_id: int = Query(...), status: Optional[str] = Query(None)):
+def get_goals(request, status: Optional[str] = Query(None)):
     """Retrieve goals for a user."""
-    queryset = Goal.objects.filter(user_id=user_id)
+    queryset = Goal.objects.filter(user_id=request.user.id)
 
     if status:
         queryset = queryset.filter(status=status)
@@ -64,7 +66,7 @@ def get_goals(request, user_id: int = Query(...), status: Optional[str] = Query(
 def get_goal(request, goal_id: int):
     """Get a single goal."""
     goal = (
-        Goal.objects.filter(id=goal_id)
+        Goal.objects.filter(id=goal_id, user_id=request.user.id)
         .values(
             "id",
             "user_id",
@@ -93,7 +95,7 @@ def create_goal(request, payload: GoalCreateSchema):
     """Create a new goal."""
     try:
         goal = Goal.objects.create(
-            user_id=payload.user_id,
+            user_id=request.user.id,
             goal_name=payload.goal_name,
             description=payload.description,
             target=payload.target,
@@ -120,7 +122,9 @@ def update_goal(request, goal_id: int, payload: GoalUpdateSchema):
     updates["updated_at"] = timezone.now()
 
     try:
-        rows_affected = Goal.objects.filter(id=goal_id).update(**updates)
+        rows_affected = Goal.objects.filter(id=goal_id, user_id=request.user.id).update(
+            **updates
+        )
         if rows_affected == 0:
             return error_response("Goal not found", code=404)
 
@@ -135,7 +139,7 @@ def update_goal(request, goal_id: int, payload: GoalUpdateSchema):
 def delete_goal(request, goal_id: int):
     """Soft delete a goal."""
     try:
-        rows_affected = Goal.objects.filter(id=goal_id).update(
+        rows_affected = Goal.objects.filter(id=goal_id, user_id=request.user.id).update(
             status="inactive", updated_at=timezone.now()
         )
         if rows_affected == 0:
