@@ -1,7 +1,7 @@
 """Income database operations."""
 
 import logging
-from datetime import datetime
+from django.utils import timezone
 from typing import Any, Dict
 
 from ninja import Router, Query
@@ -102,7 +102,7 @@ def update_income(request, income_id: int, payload: IncomeUpdateSchema):
     if not updates:
         return error_response("No fields provided for update")
 
-    updates["updated_at"] = datetime.now()
+    updates["updated_at"] = timezone.now()
 
     try:
         rows_affected = Income.objects.filter(id=income_id).update(**updates)

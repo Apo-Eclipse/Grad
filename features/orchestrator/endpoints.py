@@ -2,7 +2,7 @@
 
 import json
 import logging
-from datetime import datetime
+from django.utils import timezone
 from typing import Any, Dict, Optional
 
 from ninja import Router
@@ -15,7 +15,7 @@ from features.orchestrator.schemas import (
     ConversationResponseSchema,
 )
 from features.crud.conversations.service import insert_chat_message
-from core.models import ChatConversation, ChatMessage
+from core.models import ChatConversation
 from features.orchestrator.graph import main_orchestrator_graph
 from asgiref.sync import sync_to_async
 
@@ -71,7 +71,7 @@ def _store_messages_sync(
 
             # Update conversation timestamp
             ChatConversation.objects.filter(id=conversation_id).update(
-                last_message_at=datetime.now()
+                last_message_at=timezone.now()
             )
 
             return True
@@ -88,7 +88,7 @@ def start_conversation(request, payload: ConversationStartSchema):
         conversation = ChatConversation.objects.create(
             user_id=payload.user_id,
             channel=payload.channel,
-            last_message_at=datetime.now(),
+            last_message_at=timezone.now(),
         )
         return {
             "conversation_id": conversation.id,

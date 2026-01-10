@@ -1,7 +1,7 @@
 """Budgets database operations."""
 
 import logging
-from datetime import datetime
+from django.utils import timezone
 from typing import Any, Dict, List
 
 from ninja import Router, Query
@@ -121,7 +121,7 @@ def update_budget(request, budget_id: int, payload: BudgetUpdateSchema):
     if not updates:
         return error_response("No fields provided for update")
 
-    updates["updated_at"] = datetime.now()
+    updates["updated_at"] = timezone.now()
 
     try:
         rows_affected = Budget.objects.filter(id=budget_id).update(**updates)
@@ -140,7 +140,7 @@ def delete_budget(request, budget_id: int):
     """Soft delete a budget."""
     try:
         rows_affected = Budget.objects.filter(id=budget_id).update(
-            is_active=False, updated_at=datetime.now()
+            is_active=False, updated_at=timezone.now()
         )
         if rows_affected == 0:
             return error_response("Budget not found", code=404)

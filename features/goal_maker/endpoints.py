@@ -2,7 +2,7 @@
 
 import json
 import logging
-from datetime import datetime
+from django.utils import timezone
 
 from ninja import Router
 from django.db import transaction
@@ -48,7 +48,7 @@ def goals_assist(request, payload: GoalMakerRequestSchema):
                 "user_info": user_summary,
                 "user_request": user_request,
                 "last_conversation": conversation_summary,
-                "current_date": datetime.now().strftime("%Y-%m-%d"),
+                "current_date": timezone.now().strftime("%Y-%m-%d"),
             }
         )
     except Exception as e:
@@ -106,7 +106,7 @@ def goals_assist(request, payload: GoalMakerRequestSchema):
 
                 # Update conversation timestamp
                 ChatConversation.objects.filter(id=conversation_id).update(
-                    last_message_at=datetime.now()
+                    last_message_at=timezone.now()
                 )
         except Exception:
             logger.exception("Failed to store GoalMaker interaction")

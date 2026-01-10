@@ -1,7 +1,7 @@
 """Goals database operations."""
 
 import logging
-from datetime import datetime
+from django.utils import timezone
 from typing import Any, Dict, Optional
 
 from ninja import Router, Query
@@ -117,7 +117,7 @@ def update_goal(request, goal_id: int, payload: GoalUpdateSchema):
     if not updates:
         return error_response("No fields provided for update")
 
-    updates["updated_at"] = datetime.now()
+    updates["updated_at"] = timezone.now()
 
     try:
         rows_affected = Goal.objects.filter(id=goal_id).update(**updates)
@@ -136,7 +136,7 @@ def delete_goal(request, goal_id: int):
     """Soft delete a goal."""
     try:
         rows_affected = Goal.objects.filter(id=goal_id).update(
-            status="inactive", updated_at=datetime.now()
+            status="inactive", updated_at=timezone.now()
         )
         if rows_affected == 0:
             return error_response("Goal not found", code=404)

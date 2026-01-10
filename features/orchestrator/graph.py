@@ -84,7 +84,7 @@ def personal_assistant_orchestrator(state: OrchestratorState) -> dict:
     user_message = state.get("user_message", "")
 
     # System prompt for routing decision
-    system_prompt = f"""
+    system_prompt = """
     last conversations: {conversation_memory_str}
     Available Budgets: {available_budgets}
 
@@ -195,7 +195,7 @@ def personal_assistant_orchestrator(state: OrchestratorState) -> dict:
     =======================================================================
     """
 
-    user_prompt = f"""
+    user_prompt = """
     User: {user_message} User Name: {user_name}
     Please analyze this request and decide which agent should handle it. and the message to be sent to the selected agent.
     """
@@ -203,7 +203,14 @@ def personal_assistant_orchestrator(state: OrchestratorState) -> dict:
     prompt_template = ChatPromptTemplate.from_messages(
         [("system", system_prompt), ("human", user_prompt)]
     )
-    formatted_prompt = prompt_template.format_prompt()
+    formatted_prompt = prompt_template.invoke(
+        {
+            "conversation_memory_str": conversation_memory_str,
+            "available_budgets": available_budgets,
+            "user_message": user_message,
+            "user_name": user_name,
+        }
+    )
     routing_output = gpt_oss_120b_digital_ocean.with_structured_output(
         RoutingDecision
     ).invoke(formatted_prompt)
