@@ -1,10 +1,11 @@
 """Schemas specific to the Personal Assistant agents."""
+
 from datetime import datetime
+from django.utils import timezone
 from typing import Any, Dict, Optional, Literal
 
 from ninja import Schema
 from pydantic import Field
-
 
 
 class AnalysisRequestSchema(Schema):
@@ -24,7 +25,7 @@ class AnalysisResponseSchema(Schema):
 class AnalysisErrorSchema(Schema):
     error: str
     message: str
-    timestamp: datetime = Field(default_factory=datetime.now)
+    timestamp: datetime = Field(default_factory=timezone.now)
 
 
 class ConversationStartSchema(Schema):
@@ -37,8 +38,9 @@ class ConversationResponseSchema(Schema):
     user_id: int
     channel: str
     started_at: datetime
-"""Schemas for specialized Maker agents."""
 
+
+"""Schemas for specialized Maker agents."""
 
 
 # --- Goal Maker ---

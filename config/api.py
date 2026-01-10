@@ -27,22 +27,22 @@ api.add_router("/personal_assistant", orchestrator_router, tags=["Personal Assis
 #     "/personal_assistant/conversations", conversations_router, tags=["Conversations"]
 # )
 api.add_router("/personal_assistant/budget", budget_router, tags=["Budget Maker"])
-api.add_router("/personal_assistant/goals", goal_router, tags=["Goal Maker"])
+api.add_router("/personal_assistant/goal", goal_router, tags=["Goal Maker"])
 api.add_router(
     "/personal_assistant/transaction", transaction_router, tags=["Transaction Maker"]
 )
 api.add_router(
-    "/database/transactions", db_transactions_router, tags=["Database - Transactions"]
+    "/database/transaction", db_transactions_router, tags=["Database - Transactions"]
 )
-api.add_router("/database/budgets", db_budgets_router, tags=["Database - Budgets"])
-api.add_router("/database/goals", db_goals_router, tags=["Database - Goals"])
+api.add_router("/database/budget", db_budgets_router, tags=["Database - Budgets"])
+api.add_router("/database/goal", db_goals_router, tags=["Database - Goals"])
 api.add_router("/database/income", db_income_router, tags=["Database - Income"])
-api.add_router("/database/users", db_users_router, tags=["Database - Users"])
+api.add_router("/database/user", db_users_router, tags=["Database - Users"])
 api.add_router(
-    "/database/conversations",
+    "/database/conversation",
     conversations_router,
     tags=["Database - Conversations"],
 )
 api.add_router(
-    "/database/analytics", db_analytics_router, tags=["Database - Analytics"]
+    "/database/analytic", db_analytics_router, tags=["Database - Analytics"]
 )

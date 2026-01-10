@@ -1,4 +1,6 @@
 from typing import List
+from core.utils.dynamic_db_schema import get_dynamic_schema
+
 from langchain_core.prompts import ChatPromptTemplate
 from core.llm_providers.digital_ocean import gpt_oss_120b_digital_ocean
 from pydantic import Field, BaseModel
@@ -7,12 +9,13 @@ from pydantic import Field, BaseModel
 class query_plannerOutput(BaseModel):
     output: List[str] = Field(
         default=[],
-        description="A list of no more than 4 clear, text-only steps for another database agent to create aggregated SQL queries about a single user's behavior."
-    ) 
+        description="A list of no more than 4 clear, text-only steps for another database agent to create aggregated SQL queries about a single user's behavior.",
+    )
     message: str = Field(
         default="",
-        description="One concise sentence summarizing what the steps cover and any notable gaps."
+        description="One concise sentence summarizing what the steps cover and any notable gaps.",
     )
+
 
 system_prompt = """
 You are the Query Planner Agent.
@@ -34,11 +37,7 @@ General rules:
   5) If the request is vague, cover a compact baseline plan (trend, top category, overspend vs limit)
 
 Available schema (key fields only; PostgreSQL 18, schema public):
-- transactions(transaction_id, date, amount, time, store_name, city, neighbourhood, type_spending, user_id, budget_id, created_at)
-- budget(budget_id, user_id, budget_name, description, total_limit (MONTHLY), priority_level_int, is_active, created_at, updated_at)
-- income(income_id, user_id, type_income, amount, description, created_at, updated_at)
-- goals(goal_id, goal_name, description, target, user_id, start_date, due_date, status, created_at, updated_at)
-- users(user_id, first_name, last_name, ...)
+{schema}
 
 Output JSON format (STRICT):
 Return ONLY valid JSON. 
@@ -84,9 +83,14 @@ last steps generated: {steps}
 Orchestrator request: {message}
 """
 
-prompt = ChatPromptTemplate.from_messages([
-    ("system", system_prompt),
-    ("user", user_prompt),
-])
+prompt = ChatPromptTemplate.from_messages(
+    [
+        ("system", system_prompt),
+        ("user", user_prompt),
+    ]
+).partial(schema=get_dynamic_schema())
 
-Query_planner = prompt | gpt_oss_120b_digital_ocean.with_structured_output(query_plannerOutput)
+
+Query_planner = prompt | gpt_oss_120b_digital_ocean.with_structured_output(
+    query_plannerOutput
+)

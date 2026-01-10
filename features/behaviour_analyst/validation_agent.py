@@ -1,14 +1,24 @@
 from langchain_core.prompts import ChatPromptTemplate
 from core.llm_providers.digital_ocean import gpt_oss_120b_digital_ocean
 from pydantic import BaseModel, Field
+from core.utils.dynamic_db_schema import get_dynamic_schema
+
 
 # 1. Define the Structured Output using Pydantic
 class ValidationAgentOutput(BaseModel):
     """
     Defines the structured output for the Validation Agent.
     """
-    valid: bool = Field(..., description="True if the explanation perfectly matches the data, False otherwise.")
-    reasoning: str = Field(..., description="The specific reason for failure if invalid, otherwise an empty string.")
+
+    valid: bool = Field(
+        ...,
+        description="True if the explanation perfectly matches the data, False otherwise.",
+    )
+    reasoning: str = Field(
+        ...,
+        description="The specific reason for failure if invalid, otherwise an empty string.",
+    )
+
 
 # 2. Create the System Prompt with clear instructions and examples
 validation_system_prompt = r"""
@@ -42,77 +52,24 @@ You MUST respond in a single JSON object with two fields: `valid` (boolean) and 
 {{"valid": false, "reasoning": "Your specific reason here."}}
 
 # --- Database schema reference (updated; for context only) ---
-
-PostgreSQL Database Metadata
-
-- user_id (bigint, PK)
-- first_name (text, not null)
-- last_name (text, not null)
-- job_title (text, not null)
-- address (text, not null)
-- description (text)
-- total_limit (numeric(12,2) default 0, check total_limit >= 0)
-- priority_level_int (smallint, check 1..10)
-- is_active (boolean, default true)
-- created_at (timestamp without time zone, default now())
-- updated_at (timestamp without time zone, default now())
-- UNIQUE (user_id, budget_name)
-
-GOALS (public.goals)
-Columns:
-- goal_id (bigint, PK)
-- goal_name (text, not null)
-- description (text)
-- target (numeric(12,2) default 0, check target >= 0)
-- user_id (bigint, FK → users.user_id)
-- start_date (date)
-- due_date (date)
-- status (text default 'active')
-- created_at (timestamp without time zone, default now())
-- updated_at (timestamp without time zone, default now())
-
-INCOME (public.income)
-Columns:
-- income_id (bigint, PK)
-- user_id (bigint, FK → users.user_id)
-- type_income (text, not null)
-- amount (numeric(12,2) default 0, check amount >= 0)
-- description (text)
-- created_at (timestamp without time zone, default now())
-- updated_at (timestamp without time zone, default now())
-
-TRANSACTIONS (public.transactions)
-Columns:
-- transaction_id (bigint, PK)
-- date (date, not null)
-- amount (numeric(12,2), not null, check amount >= 0)
-- "time" (time without time zone)
-- store_name (text)
-- city (text)
-- type_spending (text)
-- user_id (bigint, FK → users.user_id ON DELETE CASCADE)
-- budget_id (bigint, FK → budget.budget_id ON DELETE RESTRICT)
-- neighbourhood (text)
-- created_at (timestamp without time zone, default now())
-
-RELATIONSHIPS
---------------
-users (1) → (N) budget via budget.user_id
-users (1) → (N) goals via goals.user_id
-users (1) → (N) income via income.user_id
-users (1) → (N) transactions via transactions.user_id
-budget (1) → (N) transactions via transactions.budget_id → budget.budget_id
-
+{schema}
 # --- End of database schema reference ---
 note : all money amounts are in EGP currency.
 """
 
 # 3. Create the Prompt Template
-validation_prompt = ChatPromptTemplate.from_messages([
-    ("system", validation_system_prompt),
-    # The user message will contain the data to be validated
-    ("user", "Please validate the following:\n\nQuery Result:\n{query_result}\n\nExplanation:\n`{explanation}`")
-])
+validation_prompt = ChatPromptTemplate.from_messages(
+    [
+        ("system", validation_system_prompt),
+        # The user message will contain the data to be validated
+        (
+            "user",
+            "Please validate the following:\n\nQuery Result:\n{query_result}\n\nExplanation:\n`{explanation}`",
+        ),
+    ]
+).partial(schema=get_dynamic_schema())
 
 # 4. Build the final agent chain using LangChain Expression Language (LCEL)
-ValidationAgent = validation_prompt | gpt_oss_120b_digital_ocean.with_structured_output(ValidationAgentOutput, method="function_calling")
+ValidationAgent = validation_prompt | gpt_oss_120b_digital_ocean.with_structured_output(
+    ValidationAgentOutput, method="function_calling"
+)

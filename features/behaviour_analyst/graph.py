@@ -2,7 +2,7 @@ import asyncio
 import ast
 import logging
 import warnings
-from datetime import datetime
+from django.utils import timezone
 from typing import TypedDict, List
 
 from features.behaviour_analyst.agents import (
@@ -48,7 +48,7 @@ def analyser(state: BehaviourAnalystState) -> dict:
             "message": message,
             "user_request": request,
             "previous_analysis": analysis,
-            "current_date": datetime.now().strftime("%Y-%m-%d"),
+            "current_date": timezone.now().strftime("%Y-%m-%d"),
         }
     )
 
@@ -81,7 +81,7 @@ def orchestrator(state: BehaviourAnalystState) -> dict:
             "sender": state.get("sender", ""),
             "user_id": state.get("user_id", ""),
             "steps": state.get("steps", []),
-            "current_date": datetime.now().strftime("%Y-%m-%d"),
+            "current_date": timezone.now().strftime("%Y-%m-%d"),
         }
     )
     next_step = Output.next_step
@@ -108,7 +108,7 @@ def query_planner(state: BehaviourAnalystState) -> dict:
             "message": message,
             "steps": state.get("steps", "no completed steps yet"),
             "user": state.get("user_id", ""),
-            "current_date": datetime.now().strftime("%Y-%m-%d"),
+            "current_date": timezone.now().strftime("%Y-%m-%d"),
         }
     )
 

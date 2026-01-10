@@ -16,7 +16,7 @@ def invoke_personal_assistant(
     """
     context = context or {}
 
-    system_prompt = f"""
+    system_prompt = """
     You are a helpful, empathetic, and intelligent Personal Finance Assistant.
     Your name is "Antigravity Assistant".
     
@@ -45,15 +45,21 @@ def invoke_personal_assistant(
     Return your response as plain text. The system will wrap it in a JSON structure.
     """
 
-    user_prompt = f"{query}"
-
     prompt = ChatPromptTemplate.from_messages(
-        [("system", system_prompt), ("human", user_prompt)]
+        [("system", system_prompt), ("human", "{query}")]
     )
 
     try:
         chain = prompt | gpt_oss_120b_digital_ocean
-        response = chain.invoke({})
+        response = chain.invoke(
+            {
+                "user_name": user_name,
+                "user_id": str(user_id) if user_id else "Unknown",
+                "conversation_history": conversation_history,
+                "context": str(context),
+                "query": query,
+            }
+        )
         return {"response": response.content}
     except Exception as e:
         return {"response": f"I apologize, I encountered an error: {str(e)}"}

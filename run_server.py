@@ -21,7 +21,7 @@ sys.path.insert(0, str(API_DIR))
 load_dotenv()
 
 from waitress import serve  # noqa: E402
-from api_config.wsgi import application  # noqa: E402
+from config.wsgi import application  # noqa: E402
 
 logging.basicConfig(
     level=logging.INFO,
