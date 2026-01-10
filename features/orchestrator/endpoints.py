@@ -17,8 +17,10 @@ from core.models import ChatConversation
 from features.orchestrator.graph import main_orchestrator_graph
 from asgiref.sync import sync_to_async
 
+from features.auth.api import AuthBearer
+
 logger = logging.getLogger(__name__)
-router = Router()
+router = Router(auth=AuthBearer())
 
 
 def _store_messages_sync(
@@ -89,13 +91,15 @@ async def analyze(request, payload: AnalysisRequestSchema):
     metadata = payload.metadata or {}
     if payload.conversation_id:
         metadata["conversation_id"] = payload.conversation_id
-    if payload.user_id:
-        metadata["user_id"] = payload.user_id
+
+    # Always use authenticated user_id
+    current_user_id = request.user.id
+    metadata["user_id"] = current_user_id
 
     initial_state = {
         "messages": [("user", payload.query)],
         "user_message": payload.query,
-        "user_id": metadata.get("user_id"),
+        "user_id": current_user_id,
         "conversation_id": metadata.get("conversation_id"),
         "filters": payload.filters or {},
     }

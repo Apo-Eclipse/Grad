@@ -3,27 +3,31 @@
 import logging
 from typing import Any, Dict
 
-from ninja import Router, Query
+from ninja import Router
 from django.db.models import Sum
 from django.db.models.functions import Coalesce, TruncMonth
 from django.utils import timezone
 
-from core.utils.database import run_select, execute_modify, safe_json_body
+# from core.utils.database import run_select, execute_modify, safe_json_body
 from core.models import Transaction, Budget, Income
 
+from features.auth.api import AuthBearer
+
 logger = logging.getLogger(__name__)
-router = Router()
+router = Router(auth=AuthBearer())
 
 
 @router.get("/monthly-spend", response=Dict[str, Any])
-def get_monthly_spend(request, user_id: int = Query(...)):
+def get_monthly_spend(request):
     """Aggregate spending by user's budgets for the current month."""
     current_month_start = timezone.now().replace(
         day=1, hour=0, minute=0, second=0, microsecond=0
     )
 
     rows = (
-        Transaction.objects.filter(user_id=user_id, date__gte=current_month_start)
+        Transaction.objects.filter(
+            user_id=request.user.id, date__gte=current_month_start
+        )
         .select_related("budget")
         .values("budget__budget_name")
         .annotate(month=TruncMonth("date"), total_spent=Coalesce(Sum("amount"), 0.0))
@@ -44,7 +48,7 @@ def get_monthly_spend(request, user_id: int = Query(...)):
 
 
 @router.get("/overspend", response=Dict[str, Any])
-def get_overspend(request, user_id: int = Query(...)):
+def get_overspend(request):
     """Identify categories where spending exceeds the budget limit."""
     current_month_start = timezone.now().replace(
         day=1, hour=0, minute=0, second=0, microsecond=0
@@ -54,7 +58,7 @@ def get_overspend(request, user_id: int = Query(...)):
     from django.db.models import Q
 
     budgets = (
-        Budget.objects.filter(user_id=user_id, is_active=True)
+        Budget.objects.filter(user_id=request.user.id, is_active=True)
         .annotate(
             spent=Coalesce(
                 Sum(
@@ -87,7 +91,7 @@ def get_overspend(request, user_id: int = Query(...)):
             overspend_data.append(row_data)
 
     # 2. Total Income
-    income_total = Income.objects.filter(user_id=user_id).aggregate(
+    income_total = Income.objects.filter(user_id=request.user.id).aggregate(
         total=Coalesce(Sum("amount"), 0.0)
     )["total"]
     total_income = float(income_total) if income_total else 0.0
@@ -103,10 +107,10 @@ def get_overspend(request, user_id: int = Query(...)):
 
 
 @router.get("/income-total", response=Dict[str, Any])
-def get_total_income(request, user_id: int = Query(...)):
+def get_total_income(request):
     """Aggregate active income items by type."""
     rows = (
-        Income.objects.filter(user_id=user_id)
+        Income.objects.filter(user_id=request.user.id)
         .values("type_income")
         .annotate(total=Coalesce(Sum("amount"), 0.0))
         .order_by("-total")

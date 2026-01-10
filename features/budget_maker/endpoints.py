@@ -19,8 +19,10 @@ from features.crud.conversations.service import (
 )
 from core.models import ChatConversation
 
+from features.auth.api import AuthBearer
+
 logger = logging.getLogger(__name__)
-router = Router()
+router = Router(auth=AuthBearer())
 
 
 @router.post("/assist", response=BudgetMakerResponseSchema)
@@ -28,7 +30,7 @@ def budget_assist(request, payload: BudgetMakerRequestSchema):
     """
     Direct endpoint for the Budget Maker Agent.
     """
-    user_id = payload.user_id
+    user_id = request.user.id
     conversation_id = payload.conversation_id or 0
     user_request = payload.user_request
 

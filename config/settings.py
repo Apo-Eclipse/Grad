@@ -20,9 +20,13 @@ if str(BASE_DIR) not in sys.path:
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+# Determine environment (assuming "production" needs strict security)
+IS_PRODUCTION = os.getenv("DJANGO_ENV") == "production"
 
-ALLOWED_HOSTS = ["*"]
+# SECURITY WARNING: don't run with debug turned on in production!
+DEBUG = os.getenv("DEBUG", "True") == "True"
+
+ALLOWED_HOSTS = ["*"]  # Update this in production to specific domain(s)
 
 # Application definition
 INSTALLED_APPS = [
@@ -59,6 +63,22 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:8081",
     "http://localhost:3000",
 ]
+
+# CSRF Configuration
+CSRF_TRUSTED_ORIGINS = [
+    "http://192.168.1.3:8000",
+    "http://192.168.1.3:8081",
+    "http://localhost:8000",
+    "http://localhost:8081",
+    "http://localhost:3000",
+]
+
+# Cookie Settings (Dynamic based on Environment)
+SESSION_COOKIE_SECURE = IS_PRODUCTION
+CSRF_COOKIE_SECURE = IS_PRODUCTION
+SESSION_COOKIE_SAMESITE = "None" if IS_PRODUCTION else "Lax"
+CSRF_COOKIE_SAMESITE = "None" if IS_PRODUCTION else "Lax"
+
 
 CORS_ALLOW_CREDENTIALS = True
 
