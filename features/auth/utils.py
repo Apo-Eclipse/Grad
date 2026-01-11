@@ -10,7 +10,7 @@ def create_token_pair(user: User) -> Dict[str, str]:
         "access": str(refresh.access_token),
         "refresh": str(refresh),
         "user_id": user.id,
-        "username": user.username,
+        "email": user.email,
     }
 
 
