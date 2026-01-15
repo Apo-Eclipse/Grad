@@ -2,9 +2,9 @@
 
 import logging
 from django.utils import timezone
-from typing import Any, Dict, List
+from typing import Any, Dict, Optional
 
-from ninja import Router
+from ninja import Router, Query
 
 from core.models import Budget
 from core.utils.responses import success_response, error_response
@@ -25,6 +25,7 @@ BUDGET_FIELDS = (
     "total_limit",
     "priority_level_int",
     "is_active",
+    "active",
     "created_at",
     "updated_at",
 )
@@ -35,35 +36,29 @@ def _format_budget(budget: Dict[str, Any]) -> Dict[str, Any]:
     budget["total_limit"] = (
         float(budget["total_limit"]) if budget["total_limit"] else 0.0
     )
+    budget["active"] = budget.get("active", True)
     return budget
 
 
-def fetch_active_budgets(user_id: int) -> List[Dict[str, Any]]:
-    """Retrieve all active budgets for a user (helper)."""
-    budgets = (
-        Budget.objects.filter(user_id=user_id, is_active=True)
-        .order_by("-priority_level_int")
-        .values("id", "budget_name", "total_limit", "priority_level_int")
-    )
-    return list(budgets)
-
-
 @router.get("/", response=Dict[str, Any])
-def get_budgets(request):
-    """Retrieve active budgets for a user."""
-    budgets = (
-        Budget.objects.filter(user_id=request.user.id, is_active=True)
-        .order_by("-priority_level_int")
-        .values(
-            "id",
-            "budget_name",
-            "description",
-            "total_limit",
-            "priority_level_int",
-            "is_active",
-            "created_at",
-            "updated_at",
-        )
+def get_budgets(request, active: Optional[bool] = Query(None)):
+    """Retrieve budgets for a user."""
+    filters = {"user_id": request.user.id}
+    if active is not None:
+        filters["active"] = active
+
+    queryset = Budget.objects.filter(**filters)
+
+    budgets = queryset.order_by("-priority_level_int").values(
+        "id",
+        "budget_name",
+        "description",
+        "total_limit",
+        "priority_level_int",
+        "is_active",
+        "active",
+        "created_at",
+        "updated_at",
     )
     return success_response(list(budgets))
 
@@ -81,6 +76,7 @@ def get_budget(request, budget_id: int):
             "total_limit",
             "priority_level_int",
             "is_active",
+            "active",
             "created_at",
             "updated_at",
         )
@@ -141,11 +137,11 @@ def update_budget(request, budget_id: int, payload: BudgetUpdateSchema):
 
 @router.delete("/{budget_id}", response=Dict[str, Any])
 def delete_budget(request, budget_id: int):
-    """Soft delete a budget."""
+    """Soft delete a budget by setting active to False."""
     try:
         rows_affected = Budget.objects.filter(
             id=budget_id, user_id=request.user.id
-        ).update(is_active=False, updated_at=timezone.now())
+        ).update(active=False, updated_at=timezone.now())
         if rows_affected == 0:
             return error_response("Budget not found", code=404)
 

@@ -1,21 +1,7 @@
 from typing import Any, Dict, Optional
-from datetime import date, datetime
-
+from datetime import date
 from ninja import Schema
 from pydantic import Field, root_validator
-
-
-class GoalSchema(Schema):
-    id: int
-    user_id: int
-    goal_name: str
-    description: Optional[str] = None
-    target: float
-    start_date: Optional[date] = None
-    due_date: Optional[date] = None
-    status: str
-    plan: Optional[str] = None
-    created_at: datetime
 
 
 class GoalCreateSchema(Schema):
@@ -24,7 +10,7 @@ class GoalCreateSchema(Schema):
     target: float = Field(default=0.0)
     start_date: Optional[date] = None
     due_date: Optional[date] = None
-    status: str = Field(default="active")
+    active: bool = True
     plan: Optional[str] = None
 
 
@@ -34,7 +20,7 @@ class GoalUpdateSchema(Schema):
     target: Optional[float] = None
     start_date: Optional[date] = None
     due_date: Optional[date] = None
-    status: Optional[str] = None
+    active: Optional[bool] = None
     plan: Optional[str] = None
 
     @root_validator(pre=True)

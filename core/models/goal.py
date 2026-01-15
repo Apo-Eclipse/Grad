@@ -11,7 +11,7 @@ class Goal(models.Model):
     user = models.ForeignKey(User, models.DO_NOTHING)
     start_date = models.DateField(blank=True, null=True)
     due_date = models.DateField(blank=True, null=True)
-    status = models.TextField(blank=True, null=True)
+    active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(blank=True, null=True)
     plan = models.TextField(blank=True, null=True)

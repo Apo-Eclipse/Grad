@@ -25,7 +25,7 @@ GOAL_FIELDS = (
     "target",
     "start_date",
     "due_date",
-    "status",
+    "active",
     "plan",
     "created_at",
     "updated_at",
@@ -39,12 +39,13 @@ def _format_goal(goal: Dict[str, Any]) -> Dict[str, Any]:
 
 
 @router.get("/", response=Dict[str, Any])
-def get_goals(request, status: Optional[str] = Query(None)):
+def get_goals(request, active: Optional[bool] = Query(None)):
     """Retrieve goals for a user."""
-    queryset = Goal.objects.filter(user_id=request.user.id)
+    filters = {"user_id": request.user.id}
+    if active is not None:
+        filters["active"] = active
 
-    if status:
-        queryset = queryset.filter(status=status)
+    queryset = Goal.objects.filter(**filters)
 
     goals = queryset.order_by("-created_at").values(
         "id",
@@ -54,7 +55,7 @@ def get_goals(request, status: Optional[str] = Query(None)):
         "target",
         "start_date",
         "due_date",
-        "status",
+        "active",
         "plan",
         "created_at",
         "updated_at",
@@ -75,7 +76,7 @@ def get_goal(request, goal_id: int):
             "target",
             "start_date",
             "due_date",
-            "status",
+            "active",
             "plan",
             "created_at",
             "updated_at",
@@ -101,7 +102,7 @@ def create_goal(request, payload: GoalCreateSchema):
             target=payload.target,
             start_date=payload.start_date,
             due_date=payload.due_date,
-            status=payload.status,
+            active=payload.active,
             plan=payload.plan,
         )
         # Fetch created goal as dict
@@ -140,7 +141,7 @@ def delete_goal(request, goal_id: int):
     """Soft delete a goal."""
     try:
         rows_affected = Goal.objects.filter(id=goal_id, user_id=request.user.id).update(
-            status="inactive", updated_at=timezone.now()
+            active=False, updated_at=timezone.now()
         )
         if rows_affected == 0:
             return error_response("Goal not found", code=404)

@@ -10,6 +10,7 @@ EMPLOYMENT_OPTIONS: Dict[str, str] = {
     "2": "Employed Part-time",
     "3": "Unemployed",
     "4": "Retired",
+    "5": "Student",
 }
 
 EDUCATION_OPTIONS: Dict[str, str] = {
@@ -29,8 +30,8 @@ GENDER_OPTIONS: Dict[str, str] = {
 class Profile(models.Model):
     user = models.OneToOneField(User, models.DO_NOTHING)
     job_title = models.TextField(blank=True, null=True)
-    address = models.TextField()
-    birthday = models.DateField()
+    address = models.TextField(blank=True, null=True)
+    birthday = models.DateField(blank=True, null=True)
     gender = models.TextField(blank=True, null=True, choices=GENDER_OPTIONS.items())
     employment_status = models.TextField(
         blank=True, null=True, choices=EMPLOYMENT_OPTIONS.items()
