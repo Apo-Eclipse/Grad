@@ -28,6 +28,7 @@ TRANSACTION_FIELDS = (
     "type_spending",
     "budget_id",
     "neighbourhood",
+    "active",
     "created_at",
 )
 
@@ -49,6 +50,7 @@ def _format_transaction(
         "type_spending": txn["type_spending"],
         "budget_id": txn["budget_id"],
         "neighbourhood": txn["neighbourhood"],
+        "active": txn.get("active", True),
         "created_at": txn["created_at"],
     }
     if include_budget_name and "budget__budget_name" in txn:
@@ -59,17 +61,22 @@ def _format_transaction(
 @router.get("/", response=Dict[str, Any])
 def get_transactions(
     request,
+    active: Optional[bool] = Query(None),
     start_date: Optional[str] = Query(None),
     end_date: Optional[str] = Query(None),
     limit: int = Query(100, le=1000),
 ):
     """Retrieve transactions for a user."""
-    queryset = Transaction.objects.filter(user_id=request.user.id)
-
+    # Build the filter arguments immediately
+    filters = {"user_id": request.user.id}
+    if active is not None:
+        filters["active"] = active
     if start_date:
-        queryset = queryset.filter(date__gte=start_date)
+        filters["date__gte"] = start_date
     if end_date:
-        queryset = queryset.filter(date__lte=end_date)
+        filters["date__lte"] = end_date
+
+    queryset = Transaction.objects.filter(**filters)
 
     transactions = queryset.order_by("-date", "-time").values(
         *TRANSACTION_FIELDS_WITH_BUDGET
@@ -150,11 +157,11 @@ def update_transaction(request, transaction_id: int, payload: TransactionUpdateS
 
 @router.delete("/{transaction_id}", response=Dict[str, Any])
 def delete_transaction(request, transaction_id: int):
-    """Delete a transaction permanently."""
+    """Soft delete a transaction by setting active to False."""
     try:
-        rows_affected, _ = Transaction.objects.filter(
+        rows_affected = Transaction.objects.filter(
             id=transaction_id, user_id=request.user.id
-        ).delete()
+        ).update(active=False)
         if rows_affected == 0:
             return error_response("Transaction not found", code=404)
 

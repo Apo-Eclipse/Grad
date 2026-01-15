@@ -5,19 +5,20 @@ from typing import Any, Dict
 
 from ninja import Router
 from django.contrib.auth.models import User
+from django.db import transaction, IntegrityError
 
 from core.models import Profile
 from core.utils.responses import success_response, error_response
-from .schemas import UserCreateSchema
+from .schemas import UserRegistrationSchema
 
 from features.auth.api import AuthBearer
 
 logger = logging.getLogger(__name__)
-router = Router(auth=AuthBearer())
+router = Router()
 
 
 # Fields to retrieve for user queries
-USER_FIELDS = ("id", "first_name", "last_name")
+USER_FIELDS = ("id", "first_name", "last_name", "email")
 PROFILE_FIELDS = (
     "job_title",
     "address",
@@ -37,13 +38,14 @@ def _format_user_response(
         "user_id": user_data["id"],
         "first_name": user_data["first_name"],
         "last_name": user_data["last_name"],
+        "email": user_data.get("email"),
     }
     if profile_data:
         result.update(profile_data)
     return result
 
 
-@router.get("/", response=Dict[str, Any])
+@router.get("/", response=Dict[str, Any], auth=AuthBearer())
 def get_user(request):
     """Get user profile details."""
     user_id = request.user.id
@@ -57,51 +59,53 @@ def get_user(request):
     return _format_user_response(user_data, profile_data)
 
 
-@router.post("/", response=Dict[str, Any], auth=None)
-def create_user(request, payload: UserCreateSchema):
-    """Create a new user."""
+@router.post("/", response=Dict[str, Any])
+def create_user(request, payload: UserRegistrationSchema):
+    """Register a new user with password."""
+    # Check for existing email
+    if User.objects.filter(email=payload.email).exists():
+        return error_response("Email already registered", code=400)
+
+    # Check for existing username
+    if User.objects.filter(username=payload.username).exists():
+        return error_response("Username already taken", code=400)
+
     try:
-        # Create the Django User - always auto-generate ID
-        import uuid
+        with transaction.atomic():
+            # Create the Django User with hashed password
+            user = User.objects.create_user(
+                username=payload.username,
+                email=payload.email,
+                password=payload.password,
+                first_name=payload.first_name,
+                last_name=payload.last_name,
+            )
 
-        user = User.objects.create(
-            first_name=payload.first_name,
-            last_name=payload.last_name,
-            username=f"user_{uuid.uuid4().hex[:8]}",  # Generate unique username
-        )
-
-        # Create the Profile
-        Profile.objects.create(
-            user=user,
-            job_title=payload.job_title,
-            address=payload.address,
-            birthday=payload.birthday,
-            gender=payload.gender,
-            employment_status=payload.employment_status,
-            education_level=payload.education_level,
-        )
-
-        # Return using values for consistency
-        user_data = User.objects.filter(id=user.id).values(*USER_FIELDS).first()
-        profile_data = (
-            Profile.objects.filter(user_id=user.id)
-            .values("job_title", "employment_status")
-            .first()
-        )
+            # Create the Profile with optional fields
+            Profile.objects.create(
+                user=user,
+                job_title=payload.job_title,
+                address=payload.address,
+                birthday=payload.birthday,
+                gender=payload.gender,
+                employment_status=payload.employment_status,
+                education_level=payload.education_level,
+            )
 
         return success_response(
             {
-                "user_id": user_data["id"],
-                "first_name": user_data["first_name"],
-                "last_name": user_data["last_name"],
-                "job_title": profile_data["job_title"] if profile_data else None,
-                "employment_status": profile_data["employment_status"]
-                if profile_data
-                else None,
+                "user_id": user.id,
+                "email": user.email,
+                "username": user.username,
+                "first_name": user.first_name,
+                "last_name": user.last_name,
             },
-            "User created successfully",
+            "User registered successfully",
         )
 
+    except IntegrityError as e:
+        logger.exception(f"Database integrity error during registration {e}")
+        return error_response("Registration failed: duplicate entry", code=400)
     except Exception as e:
         logger.exception("Failed to create user")
         return error_response(f"Failed to create user: {e}")

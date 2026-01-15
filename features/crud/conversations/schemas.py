@@ -1,5 +1,4 @@
 from datetime import datetime
-from typing import Optional
 
 
 from ninja import Schema
@@ -15,15 +14,6 @@ class ConversationResponseSchema(Schema):
     user_id: int
     channel: str
     started_at: datetime
-
-
-class ConversationSchema(Schema):
-    conversation_id: int
-    user_id: int
-    title: Optional[str] = None
-    channel: Optional[str] = None
-    started_at: datetime
-    last_message_at: Optional[datetime] = None
 
 
 class MessageSchema(Schema):

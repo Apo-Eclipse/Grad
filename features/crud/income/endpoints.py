@@ -2,9 +2,9 @@
 
 import logging
 from django.utils import timezone
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
-from ninja import Router
+from ninja import Router, Query
 
 from core.models import Income
 from core.utils.responses import success_response, error_response
@@ -22,6 +22,7 @@ INCOME_FIELDS = (
     "type_income",
     "amount",
     "description",
+    "active",
     "created_at",
     "updated_at",
 )
@@ -30,24 +31,28 @@ INCOME_FIELDS = (
 def _format_income(income: Dict[str, Any]) -> Dict[str, Any]:
     """Format income dict for JSON response."""
     income["amount"] = float(income["amount"]) if income["amount"] else None
+    income["active"] = income.get("active", True)
     return income
 
 
 @router.get("/", response=Dict[str, Any])
-def get_income(request):
+def get_income(request, active: Optional[bool] = Query(None)):
     """Retrieve all income sources for a user."""
-    incomes = (
-        Income.objects.filter(user_id=request.user.id)
-        .order_by("-created_at")
-        .values(
-            "id",
-            "user_id",
-            "type_income",
-            "amount",
-            "description",
-            "created_at",
-            "updated_at",
-        )
+    filters = {"user_id": request.user.id}
+    if active is not None:
+        filters["active"] = active
+
+    queryset = Income.objects.filter(**filters)
+
+    incomes = queryset.order_by("-created_at").values(
+        "id",
+        "user_id",
+        "type_income",
+        "amount",
+        "description",
+        "active",
+        "created_at",
+        "updated_at",
     )
     return success_response(list(incomes))
 
@@ -63,6 +68,7 @@ def get_single_income(request, income_id: int):
             "type_income",
             "amount",
             "description",
+            "active",
             "created_at",
             "updated_at",
         )
@@ -122,11 +128,11 @@ def update_income(request, income_id: int, payload: IncomeUpdateSchema):
 
 @router.delete("/{income_id}", response=Dict[str, Any])
 def delete_income(request, income_id: int):
-    """Delete an income source permanently."""
+    """Soft delete an income source by setting active to False."""
     try:
-        rows_affected, _ = Income.objects.filter(
+        rows_affected = Income.objects.filter(
             id=income_id, user_id=request.user.id
-        ).delete()
+        ).update(active=False, updated_at=timezone.now())
         if rows_affected == 0:
             return error_response("Income not found", code=404)
 

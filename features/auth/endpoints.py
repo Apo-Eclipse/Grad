@@ -1,18 +1,24 @@
 from ninja import Router
-from django.contrib.auth import authenticate
+from django.contrib.auth import authenticate, get_user_model
 from core.utils.responses import error_response
 from .schemas import LoginSchema, TokenSchema
 from .utils import create_token_pair
 
 router = Router()
+User = get_user_model()
 
 
 @router.post("/login", response=TokenSchema)
 def login(request, payload: LoginSchema):
     """
-    Authenticate user and return access/refresh tokens.
+    Authenticate user with email and password, return access/refresh tokens.
     """
-    user = authenticate(username=payload.username, password=payload.password)
+    try:
+        user_obj = User.objects.get(email=payload.email)
+    except User.DoesNotExist:
+        return error_response("Invalid credentials", code=401)
+
+    user = authenticate(username=user_obj.username, password=payload.password)
     if not user:
         return error_response("Invalid credentials", code=401)
 

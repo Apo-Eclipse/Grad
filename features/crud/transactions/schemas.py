@@ -1,22 +1,7 @@
 from typing import Any, Dict, Optional
-from datetime import date, datetime
-
+from datetime import date
 from ninja import Schema
 from pydantic import root_validator
-
-
-class TransactionSchema(Schema):
-    id: int
-    user_id: int
-    date: date
-    amount: float
-    time: Optional[str] = None
-    store_name: Optional[str] = None
-    city: Optional[str] = None
-    type_spending: Optional[str] = None
-    budget_id: Optional[int] = None
-    neighbourhood: Optional[str] = None
-    created_at: datetime
 
 
 class TransactionCreateSchema(Schema):
@@ -39,6 +24,7 @@ class TransactionUpdateSchema(Schema):
     type_spending: Optional[str] = None
     budget_id: Optional[int] = None
     neighbourhood: Optional[str] = None
+    active: Optional[bool] = None
 
     @root_validator(pre=True)
     def at_least_one_field(cls, values: Dict[str, Any]) -> Dict[str, Any]:

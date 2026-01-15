@@ -2,7 +2,7 @@ from ninja import Schema
 
 
 class LoginSchema(Schema):
-    username: str
+    email: str
     password: str
 
 
@@ -10,4 +10,4 @@ class TokenSchema(Schema):
     access: str
     refresh: str
     user_id: int
-    username: str
+    email: str

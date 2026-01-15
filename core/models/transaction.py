@@ -15,6 +15,7 @@ class Transaction(models.Model):
     user = models.ForeignKey(User, models.DO_NOTHING, blank=True, null=True)
     budget = models.ForeignKey(Budget, models.DO_NOTHING)
     neighbourhood = models.TextField(blank=True, null=True)
+    active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
