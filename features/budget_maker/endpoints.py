@@ -30,6 +30,7 @@ def budget_assist(request, payload: BudgetMakerRequestSchema):
     """
     Direct endpoint for the Budget Maker Agent.
     """
+
     user_id = request.user.id
     conversation_id = payload.conversation_id or 0
     user_request = payload.user_request
@@ -57,6 +58,14 @@ def budget_assist(request, payload: BudgetMakerRequestSchema):
         return {
             "conversation_id": conversation_id,
             "message": f"Error interacting with Budget Maker: {str(e)}",
+            "is_done": True,
+        }
+
+    if budget_result is None:
+        logger.error("Budget Maker Agent returned None")
+        return {
+            "conversation_id": conversation_id,
+            "message": "I apologize, but I encountered an internal error while processing your request. Please try again.",
             "is_done": True,
         }
 

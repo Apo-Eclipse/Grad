@@ -27,7 +27,19 @@ system_prompt = r"""
 You are the Transaction Maker Agent. Your job is to help the user record a new financial transaction from natural language.
 
 OUTPUT FORMAT:
-Return a JSON object matching:
+Return a SINGLE valid JSON object.
+
+--------------------------------------------------
+CRITICAL OUTPUT RULES
+--------------------------------------------------
+- Return ONLY valid JSON.
+- Do NOT include markdown formatting (like ```json ... ```).
+- Do NOT include literal newlines in strings. Use \n if needed.
+- Use double quotes for all keys and string values.
+- Do NOT add comments or explanations outside the JSON.
+--------------------------------------------------
+
+Example match:
 {{
   "message": "...",
   "amount": 150.0,
@@ -93,4 +105,19 @@ prompt = ChatPromptTemplate.from_messages([
     ("user", user_prompt),
 ])
 
-Transaction_maker_agent = prompt | gpt_oss_120b_digital_ocean.with_structured_output(TransactionMakerOutput)
+import json
+import re
+from langchain_core.messages import BaseMessage
+
+def parse_output(message: BaseMessage | str) -> TransactionMakerOutput | None:
+    text = message.content if isinstance(message, BaseMessage) else message
+    text = text.replace("```json", "").replace("```", "").strip()
+    try:
+        data = json.loads(text)
+        return TransactionMakerOutput(**data)
+    except Exception as e:
+        print(f"Parsing error: {e}")
+        print(f"Raw Output: {text}")
+        return None
+
+Transaction_maker_agent = prompt | gpt_oss_120b_digital_ocean | parse_output
