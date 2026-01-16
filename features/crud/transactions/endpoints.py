@@ -6,6 +6,8 @@ from typing import Any, Dict, Optional
 from ninja import Router, Query
 from django.db.models import Q
 
+from django.utils import timezone
+
 from core.models import Transaction
 from core.utils.responses import success_response, error_response
 from .schemas import TransactionCreateSchema, TransactionUpdateSchema
@@ -30,6 +32,7 @@ TRANSACTION_FIELDS = (
     "neighbourhood",
     "active",
     "created_at",
+    "updated_at",
 )
 
 TRANSACTION_FIELDS_WITH_BUDGET = TRANSACTION_FIELDS + ("budget__budget_name",)
@@ -52,6 +55,7 @@ def _format_transaction(
         "neighbourhood": txn["neighbourhood"],
         "active": txn.get("active", True),
         "created_at": txn["created_at"],
+        "updated_at": txn["updated_at"],
     }
     if include_budget_name and "budget__budget_name" in txn:
         result["budget_name"] = txn["budget__budget_name"]
@@ -134,6 +138,9 @@ def update_transaction(request, transaction_id: int, payload: TransactionUpdateS
     updates = payload.dict(exclude_unset=True)
     if not updates:
         return error_response("No fields provided for update")
+
+    # Manually update updated_at since using .update() bypasses auto_now
+    updates["updated_at"] = timezone.now()
 
     try:
         rows_affected = Transaction.objects.filter(
