@@ -61,7 +61,7 @@ def get_overspend(request):
     from django.db.models import Q
 
     budgets = (
-        Budget.objects.filter(user_id=request.user.id, is_active=True)
+        Budget.objects.filter(user_id=request.user.id, active=True)
         .annotate(
             spent=Coalesce(
                 Sum(

@@ -11,7 +11,6 @@ class BudgetCreateSchema(Schema):
     description: Optional[str] = None
     total_limit: float = Field(default=0.0)
     priority_level_int: Optional[int] = None
-    is_active: bool = Field(default=True)
 
 
 class BudgetUpdateSchema(Schema):
@@ -19,7 +18,6 @@ class BudgetUpdateSchema(Schema):
     description: Optional[str] = None
     total_limit: Optional[float] = None
     priority_level_int: Optional[int] = None
-    is_active: Optional[bool] = None
     active: Optional[bool] = None
 
     @root_validator(pre=True)

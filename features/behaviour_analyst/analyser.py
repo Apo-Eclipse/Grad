@@ -1,11 +1,17 @@
 from core.llm_providers.digital_ocean import gpt_oss_120b_digital_ocean
+from core.utils.dynamic_db_schema import get_dynamic_schema
 from langchain_core.prompts import ChatPromptTemplate
 from pydantic import Field, BaseModel
 
+
 class AnalyserOutput(BaseModel):
     output: str = Field(default="", description="The analysis output from the agent.")
-    message : str = Field(default="", description="Any additional message or insights from the analysis to the orchestrator.")
-    
+    message: str = Field(
+        default="",
+        description="Any additional message or insights from the analysis to the orchestrator.",
+    )
+
+
 system_prompt = """
 You are a Financial Behaviour Analyst Agent.
 
@@ -33,7 +39,7 @@ CORE ANALYSIS PRINCIPLES
    - Provide a reasonable hypothesis (no speculation).
 
 4. **Behavioral & psychological insights**
-   Consider:
+Consider:
    - Emotional spending (late night, weekends, entertainment)
    - Habitual leaks (coffee, snacks, subscriptions)
    - Impulse buying (clusters of unrelated purchases)
@@ -83,57 +89,7 @@ Bad requests:
 DATABASE SCHEMA (USE EXACT NAMES)
 ────────────────────────
 
-TABLE: transactions
-- transaction_id
-- user_id
-- budget_id
-- amount
-- date
-- time
-- store_name
-- city
-- neighbourhood
-- type_spending
-- created_at
-
-TABLE: budget
-- budget_id
-- user_id
-- budget_name
-- description
-- total_limit        (MONTHLY limit)
-- priority_level_int
-- is_active
-- created_at
-- updated_at
-
-TABLE: income
-- income_id
-- user_id
-- type_income
-- amount
-- description
-- created_at
-- updated_at
-
-TABLE: goals
-- goal_id
-- user_id
-- goal_name
-- description
-- target
-- start_date
-- due_date
-- status
-- created_at
-- updated_at
-
-TABLE: users (CONTEXT ONLY – DO NOT REQUEST DIRECTLY)
-- user_id
-- first_name
-- last_name
-- job_title
-- address
+{schema}
 
 ────────────────────────
 OUTPUT FORMAT (STRICT)
@@ -163,9 +119,13 @@ user request: {user_request}
 if there is new info in the Acquired Data till now update the previous analysis with it, DON'T RETURN THE SAME PREVIOUS ANALYSIS AS IT IS.
 """
 
-analyser_prompt = ChatPromptTemplate.from_messages([
-    ("system", system_prompt),
-    ("user", user_prompt),
-])
+analyser_prompt = ChatPromptTemplate.from_messages(
+    [
+        ("system", system_prompt),
+        ("user", user_prompt),
+    ]
+).partial(schema=get_dynamic_schema())
 
-Analyser = analyser_prompt | gpt_oss_120b_digital_ocean.with_structured_output(AnalyserOutput)
+Analyser = analyser_prompt | gpt_oss_120b_digital_ocean.with_structured_output(
+    AnalyserOutput
+)

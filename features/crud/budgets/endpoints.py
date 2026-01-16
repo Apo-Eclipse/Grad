@@ -24,7 +24,6 @@ BUDGET_FIELDS = (
     "description",
     "total_limit",
     "priority_level_int",
-    "is_active",
     "active",
     "created_at",
     "updated_at",
@@ -55,7 +54,6 @@ def get_budgets(request, active: Optional[bool] = Query(None)):
         "description",
         "total_limit",
         "priority_level_int",
-        "is_active",
         "active",
         "created_at",
         "updated_at",
@@ -75,7 +73,6 @@ def get_budget(request, budget_id: int):
             "description",
             "total_limit",
             "priority_level_int",
-            "is_active",
             "active",
             "created_at",
             "updated_at",
@@ -102,7 +99,6 @@ def create_budget(request, payload: BudgetCreateSchema):
             description=payload.description,
             total_limit=payload.total_limit,
             priority_level_int=payload.priority_level_int,
-            is_active=payload.is_active,
         )
         # Fetch created budget as dict
         created = Budget.objects.filter(id=budget.id).values(*BUDGET_FIELDS).first()
