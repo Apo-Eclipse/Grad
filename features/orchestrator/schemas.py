@@ -42,7 +42,9 @@ class GoalMakerRequestSchema(Schema):
 class GoalMakerResponseSchema(Schema):
     conversation_id: int
     message: str
+    action: Literal["create", "update"] = "create"
     goal_name: Optional[str] = None
+    goal_id: Optional[int] = None
     target: Optional[float] = None
     goal_description: Optional[str] = None
     due_date: Optional[str] = None

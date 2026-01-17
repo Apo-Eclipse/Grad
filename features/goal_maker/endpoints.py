@@ -41,6 +41,7 @@ def goals_assist(request, payload: GoalMakerRequestSchema):
         if conversation_id
         else "No history."
     )
+    print("user_summary", user_summary)
 
     # 2. Invoke Agent
     try:
@@ -89,11 +90,14 @@ def goals_assist(request, payload: GoalMakerRequestSchema):
 
                 # Structured Payload (if any)
                 goal_payload = {
+                    "action": goal_result.action,
                     "goal_name": goal_result.goal_name,
+                    "goal_id": goal_result.goal_id,
                     "target": goal_result.target,
                     "goal_description": goal_result.goal_description,
                     "due_date": goal_result.due_date,
                     "plan": goal_result.plan,
+                    "is_done": goal_result.is_done,
                 }
                 # Only insert if there's meaningful data
                 if any(goal_payload.values()):
@@ -115,7 +119,9 @@ def goals_assist(request, payload: GoalMakerRequestSchema):
     return {
         "conversation_id": conversation_id,
         "message": goal_result.message,
+        "action": goal_result.action,
         "goal_name": goal_result.goal_name,
+        "goal_id": goal_result.goal_id,
         "target": goal_result.target,
         "goal_description": goal_result.goal_description,
         "due_date": goal_result.due_date,

@@ -72,7 +72,7 @@ def fetch_active_goals(user_id: int) -> list[dict]:
     return list(
         Goal.objects.filter(user_id=user_id, active=True)
         .order_by("due_date")
-        .values("goal_name", "target", "due_date")
+        .values("id", "goal_name", "target", "due_date")
     )
 
 
@@ -202,7 +202,7 @@ def format_goals_section(goals: list[dict]) -> str:
         return "Active Goals: None"
 
     goal_strs = [
-        f"- {g['goal_name']} (Target: {float(g['target'] or 0):.2f}, Due: {g['due_date']})"
+        f"- {g['goal_name']} (ID: {g['id']}, Target: {float(g['target'] or 0):.2f}, Due: {g['due_date']})"
         for g in goals
     ]
     return "Active Goals: " + "; ".join(goal_strs)
