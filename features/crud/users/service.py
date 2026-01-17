@@ -4,6 +4,7 @@ from django.db.models.functions import Coalesce
 from django.contrib.auth.models import User
 from django.utils import timezone
 from datetime import timedelta
+from decimal import Decimal
 
 from core.models import (
     Goal,
@@ -38,14 +39,13 @@ def get_user_summary(user_id: int) -> str:
 
         # Income - total amount
         income_total = Income.objects.filter(user_id=user_id).aggregate(
-            total=Coalesce(Sum("amount"), 0.0)
+            total=Coalesce(Sum("amount"), Decimal("0.00"))
         )["total"]
         total_income = float(income_total) if income_total else 0.0
 
         # Goals (active) - already uses .values()
         goals_rows = list(
-            Goal.objects.filter(user_id=user_id)
-            .filter(Q(status__isnull=True) | Q(status="active"))
+            Goal.objects.filter(user_id=user_id, active=True)
             .order_by("due_date")
             .values("goal_name", "target", "due_date")
         )
@@ -58,7 +58,7 @@ def get_user_summary(user_id: int) -> str:
 
         spend_total = Transaction.objects.filter(
             user_id=user_id, date__gte=ninety_days_ago
-        ).aggregate(total=Coalesce(Sum("amount"), 0.0))["total"]
+        ).aggregate(total=Coalesce(Sum("amount"), Decimal("0.00")))["total"]
         total_spent_90d = float(spend_total) if spend_total else 0.0
 
         # Top Categories (90 days) - already uses .values()
@@ -135,5 +135,5 @@ def get_user_summary(user_id: int) -> str:
         return "\n".join(parts)
 
     except Exception as exc:
-        logger.warning(f"Error building user summary for {user_id}: {exc}")
-        return f"Error retrieving user summary for {user_id}."
+        logger.exception(f"Error building user summary for {user_id}")
+        return f"Error retrieving user summary for {user_id}: {exc}"

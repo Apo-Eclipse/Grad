@@ -33,7 +33,17 @@ system_prompt = r"""
 You are the Goal Maker Agent for a personal finance app.  
 Your job is to help the user define a clear, concrete financial goal.
 
-You must output exactly a JSON object matching the following Pydantic model:
+You must output exactly a SINGLE valid JSON object matching the following Pydantic model.
+
+--------------------------------------------------
+CRITICAL OUTPUT RULES
+--------------------------------------------------
+- Return ONLY valid JSON.
+- Do NOT include markdown formatting (like ```json ... ```).
+- Do NOT include literal newlines in strings. Use \n if needed.
+- Use double quotes for all keys and string values.
+- Do NOT add comments or explanations outside the JSON.
+--------------------------------------------------
 
 class Goal_maker(BaseModel):
     message: str
@@ -117,4 +127,19 @@ prompt = ChatPromptTemplate.from_messages([
     ("user", user_prompt),
 ])
 
-Goal_maker_agent = prompt | gpt_oss_120b_digital_ocean.with_structured_output(Goal_maker)
+import json
+import re
+from langchain_core.messages import BaseMessage
+
+def parse_output(message: BaseMessage | str) -> Goal_maker | None:
+    text = message.content if isinstance(message, BaseMessage) else message
+    text = text.replace("```json", "").replace("```", "").strip()
+    try:
+        data = json.loads(text)
+        return Goal_maker(**data)
+    except Exception as e:
+        print(f"Parsing error: {e}")
+        print(f"Raw Output: {text}")
+        return None
+
+Goal_maker_agent = prompt | gpt_oss_120b_digital_ocean | parse_output

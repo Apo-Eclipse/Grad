@@ -16,6 +16,30 @@ from features.auth.api import AuthBearer
 logger = logging.getLogger(__name__)
 router = Router(auth=AuthBearer())
 
+
+# --- Manual/Testing Endpoints ---
+
+@router.api_operation(["POST", "GET"], "/start", response=ConversationResponseSchema)
+def start_conversation(request, payload: ConversationStartSchema = None):
+    """Start a new conversation thread."""
+    try:
+        channel = payload.channel if payload else "web"
+        conversation = ChatConversation.objects.create(
+            user_id=request.user.id,
+            channel=channel,
+            last_message_at=timezone.now(),
+        )
+        return {
+            "conversation_id": conversation.id,
+            "user_id": conversation.user_id,
+            "channel": conversation.channel,
+            "started_at": conversation.started_at,
+        }
+    except Exception as e:
+        logger.exception("Failed to start conversation")
+        raise Exception(f"Failed to start conversation: {e}")
+
+
 # --- CRUD Endpoints ---
 
 
@@ -91,23 +115,3 @@ def add_message(request, conversation_id: int, role: str, content: str):
     except Exception as e:
         logger.exception("Failed to add message")
         return {"success": False, "error": str(e)}
-
-
-@router.post("/start", response=ConversationResponseSchema)
-def start_conversation(request, payload: ConversationStartSchema):
-    """Start a new conversation thread."""
-    try:
-        conversation = ChatConversation.objects.create(
-            user_id=request.user.id,
-            channel=payload.channel,
-            last_message_at=timezone.now(),
-        )
-        return {
-            "conversation_id": conversation.id,
-            "user_id": conversation.user_id,
-            "channel": conversation.channel,
-            "started_at": conversation.started_at,
-        }
-    except Exception as e:
-        logger.exception("Failed to start conversation")
-        raise Exception(f"Failed to start conversation: {e}")
