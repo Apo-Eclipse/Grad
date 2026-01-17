@@ -14,7 +14,7 @@ from features.orchestrator.schemas import (
 )
 from features.crud.users.service import get_user_summary
 from features.crud.conversations.service import (
-    get_conversation_summary,
+    get_conversation_context,
     insert_chat_message,
 )
 from core.models import ChatConversation
@@ -37,11 +37,15 @@ def budget_assist(request, payload: BudgetMakerRequestSchema):
 
     # 1. Fetch Context
     user_summary = get_user_summary(user_id)
-    conversation_summary = (
-        get_conversation_summary(conversation_id, limit=10)
-        if conversation_id
-        else "No history."
-    )
+
+    # Get both conversation history and current budget state
+    if conversation_id:
+        context = get_conversation_context(conversation_id, limit=10)
+        conversation_history = context["history"]
+        current_state = context["current_state"]
+    else:
+        conversation_history = "No history."
+        current_state = None
 
     # 2. Invoke Agent
     try:
@@ -49,7 +53,8 @@ def budget_assist(request, payload: BudgetMakerRequestSchema):
             {
                 "user_info": user_summary,
                 "user_request": user_request,
-                "last_conversation": conversation_summary,
+                "last_conversation": conversation_history,
+                "current_budget_state": current_state or "No budget in progress.",
                 "current_date": timezone.now().strftime("%Y-%m-%d"),
             }
         )
