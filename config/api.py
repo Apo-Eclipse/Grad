@@ -14,6 +14,7 @@ from features.goal_maker.endpoints import router as goal_router
 from features.orchestrator.endpoints import router as orchestrator_router
 from features.transaction_maker.endpoints import router as transaction_router
 from features.auth.endpoints import router as auth_router
+from features.notifications.endpoints import router as notifications_router
 
 # Create the main API instance
 api = NinjaAPI(
@@ -45,3 +46,4 @@ api.add_router(
 )
 api.add_router("/database/analytic", db_analytics_router, tags=["Database - Analytics"])
 api.add_router("/auth", auth_router, tags=["Authentication"])
+api.add_router("/notifications", notifications_router, tags=["Notifications"])
