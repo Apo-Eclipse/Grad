@@ -43,6 +43,7 @@ INSTALLED_APPS = [
     "ninja",
     # --- 3. YOUR APPS ---
     "core",  # Main Django app with models
+    "features.notifications",  # Notification system
 ]
 
 MIDDLEWARE = [

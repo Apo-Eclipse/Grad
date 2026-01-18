@@ -102,8 +102,12 @@ Interactive agent for setting financial goals. It helps guide the user to define
 {
   "conversation_id": 10,
   "message": "What is your target amount?",
+  "action": "create",            // "create" or "update"
   "goal_name": "Vacation",       // optional
+  "goal_id": 5,                  // optional
   "target": 0.0,                 // optional
+  "due_date": "2024-12-01",      // optional
+  "plan": "Save...",             // optional
   "is_done": false               // false if more information is needed
 }
 ```
@@ -260,3 +264,27 @@ Initiates a new chat session. Returns the new conversation ID. Supports GET for 
   "started_at": "2024-01-01T12:00:00Z"
 }
 ```
+
+### Notifications
+**GET** `/notifications/`
+List all notifications for the authenticated user, ordered by newest first.
+
+**Response Schema** (List of `NotificationSchema`):
+```json
+[
+  {
+    "id": 1,
+    "title": "Budget Limit Exceeded",
+    "message": "Your 'Food' budget has exceeded its limit! ...",
+    "is_read": false,
+    "notification_type": "budget_alert",
+    "created_at": "2024-01-01T12:00:00Z"
+  }
+]
+```
+
+**PUT** `/notifications/{id}/read`
+Mark a specific notification as read.
+
+**Response**:
+`"Marked as read"`
