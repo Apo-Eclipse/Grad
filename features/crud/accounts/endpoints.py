@@ -3,9 +3,10 @@
 from typing import List, Optional
 from django.db import transaction
 from django.db.models import F
+from django.utils import timezone
 from ninja import Router, Schema
 from features.auth.api import AuthBearer
-from core.models import Account, Transaction, Budget
+from core.models import Account, Transaction
 
 router = Router(auth=AuthBearer())
 
@@ -102,29 +103,15 @@ def transfer_funds(request, payload: TransferSchema):
 
         Transaction.objects.create(
             user=request.user,
-            budget_id=1,  # NEED A DEFAULT BUDGET? Or make budget nullable?
-            # Transaction model has `budget` as non-nullable FK?
-            # Let's check Transaction model again.
-            # `budget = models.ForeignKey(Budget, models.DO_NOTHING)` -> It is required.
-            # We need a "Transfer/Uncategorized" budget or make it nullable.
-            # For now, I'll fetch the first active budget or a dummy.
-            # To be safe, I should probably make budget nullable in Transaction if it's a transfer?
-            # Or just pick the first budget.
-            # Let's query a budget.
-            date=transaction.get_connection().ops.value_to_db_date(
-                transaction.get_connection()
-                .ops.value_to_db_datetime(transaction.now())
-                .date()
-            ),  # simpler: timezone.now().date()
+            transaction_type=Transaction.TransactionType.TRANSFER,
+            date=timezone.now().date(),
             amount=payload.amount,
-            # store_name=f"Transfer to {to_acc.name}",
-            store_name="Transfer",
             description=payload.description
             or f"Transfer from {from_acc.name} to {to_acc.name}",
-            type_spending="Transfer",
+            category="Transfer",
             account=from_acc,
             transfer_to=to_acc,
-            budget=Budget.objects.filter(user=request.user).first(),  # Fallback
+            budget=None,  # Transfers don't need a budget
         )
 
     return 200, "Transfer successful."

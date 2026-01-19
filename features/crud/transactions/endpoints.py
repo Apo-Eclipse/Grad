@@ -25,14 +25,17 @@ TRANSACTION_FIELDS = (
     "date",
     "amount",
     "time",
-    "store_name",
+    "description",  # Was store_name
     "city",
-    "type_spending",
+    "category",  # Was type_spending
     "budget_id",
     "neighbourhood",
     "active",
     "created_at",
     "updated_at",
+    "transaction_type",
+    "account_id",
+    "transfer_to_id",
 )
 
 TRANSACTION_FIELDS_WITH_BUDGET = TRANSACTION_FIELDS + ("budget__budget_name",)
@@ -48,14 +51,17 @@ def _format_transaction(
         "date": txn["date"],
         "amount": float(txn["amount"]) if txn["amount"] else 0.0,
         "time": str(txn["time"]) if txn["time"] else None,
-        "store_name": txn["store_name"],
+        "description": txn.get("description"),  # Was store_name
         "city": txn["city"],
-        "type_spending": txn["type_spending"],
+        "category": txn.get("category"),  # Was type_spending
         "budget_id": txn["budget_id"],
         "neighbourhood": txn["neighbourhood"],
         "active": txn.get("active", True),
         "created_at": txn["created_at"],
         "updated_at": txn["updated_at"],
+        "transaction_type": txn.get("transaction_type", "EXPENSE"),
+        "account_id": txn.get("account_id"),
+        "transfer_to_id": txn.get("transfer_to_id"),
     }
     if include_budget_name and "budget__budget_name" in txn:
         result["budget_name"] = txn["budget__budget_name"]
@@ -68,6 +74,7 @@ def get_transactions(
     active: Optional[bool] = Query(None),
     start_date: Optional[str] = Query(None),
     end_date: Optional[str] = Query(None),
+    transaction_type: Optional[str] = Query(None),
     limit: int = Query(100, le=1000),
 ):
     """Retrieve transactions for a user."""
@@ -79,6 +86,8 @@ def get_transactions(
         filters["date__gte"] = start_date
     if end_date:
         filters["date__lte"] = end_date
+    if transaction_type:
+        filters["transaction_type"] = transaction_type
 
     queryset = Transaction.objects.filter(**filters)
 
@@ -101,11 +110,13 @@ def create_transaction(request, payload: TransactionCreateSchema):
             date=payload.date,
             amount=payload.amount,
             time=payload.time,
-            store_name=payload.store_name,
+            description=payload.description,  # Was store_name
             city=payload.city,
-            type_spending=payload.type_spending,
+            category=payload.category,  # Was type_spending
             budget_id=payload.budget_id,
             neighbourhood=payload.neighbourhood,
+            account_id=payload.account_id,
+            transaction_type=payload.transaction_type,
         )
         # Return created transaction data using values
         created = (
@@ -196,12 +207,12 @@ def search_transactions(
 
     if query_text:
         queryset = queryset.filter(
-            Q(store_name__icontains=query_text) | Q(type_spending__icontains=query_text)
+            Q(description__icontains=query_text) | Q(category__icontains=query_text)
         )
 
     if category:
         queryset = queryset.filter(
-            Q(type_spending=category) | Q(budget__budget_name__icontains=category)
+            Q(category=category) | Q(budget__budget_name__icontains=category)
         )
 
     if min_amount is not None:

@@ -7,14 +7,23 @@ from .account import Account
 
 
 class Transaction(models.Model):
+    class TransactionType(models.TextChoices):
+        EXPENSE = "EXPENSE", "Expense"
+        TRANSFER = "TRANSFER", "Transfer"
+
+    transaction_type = models.TextField(
+        choices=TransactionType.choices, default=TransactionType.EXPENSE
+    )
     date = models.DateField()
     amount = models.DecimalField(max_digits=12, decimal_places=2)
     time = models.TimeField(blank=True, null=True)
-    store_name = models.TextField(blank=True, null=True)
+    description = models.TextField(blank=True, null=True)  # Was store_name
+    category = models.TextField(blank=True, null=True)  # Was type_spending
     city = models.TextField(blank=True, null=True)
-    type_spending = models.TextField(blank=True, null=True)
     user = models.ForeignKey(User, models.DO_NOTHING, blank=True, null=True)
-    budget = models.ForeignKey(Budget, models.DO_NOTHING)
+    budget = models.ForeignKey(
+        Budget, models.DO_NOTHING, blank=True, null=True
+    )  # Now nullable
     account = models.ForeignKey(
         Account, models.DO_NOTHING, blank=True, null=True, related_name="transactions"
     )
