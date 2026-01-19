@@ -98,17 +98,56 @@ def get_overspend(request):
 
         overspend_data.append(row_data)
 
-    # 2. Total Income
+    # 2. Total Income (Legacy metric, kept for reference)
     income_total = Income.objects.filter(user_id=request.user.id).aggregate(
         total=Coalesce(Sum("amount"), 0, output_field=DecimalField())
     )["total"]
     total_income = float(income_total) if income_total else 0.0
 
+    # 3. Account Balances (Real Net Worth)
+    from core.models import Account
+
+    accounts = Account.objects.filter(user_id=request.user.id, active=True)
+
+    total_assets = 0.0
+    total_liabilities = 0.0
+
+    account_breakdown = []
+
+    for acc in accounts:
+        bal = float(acc.balance)
+        account_breakdown.append(
+            {"id": acc.id, "name": acc.name, "type": acc.type, "balance": bal}
+        )
+
+        if acc.type == Account.AccountType.CREDIT:
+            # Assuming Credit balance is negative when owed, or positive when owed?
+            # Convection:
+            # If I spend $100, balance -> -100.
+            # So simple Sum is correct for Net Worth.
+            # Liabilities is usually absolute value of negative balances.
+            if bal < 0:
+                total_liabilities += abs(bal)
+            else:
+                # Positive credit balance is an asset (overpayment)
+                total_assets += bal
+        else:
+            if bal >= 0:
+                total_assets += bal
+            else:
+                # Overdraft
+                total_liabilities += abs(bal)
+
+    net_worth = total_assets - total_liabilities  # Or just sum of all balances
+
     summary = {
         "total_income": total_income,
         "total_spent": total_spent_all,
-        "net_position": total_income - total_spent_all,
-        "is_deficit": (total_spent_all > total_income),
+        "net_position": net_worth,  # Now reflects Real Net Worth
+        "total_assets": total_assets,
+        "total_liabilities": total_liabilities,
+        "is_deficit": (total_spent_all > total_income),  # Keep monthly flow logic
+        "accounts": account_breakdown,
     }
 
     return {"data": overspend_data, "summary": summary}

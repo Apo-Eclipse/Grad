@@ -3,6 +3,7 @@
 from django.db import models
 from django.contrib.auth.models import User
 from .budget import Budget
+from .account import Account
 
 
 class Transaction(models.Model):
@@ -14,6 +15,12 @@ class Transaction(models.Model):
     type_spending = models.TextField(blank=True, null=True)
     user = models.ForeignKey(User, models.DO_NOTHING, blank=True, null=True)
     budget = models.ForeignKey(Budget, models.DO_NOTHING)
+    account = models.ForeignKey(
+        Account, models.DO_NOTHING, blank=True, null=True, related_name="transactions"
+    )
+    transfer_to = models.ForeignKey(
+        Account, models.DO_NOTHING, blank=True, null=True, related_name="transfers_in"
+    )
     neighbourhood = models.TextField(blank=True, null=True)
     active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
