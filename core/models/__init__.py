@@ -5,6 +5,7 @@ from .budget import Budget
 from .transaction import Transaction
 from .goal import Goal
 from .income import Income
+from .account import Account
 from .conversation import ChatConversation, ChatMessage
 from .notification import Notification
 
@@ -14,6 +15,7 @@ __all__ = [
     "Transaction",
     "Goal",
     "Income",
+    "Account",
     "ChatConversation",
     "ChatMessage",
     "Notification",

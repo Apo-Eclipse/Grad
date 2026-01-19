@@ -10,6 +10,7 @@ from features.crud.goals.endpoints import router as db_goals_router
 from features.crud.income.endpoints import router as db_income_router
 from features.crud.transactions.endpoints import router as db_transactions_router
 from features.crud.users.endpoints import router as db_users_router
+from features.crud.accounts.endpoints import router as db_accounts_router
 from features.goal_maker.endpoints import router as goal_router
 from features.orchestrator.endpoints import router as orchestrator_router
 from features.transaction_maker.endpoints import router as transaction_router
@@ -45,5 +46,6 @@ api.add_router(
     "/database/conversation", conversations_router, tags=["Database - Conversations"]
 )
 api.add_router("/database/analytic", db_analytics_router, tags=["Database - Analytics"])
+api.add_router("/database/account", db_accounts_router, tags=["Database - Accounts"])
 api.add_router("/auth", auth_router, tags=["Authentication"])
 api.add_router("/notifications", notifications_router, tags=["Notifications"])
