@@ -1,6 +1,8 @@
 from core.llm_providers.digital_ocean import gpt_oss_120b_digital_ocean
 from langchain_core.prompts import ChatPromptTemplate
 from pydantic import Field, BaseModel
+from langchain_core.messages import BaseMessage
+import json
 
 class ExplainerAgentOutput(BaseModel):
     explanation: str = Field(..., description="The explanation in plain text")
@@ -78,4 +80,15 @@ prompt = ChatPromptTemplate.from_messages([
     ("user", user_prompt)
 ])
 
-Explainer_agent = prompt | gpt_oss_120b_digital_ocean.with_structured_output(ExplainerAgentOutput)
+def parse_output(message: BaseMessage | str) -> ExplainerAgentOutput | None:
+    text = message.content if isinstance(message, BaseMessage) else message
+    text = text.replace("```json", "").replace("```", "").strip()
+    try:
+        data = json.loads(text)
+        return ExplainerAgentOutput(**data)
+    except Exception as e:
+        print(f"Parsing error: {e}")
+        print(f"Raw Output: {text}")
+        return None
+
+Explainer_agent = prompt | gpt_oss_120b_digital_ocean | parse_output

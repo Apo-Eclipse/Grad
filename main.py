@@ -5,6 +5,7 @@ sys.dont_write_bytecode = True
 
 import json
 import os
+import getpass
 from datetime import datetime
 from typing import Dict, Optional, Tuple
 
@@ -15,8 +16,13 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Local API only - no remote fallback
-API_BASE_URL = "http://127.0.0.1:8000/api"  
+API_BASE_URL = "http://127.0.0.1:8000/api"
 
+# Global Session Token
+ACCESS_TOKEN: Optional[str] = None
+CURRENT_USER_ID: Optional[int] = None
+
+# Enums
 EMPLOYMENT_OPTIONS: Dict[str, str] = {
     "1": "Employed Full-time",
     "2": "Employed Part-time",
@@ -48,6 +54,12 @@ def request_json(
 ) -> Tuple[bool, Optional[Dict]]:
     """Send an HTTP request and return (success, json_payload)."""
     url = f"{API_BASE_URL}{path}"
+    headers = {}
+    
+    # Inject Authorization Header if logged in
+    if ACCESS_TOKEN:
+        headers["Authorization"] = f"Bearer {ACCESS_TOKEN}"
+
     try:
         response = requests.request(
             method,
@@ -55,6 +67,7 @@ def request_json(
             params=params,
             json=json_body,
             timeout=timeout,
+            headers=headers
         )
     except requests.RequestException as exc:
         print(f"Connection error calling {url}: {exc}")
@@ -68,35 +81,98 @@ def request_json(
                 return True, None
         return True, None
 
+    # Error Handling
     try:
         detail = response.json()
     except ValueError:
         detail = response.text
+    
+    # Handle Token Expiration
+    if response.status_code == 401:
+        print(f"\n[!] Session expired or unauthorized: {detail}")
+        # Could auto-logout here, but keeping it simple for now
+    
     print(f"Error calling {path}: {detail}")
     return False, None
 
 
-def detect_api_base_url() -> str:
-    """Try local endpoints only (8000 and 8080)."""
-    candidates = ["http://127.0.0.1:8000/api", "http://localhost:8000/api", "http://127.0.0.1:8080/api", "http://localhost:8080/api"]
-
-    for base in candidates:
-        health_url = f"{base}/personal_assistant/health"
-        try:
-            resp = requests.get(health_url, timeout=10)
-            if resp.status_code == 200:
-                return base
-        except requests.RequestException:
-            continue
+def login() -> bool:
+    """Authenticate user and store token."""
+    global ACCESS_TOKEN, CURRENT_USER_ID
     
-    # Default to local port 8000
-    return "http://127.0.0.1:8000/api"
+    print("\n=== LOGIN ===")
+    email = input("Email: ").strip()
+    password = getpass.getpass("Password: ").strip()
+
+    if not email or not password:
+        print("Credentials required.")
+        return False
+
+    success, data = request_json("POST", "/auth/login", json_body={"email": email, "password": password})
+    
+    if success and data and "access" in data:
+        ACCESS_TOKEN = data["access"]
+        # Fetch user details to get ID
+        user_success, user_data = request_json("GET", "/database/user/")
+        if user_success and user_data:
+             CURRENT_USER_ID = user_data.get("user_id")
+             print(f"Login successful! Welcome, {user_data.get('first_name')}.")
+             return True
+        else:
+             print("Login successful but failed to fetch profile.")
+             return False
+    else:
+        print("Login failed. Check credentials.")
+        return False
+
+
+def register() -> bool:
+    """Register a new user."""
+    print("\n=== REGISTER NEW USER ===")
+    username = input("Username: ").strip()
+    email = input("Email: ").strip()
+    password = getpass.getpass("Password: ").strip()
+    first_name = input("First Name: ").strip()
+    last_name = input("Last Name: ").strip()
+    
+    if not all([username, email, password, first_name, last_name]):
+         print("All fields are required for basics.")
+         return False
+
+    # Optional Details
+    print("\n--- Optional Profile Details (Press Enter to skip) ---")
+    job_title = input("Job Title: ").strip() or "N/A"
+    address = input("Address: ").strip() or "N/A"
+    birthday = input("Birthday (YYYY-MM-DD): ").strip()
+    if not birthday: birthday = "2000-01-01"
+    
+    payload = {
+        "username": username,
+        "email": email,
+        "password": password,
+        "first_name": first_name,
+        "last_name": last_name,
+        "job_title": job_title,
+        "address": address,
+        "birthday": birthday,
+        "gender": "male", # default to simplify
+        "employment_status": "Employed Full-time",
+        "education_level": "Bachelor degree"
+    }
+
+    success, data = request_json("POST", "/database/user/", json_body=payload)
+    if success:
+        print("Registration successful! You can now log in.")
+        return True
+    else:
+        print("Registration failed.")
+        return False
 
 
 def start_conversation(user_id: int, channel: str = "web") -> Optional[Dict]:
     success, data = request_json(
         "POST",
-        "/personal_assistant/conversations/start",
+        "/database/conversation/start",
         json_body={"user_id": user_id, "channel": channel},
     )
     return data if success else None
@@ -106,125 +182,12 @@ def analyze_query(query: str, conversation_id: Optional[int], user_id: Optional[
     payload = {"query": query}
     if conversation_id:
         payload["conversation_id"] = conversation_id
+    # Backend usually infers user from Token now, but passing ID is safe fallback for orchestrator
     if user_id:
         payload["user_id"] = user_id
 
     success, data = request_json("POST", "/personal_assistant/analyze", json_body=payload)
     return data if success else None
-
-
-def get_user(user_id: int) -> Optional[Dict]:
-    success, data = request_json("GET", f"/database/users/{user_id}")
-    return data if success else None
-
-
-def prompt_required(prompt: str) -> str:
-    value = input(prompt).strip()
-    while not value:
-        print("This field is required.")
-        value = input(prompt).strip()
-    return value
-
-
-def prompt_enum(label: str, options: Dict[str, str]) -> Optional[str]:
-    print(f"\n{label}:")
-    for key, value in options.items():
-        print(f"  {key}. {value}")
-    selection = input("Choose an option (leave blank to skip): ").strip()
-    if not selection:
-        return None
-    if selection not in options:
-        print("Invalid choice. Leaving empty.")
-        return None
-    return options[selection]
-
-
-def prompt_date(prompt: str) -> str:
-    while True:
-        value = input(prompt).strip()
-        try:
-            return datetime.strptime(value, "%Y-%m-%d").strftime("%Y-%m-%d")
-        except ValueError:
-            print("Invalid format. Please use YYYY-MM-DD.")
-
-
-def upsert_user_via_api() -> Optional[int]:
-    """Collect user information and send it to the modify endpoint."""
-    print("\nLet's capture some personal details.")
-    user_id_raw = input("Enter a numeric user ID to use (e.g., 1001): ").strip()
-    if not user_id_raw.isdigit():
-        print("User ID must be numeric. Aborting user creation.")
-        return None
-    user_id = int(user_id_raw)
-
-    first_name = input("First name: ").strip() or "User"
-    last_name = input("Last name: ").strip() or "Guest"
-    job_title = prompt_required("Job title (required): ").strip()
-    address = prompt_required("Address (required): ").strip()
-    employment_status = prompt_enum("Employment status options", EMPLOYMENT_OPTIONS)
-    education_level = prompt_enum("Education level options", EDUCATION_OPTIONS)
-    birthday = prompt_date("Birthday (YYYY-MM-DD, required): ")
-    gender = prompt_enum("Gender options", GENDER_OPTIONS)
-
-    sql = """
-        INSERT INTO users (
-            user_id, first_name, last_name, job_title, address,
-            employment_status, education_level, birthday, gender, created_at, updated_at
-        )
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, NOW(), NOW())
-        ON CONFLICT (user_id) DO UPDATE SET
-            first_name = EXCLUDED.first_name,
-            last_name = EXCLUDED.last_name,
-            job_title = EXCLUDED.job_title,
-            address = EXCLUDED.address,
-            employment_status = EXCLUDED.employment_status,
-            education_level = EXCLUDED.education_level,
-            birthday = EXCLUDED.birthday,
-            gender = EXCLUDED.gender,
-            updated_at = NOW();
-    """
-
-    payload = {
-        "query": sql,
-        "params": [
-            user_id,
-            first_name,
-            last_name,
-            job_title,
-            address,
-            employment_status,
-            education_level,
-            birthday,
-            gender,
-        ],
-    }
-
-    success, data = request_json("POST", "/database/analytics/execute/modify", json_body=payload)
-    if success and data and data.get("success"):
-        print(f"User {user_id} saved successfully.")
-        return user_id
-    print(f"Failed to save user: {data}")
-    return None
-
-
-def choose_user() -> Tuple[int, Optional[Dict]]:
-    choice = input(
-        "\nDo you want to (1) use an existing user or (2) create/update a user? [1/2]: "
-    ).strip() or "1"
-
-    if choice == "2":
-        user_id = upsert_user_via_api()
-        if user_id:
-            return user_id, get_user(user_id)
-        return 0, None
-
-    user_id_raw = input("Enter existing user ID: ").strip()
-    if user_id_raw.isdigit():
-        user_id = int(user_id_raw)
-        return user_id, get_user(user_id)
-
-    print("Invalid user ID. Falling back to default user 3.")
-    return 3, get_user(3)
 
 
 def display_data(payload: Dict) -> None:
@@ -265,7 +228,7 @@ AGENTS = {
     "4": {"name": "Transaction Maker", "slug": "transaction"},
 }
 
-def run_mode_loop(agent_key: str, user_id: int, user_name: str, conversation_id: int) -> int:
+def run_mode_loop(agent_key: str, user_id: int, conversation_id: int) -> int:
     """
     Runs the chat loop for a specific agent mode. 
     Returns the updated conversation_id (in case it was created/changed).
@@ -280,9 +243,6 @@ def run_mode_loop(agent_key: str, user_id: int, user_name: str, conversation_id:
 
     # If no conversation exists for this agent yet, start one now
     if not conversation_id:
-        # Start a generic conversation entry in the DB to track this thread
-        # Note: All agents share the 'chat_conversations' table, but we track IDs separately in the dict
-        # The 'channel' 'web' is generic.
         conversation = start_conversation(user_id=user_id, channel=f"cli-{slug}")
         if not conversation:
             print("Error: Could not start new conversation session.")
@@ -291,7 +251,7 @@ def run_mode_loop(agent_key: str, user_id: int, user_name: str, conversation_id:
         print(f"Started new session {conversation_id} for {agent_name}.")
 
     while True:
-        user_input = input(f"\n{user_name} ({slug}): ").strip()
+        user_input = input(f"\n({slug}): ").strip()
         if user_input.lower() in {"exit", "quit", "menu"}:
             print(f"Exiting {agent_name} mode.")
             break
@@ -343,30 +303,34 @@ def run_mode_loop(agent_key: str, user_id: int, user_name: str, conversation_id:
 
 
 def main() -> None:
-    # Local API only - no remote fallback
-    # API_BASE_URL is already defined at module level as "http://127.0.0.1:8000/api"
-    
     print("\n" + "=" * 80)
-    print("Personal Assistant CLI - Multi-Agent Mode")
+    print("Personal Assistant CLI - Multi-Agent Mode (Localhost)")
     print("=" * 80)
-    print(f"Connecting to API at: {API_BASE_URL} (Local Only)")
+    print(f"Connecting to API at: {API_BASE_URL}")
 
-    user_id, profile = choose_user()
-    if not user_id:
-        print("Unable to determine a valid user ID. Exiting.")
-        return
-
-    user_name = (
-        f"{profile.get('first_name', '')} {profile.get('last_name', '')}".strip()
-        if profile
-        else f"User {user_id}"
-    ) or f"User {user_id}"
+    # Authentication Loop
+    while not ACCESS_TOKEN:
+        print("\nAuthentication Required:")
+        print("1. Login")
+        print("2. Register New User")
+        print("q. Quit")
+        choice = input("Select: ").strip().lower()
+        
+        if choice == '1':
+            if login():
+                break
+        elif choice == '2':
+            if register():
+                if login():
+                    break
+        elif choice == 'q':
+            return
+        else:
+            print("Invalid choice.")
 
     # Dictionary to persist conversation IDs per agent for this session
     # Key: agent_key (str), Value: conversation_id (int)
     agent_conversations: Dict[str, int] = {}
-
-    print(f"\nWelcome {user_name}!")
 
     while True:
         print("\n" + "-" * 40)
@@ -385,8 +349,7 @@ def main() -> None:
             
         if choice in AGENTS:
             current_cid = agent_conversations.get(choice, 0)
-            updated_cid = run_mode_loop(choice, user_id, user_name, current_cid)
-            # Update the stored ID so we can resume later
+            updated_cid = run_mode_loop(choice, CURRENT_USER_ID, current_cid)
             if updated_cid:
                 agent_conversations[choice] = updated_cid
         else:

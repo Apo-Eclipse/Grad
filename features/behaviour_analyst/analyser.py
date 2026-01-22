@@ -2,6 +2,8 @@ from core.llm_providers.digital_ocean import gpt_oss_120b_digital_ocean
 from core.utils.dynamic_db_schema import get_dynamic_schema
 from langchain_core.prompts import ChatPromptTemplate
 from pydantic import Field, BaseModel
+from langchain_core.messages import BaseMessage
+import json
 
 
 class AnalyserOutput(BaseModel):
@@ -126,6 +128,15 @@ analyser_prompt = ChatPromptTemplate.from_messages(
     ]
 ).partial(schema=get_dynamic_schema())
 
-Analyser = analyser_prompt | gpt_oss_120b_digital_ocean.with_structured_output(
-    AnalyserOutput
-)
+def parse_output(message: BaseMessage | str) -> AnalyserOutput | None:
+    text = message.content if isinstance(message, BaseMessage) else message
+    text = text.replace("```json", "").replace("```", "").strip()
+    try:
+        data = json.loads(text)
+        return AnalyserOutput(**data)
+    except Exception as e:
+        print(f"Parsing error: {e}")
+        print(f"Raw Output: {text}")
+        return None
+
+Analyser = analyser_prompt | gpt_oss_120b_digital_ocean | parse_output

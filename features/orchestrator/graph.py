@@ -17,6 +17,8 @@ from features.behaviour_analyst.graph import behaviour_analyst_super_agent
 from features.personal_assistant.agent import invoke_personal_assistant
 from features.crud.conversations.service import get_conversation_summary
 from core.llm_providers.digital_ocean import gpt_oss_120b_digital_ocean
+from langchain_core.messages import BaseMessage
+import json
 
 from features.crud.budgets.service import fetch_active_budgets
 
@@ -54,6 +56,17 @@ class OrchestratorState(TypedDict):
         str  # Track which agent was called: 'database_agent', 'behaviour_analyst', etc.
     )
 
+
+def parse_output(message: BaseMessage | str) -> RoutingDecision | None:
+    text = message.content if isinstance(message, BaseMessage) else message
+    text = text.replace("```json", "").replace("```", "").strip()
+    try:
+        data = json.loads(text)
+        return RoutingDecision(**data)
+    except Exception as e:
+        print(f"Parsing error: {e}")
+        print(f"Raw Output: {text}")
+        return None
 
 def personal_assistant_orchestrator(state: OrchestratorState) -> dict:
     """PersonalAssistant uses LLM to decide routing and generate message."""
@@ -203,17 +216,14 @@ def personal_assistant_orchestrator(state: OrchestratorState) -> dict:
     prompt_template = ChatPromptTemplate.from_messages(
         [("system", system_prompt), ("human", user_prompt)]
     )
-    formatted_prompt = prompt_template.invoke(
-        {
+    formatted_prompt = {
             "conversation_memory_str": conversation_memory_str,
             "available_budgets": available_budgets,
             "user_message": user_message,
             "user_name": user_name,
-        }
-    )
-    routing_output = gpt_oss_120b_digital_ocean.with_structured_output(
-        RoutingDecision
-    ).invoke(formatted_prompt)
+    }
+    model = prompt_template | gpt_oss_120b_digital_ocean | parse_output
+    routing_output = model.invoke(formatted_prompt)
     if routing_output is None:
         return {
             "routing_decision": "personal_assistant_response",
