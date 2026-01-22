@@ -2,7 +2,8 @@ from typing import Literal
 from core.llm_providers.digital_ocean import gpt_oss_120b_digital_ocean
 from langchain_core.prompts import ChatPromptTemplate
 from pydantic import Field, BaseModel
-
+from langchain_core.messages import BaseMessage
+import json
 
 class orchestratorOutput(BaseModel):
     message: str = Field(..., description="The message from the agent. (ok if there is no problem and error if there is)")
@@ -63,4 +64,15 @@ prompt = ChatPromptTemplate.from_messages([
     ("user", user_prompt)
 ])
 
-Behaviour_analyser_orchestrator = prompt | gpt_oss_120b_digital_ocean.with_structured_output(orchestratorOutput)
+def parse_output(message: BaseMessage | str) -> orchestratorOutput | None:
+    text = message.content if isinstance(message, BaseMessage) else message
+    text = text.replace("```json", "").replace("```", "").strip()
+    try:
+        data = json.loads(text)
+        return orchestratorOutput(**data)
+    except Exception as e:
+        print(f"Parsing error: {e}")
+        print(f"Raw Output: {text}")
+        return None  
+
+Behaviour_analyser_orchestrator = prompt | gpt_oss_120b_digital_ocean | parse_output

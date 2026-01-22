@@ -4,6 +4,8 @@ from core.utils.dynamic_db_schema import get_dynamic_schema
 from langchain_core.prompts import ChatPromptTemplate
 from core.llm_providers.digital_ocean import gpt_oss_120b_digital_ocean
 from pydantic import Field, BaseModel
+from langchain_core.messages import BaseMessage
+import json
 
 
 class query_plannerOutput(BaseModel):
@@ -90,7 +92,15 @@ prompt = ChatPromptTemplate.from_messages(
     ]
 ).partial(schema=get_dynamic_schema())
 
+def parse_output(message: BaseMessage | str) -> query_plannerOutput | None:
+    text = message.content if isinstance(message, BaseMessage) else message
+    text = text.replace("```json", "").replace("```", "").strip()
+    try:
+        data = json.loads(text)
+        return query_plannerOutput(**data)
+    except Exception as e:
+        print(f"Parsing error: {e}")
+        print(f"Raw Output: {text}")
+        return None
 
-Query_planner = prompt | gpt_oss_120b_digital_ocean.with_structured_output(
-    query_plannerOutput
-)
+Query_planner = prompt | gpt_oss_120b_digital_ocean | parse_output
