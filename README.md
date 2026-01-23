@@ -77,8 +77,9 @@ graph LR
     Context -->|Injects| GoalMaker[Goal Maker]
     
     BudgetMaker -->|Suggestion| User
+    GoalMaker -->|Suggestion| User
     
-    note[Example: Agent suggest budget limit <br/>based on YOUR 3-month avg spending]
+    note[Example: Agent suggest budget/goal <br/>based on YOUR 3-month avg spending]
     style note fill:#f9f,stroke:#333
 ```
 
