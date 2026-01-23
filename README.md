@@ -18,9 +18,9 @@ An advanced, conversational financial advisor powered by Large Language Models (
 *   **Psychological Profiling**: Understands the *why* behind your spending.
 *   **Probabilistic Validation**: A corrective mechanism specifically for the **Explainer Agent** to ensure data accuracy before presenting it to the user.
 
-## 🧠 Behaviour Analyst Sub-System (Research / In Progress)
+## 🧠 Behaviour Analyst Sub-System (Future Roadmap / In Progress)
 
-The **Behaviour Analyst** is a complex, self-contained multi-agent workflow designed to derive deep insights from raw data. It operates as a distinct subgraph:
+The **Behaviour Analyst** represents the **future vision** of this platform. While currently in an experimental research phase, our goal is to fully integratethis complex, self-contained multi-agent workflow to derive deep insights from raw data. It currently operates as a distinct subgraph:
 
 1.  **Orchestrator**: The "Brain" that manages the analysis lifecycle. It decides whether to fetch more data, analyze existing data, or ask the user for clarification.
 2.  **Query Planner**: Translates high-level analytic questions (e.g., "Analyze my food spending trends") into precise, step-by-step SQL planning instructions.
@@ -51,6 +51,36 @@ graph LR
         
         Analyser -->|Insights| Orchestrator
     end
+```
+
+## 🧠 Context-Awareness & Memory (Future Integration)
+
+The "Maker" Agents (Budget, Goal, and Transaction Makers) are designed to possess **Deep Context** about the user via the `get_user_summary` injection system. This is a key part of our **future roadmap** to make agents truly intelligent.
+
+When fully implemented, we will leverage the **Behaviour Analyst** sub-system to generate this context dynamically. Instead of simple statistics, the Analyst will provide deep psychological and behavioral insights (e.g., "User tends to overspend on weekends due to social pressure"), enabling the Maker Agents to offer truly personalized advice.
+
+**Data Injected via `get_user_summary`:**
+1.  **Profile**: Job title, employment status (e.g., "Freelancer" vs "Salaried").
+2.  **Financial Health**: Total monthly income vs current active budgets.
+3.  **Active Goals**: What you are saving for (prevents conflicting advice).
+4.  **Spending Patterns**:
+    *   3-Month Average Spending.
+    *   Month-to-Date Spending.
+    *   Top Spending Categories & Stores.
+
+```mermaid
+graph LR
+    DB[(Database)] -->|Fetch| Service[User Summary Service]
+    Service -->|Aggregates| Context{User Context Snapshot}
+    
+    Context -->|Injects| BudgetMaker[Budget Maker]
+    Context -->|Injects| GoalMaker[Goal Maker]
+    
+    BudgetMaker -->|Suggestion| User
+    GoalMaker -->|Suggestion| User
+    
+    note[Example: Agent suggest budget/goal <br/>based on YOUR 3-month avg spending]
+    style note fill:#f9f,stroke:#333
 ```
 
 ## 🛠️ System Architecture
