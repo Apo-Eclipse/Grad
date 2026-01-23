@@ -114,8 +114,12 @@ def query_planner(state: BehaviourAnalystState) -> dict:
 
     print("Query Planner Output:", Output)
 
-    message = Output.message
-    steps_output = Output.output
+    if Output is None:
+        message = "Error: Failed to parse Query Planner output."
+        steps_output = []
+    else:
+        message = Output.message
+        steps_output = Output.output
 
     # Ensure steps are in list format
     if isinstance(steps_output, str):
