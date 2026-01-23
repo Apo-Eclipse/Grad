@@ -1,27 +1,62 @@
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
 from ninja import Schema
-from pydantic import Field, root_validator
-
-
+from pydantic import Field, model_validator
 
 
 class BudgetCreateSchema(Schema):
-    budget_name: str
+    name: str  # Frontend sends "name", maps to budget_name
     description: Optional[str] = None
+    icon: Optional[str] = "wallet"
+    color: Optional[str] = "#3162ff"
     total_limit: float = Field(default=0.0)
     priority_level_int: Optional[int] = None
 
 
 class BudgetUpdateSchema(Schema):
-    budget_name: Optional[str] = None
+    name: Optional[str] = None
     description: Optional[str] = None
+    icon: Optional[str] = None
+    color: Optional[str] = None
     total_limit: Optional[float] = None
     priority_level_int: Optional[int] = None
     active: Optional[bool] = None
 
-    @root_validator(pre=True)
-    def at_least_one_field(cls, values: Dict[str, Any]) -> Dict[str, Any]:
+    @model_validator(mode="before")
+    @classmethod
+    def at_least_one_field(cls, values):
         if not values:
             raise ValueError("At least one field must be provided for update.")
         return values
+
+
+class BudgetOutSchema(Schema):
+    id: int
+    uuid: int
+    budget_name: str
+    total_limit: float
+    priority_level: Optional[int] = None
+    priority_level_int: Optional[int] = None
+    active: bool
+    created_at: Any
+    updated_at: Any
+    spent: float
+    remaining: float
+    percentage_used: float
+    transaction_count: int
+    description: Optional[str] = None
+    icon: Optional[str] = None
+    color: Optional[str] = None
+    clean_description: Optional[str] = None
+
+
+class BudgetResponse(Schema):
+    status: str
+    message: str
+    data: Optional[BudgetOutSchema] = None
+
+
+class BudgetListResponse(Schema):
+    status: str
+    message: str
+    data: list[BudgetOutSchema]
