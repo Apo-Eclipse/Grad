@@ -14,7 +14,7 @@ router = Router(auth=AuthBearer())
 class AccountSchema(Schema):
     id: int
     name: str
-    type: str  # REGULAR, SAVINGS, CREDIT
+    type: str  # REGULAR, SAVINGS
     balance: float
 
 
@@ -32,9 +32,12 @@ class TransferSchema(Schema):
 
 
 @router.get("/", response=List[AccountSchema])
-def list_accounts(request):
-    """List all active accounts for the user."""
-    return Account.objects.filter(user=request.user, active=True).order_by("id")
+def list_accounts(request, type: str = None):
+    """List all active accounts for the user, optionally filtered by type."""
+    qs = Account.objects.filter(user=request.user, active=True)
+    if type:
+        qs = qs.filter(type=type)
+    return qs.order_by("id")
 
 
 @router.post("/", response=AccountSchema)

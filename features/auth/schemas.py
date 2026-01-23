@@ -11,3 +11,7 @@ class TokenSchema(Schema):
     refresh: str
     user_id: int
     email: str
+
+
+class RefreshSchema(Schema):
+    refresh: str

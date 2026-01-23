@@ -74,5 +74,25 @@ class UserRegistrationSchema(Schema):
         return v
 
 
+class UserOutSchema(Schema):
+    user_id: int
+    first_name: str
+    last_name: str
+    email: Optional[str] = None
+    job_title: Optional[str] = None
+    address: Optional[str] = None
+    birthday: Optional[date] = None
+    gender: Optional[str] = None
+    employment_status: Optional[str] = None
+    education_level: Optional[str] = None
+    created_at: Optional[datetime] = None
+
+
+class UserResponse(Schema):
+    status: str
+    message: str
+    data: Optional[UserOutSchema] = None
+
+
 # Keep for backwards compatibility if needed
 UserCreateSchema = UserRegistrationSchema

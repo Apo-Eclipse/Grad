@@ -8,7 +8,12 @@ from ninja import Router, Query
 
 from core.models import Income
 from core.utils.responses import success_response, error_response
-from .schemas import IncomeCreateSchema, IncomeUpdateSchema
+from .schemas import (
+    IncomeCreateSchema,
+    IncomeUpdateSchema,
+    IncomeResponse,
+    IncomeListResponse,
+)
 from features.auth.api import AuthBearer
 
 logger = logging.getLogger(__name__)
@@ -32,10 +37,15 @@ def _format_income(income: Dict[str, Any]) -> Dict[str, Any]:
     """Format income dict for JSON response."""
     income["amount"] = float(income["amount"]) if income["amount"] else None
     income["active"] = income.get("active", True)
+
+    # Static visual fields
+    income["icon"] = "cash-outline"
+    income["color"] = "#10b981"
+
     return income
 
 
-@router.get("/", response=Dict[str, Any])
+@router.get("/", response=IncomeListResponse)
 def get_income(request, active: Optional[bool] = Query(None)):
     """Retrieve all income sources for a user."""
     filters = {"user_id": request.user.id}
@@ -44,20 +54,21 @@ def get_income(request, active: Optional[bool] = Query(None)):
 
     queryset = Income.objects.filter(**filters)
 
-    incomes = queryset.order_by("-created_at").values(
-        "id",
-        "user_id",
-        "type_income",
-        "amount",
-        "description",
-        "active",
-        "created_at",
-        "updated_at",
-    )
-    return success_response(list(incomes))
+    # Sorting
+    if active is False:
+        # Recently deleted first
+        queryset = queryset.order_by("-updated_at")
+    else:
+        # Highest income first
+        queryset = queryset.order_by("-amount")
+
+    incomes = queryset.values(*INCOME_FIELDS)
+
+    result = [_format_income(i) for i in incomes]
+    return success_response(result)
 
 
-@router.get("/{income_id}", response=Dict[str, Any])
+@router.get("/{income_id}", response=IncomeResponse)
 def get_single_income(request, income_id: int):
     """Get a single income source."""
     income = (
@@ -78,12 +89,13 @@ def get_single_income(request, income_id: int):
     if not income:
         return error_response("Income not found", code=404)
 
-    # Format amount
-    income["amount"] = float(income["amount"]) if income["amount"] else None
-    return success_response(income)
+    if not income:
+        return error_response("Income not found", code=404)
+
+    return success_response(_format_income(income))
 
 
-@router.post("/", response=Dict[str, Any])
+@router.post("/", response=IncomeResponse)
 def create_income(request, payload: IncomeCreateSchema):
     """Add a new income source."""
     try:
@@ -103,7 +115,7 @@ def create_income(request, payload: IncomeCreateSchema):
         return error_response(f"Failed to create income source: {e}")
 
 
-@router.put("/{income_id}", response=Dict[str, Any])
+@router.put("/{income_id}", response=IncomeResponse)
 def update_income(request, income_id: int, payload: IncomeUpdateSchema):
     """Update an existing income source."""
     updates = payload.dict(exclude_unset=True)
@@ -126,7 +138,7 @@ def update_income(request, income_id: int, payload: IncomeUpdateSchema):
         return error_response(f"Failed to update income: {e}")
 
 
-@router.delete("/{income_id}", response=Dict[str, Any])
+@router.delete("/{income_id}", response=IncomeResponse)
 def delete_income(request, income_id: int):
     """Soft delete an income source by setting active to False."""
     try:

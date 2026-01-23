@@ -4,7 +4,7 @@ import logging
 from typing import Any, Dict
 
 from ninja import Router
-from django.db.models import Sum, DecimalField
+from django.db.models import Sum, DecimalField, Count, Q
 from django.db.models.functions import Coalesce, TruncMonth
 from django.utils import timezone
 
@@ -12,6 +12,8 @@ from django.utils import timezone
 from core.models import Transaction, Budget, Income
 
 from features.auth.api import AuthBearer
+from core.utils.responses import error_response
+from .schemas import MonthlyBreakdownSchema, OverspendResponseSchema
 
 logger = logging.getLogger(__name__)
 router = Router(auth=AuthBearer())
@@ -50,7 +52,7 @@ def get_monthly_spend(request):
     return {"data": data}
 
 
-@router.get("/overspend", response=Dict[str, Any])
+@router.get("/overspend", response=OverspendResponseSchema)
 def get_overspend(request):
     """Identify categories where spending exceeds the budget limit."""
     current_month_start = timezone.now().replace(
@@ -111,6 +113,8 @@ def get_overspend(request):
 
     total_assets = 0.0
     total_liabilities = 0.0
+    total_regular = 0.0
+    total_savings = 0.0
 
     account_breakdown = []
 
@@ -120,25 +124,33 @@ def get_overspend(request):
             {"id": acc.id, "name": acc.name, "type": acc.type, "balance": bal}
         )
 
-        if acc.type == Account.AccountType.CREDIT:
-            # Assuming Credit balance is negative when owed, or positive when owed?
-            # Convection:
-            # If I spend $100, balance -> -100.
-            # So simple Sum is correct for Net Worth.
-            # Liabilities is usually absolute value of negative balances.
-            if bal < 0:
-                total_liabilities += abs(bal)
-            else:
-                # Positive credit balance is an asset (overpayment)
-                total_assets += bal
+        # Break down by type
+        if acc.type == Account.AccountType.SAVINGS:
+            total_savings += bal
         else:
-            if bal >= 0:
-                total_assets += bal
-            else:
-                # Overdraft
-                total_liabilities += abs(bal)
+            # Regular accounts (Spendable Cash)
+            total_regular += bal
 
-    net_worth = total_assets - total_liabilities  # Or just sum of all balances
+        # All accounts are assets in this simplified model
+        if bal >= 0:
+            total_assets += bal
+        else:
+            # Overdraft
+            total_liabilities += abs(bal)
+
+    net_worth = total_assets - total_liabilities
+
+    summary = {
+        "total_income": total_income,
+        "total_spent": total_spent_all,
+        "net_position": net_worth,
+        "total_assets": total_assets,
+        "total_liabilities": total_liabilities,
+        "total_regular": total_regular,  # Spendable
+        "total_savings": total_savings,  # Reserved
+        "is_deficit": (total_spent_all > total_income),
+        "accounts": account_breakdown,
+    }
 
     summary = {
         "total_income": total_income,
@@ -166,6 +178,110 @@ def get_total_income(request):
     data = [{"type_income": r["type_income"], "total": float(r["total"])} for r in rows]
 
     return {"data": data}
+
+
+@router.get("/monthly-breakdown", response=MonthlyBreakdownSchema)
+def get_monthly_breakdown(request, month: str = None):
+    """
+    Get detailed breakdown for a specific month.
+    Query Param: month (YYYY-MM-DD), defaults to current month.
+    """
+    user_id = request.user.id
+
+    # Date Range Calculation
+    if month:
+        try:
+            target_date = timezone.datetime.strptime(month, "%Y-%m-%d").date()
+            start_date = target_date.replace(day=1)
+        except ValueError:
+            return error_response("Invalid date format. Use YYYY-MM-DD")
+    else:
+        start_date = timezone.now().date().replace(day=1)
+
+    # Calculate end_date (start of next month)
+    if start_date.month == 12:
+        end_date = start_date.replace(year=start_date.year + 1, month=1, day=1)
+    else:
+        end_date = start_date.replace(month=start_date.month + 1, day=1)
+
+    # 1. Total Income (Recurring Model - Active items)
+    # We sum all active income sources as they are monthly recurring
+    income_agg = Income.objects.filter(user_id=user_id, active=True).aggregate(
+        total=Coalesce(Sum("amount"), 0, output_field=DecimalField())
+    )
+    total_income = float(income_agg["total"])
+
+    # 2. Transactions (Expenses only)
+    tx_filter = Q(
+        user_id=user_id,
+        active=True,
+        transaction_type="EXPENSE",
+        date__gte=start_date,
+        date__lt=end_date,
+    )
+
+    # Aggregate Totals
+    tx_stats = Transaction.objects.filter(tx_filter).aggregate(
+        total_spent=Coalesce(Sum("amount"), 0, output_field=DecimalField()),
+        count=Count("id"),
+    )
+
+    total_spent = float(tx_stats["total_spent"])
+    transaction_count = tx_stats["count"]
+
+    # 3. Category Breakdown (Group by Budget)
+    # Group by budget to get the color/icon from budget description
+    category_rows = (
+        Transaction.objects.filter(tx_filter)
+        .values("budget__budget_name", "budget__icon", "budget__color")
+        .annotate(
+            cat_total=Coalesce(Sum("amount"), 0, output_field=DecimalField()),
+            cat_count=Count("id"),
+        )
+        .order_by("-cat_total")
+    )
+
+    categories = []
+    for row in category_rows:
+        amount = float(row["cat_total"])
+        # Handle unbudgeted transactions
+        if row["budget__budget_name"]:
+            name = row["budget__budget_name"]
+            color = row["budget__color"]
+            icon = row["budget__icon"]
+        else:
+            name = "Unbudgeted"
+            color = "#9ca3af"  # Gray
+            icon = "help-circle-outline"  # or similar
+
+        # Percentage
+        pct = (amount / total_spent * 100) if total_spent > 0 else 0.0
+
+        categories.append(
+            {
+                "name": name,
+                "amount": amount,
+                "count": row["cat_count"],
+                "percentage": round(pct, 1),
+                "color": color,
+                "icon": icon,
+            }
+        )
+
+    # 5. Construct Flat Response (matching frontend interface)
+    net_savings = total_income - total_spent
+    avg_txn = (total_spent / transaction_count) if transaction_count > 0 else 0.0
+
+    return {
+        "total_income": total_income,
+        "total_spent": total_spent,
+        "net_savings": net_savings,
+        "surplus": net_savings >= 0,
+        "transaction_count": transaction_count,
+        "avg_per_transaction": round(avg_txn, 2),
+        "categories": categories,
+        # "period": {"start": start_date, "end": end_date} # Optional, can be removed if strict
+    }
 
 
 # ============================================================================

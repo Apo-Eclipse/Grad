@@ -9,7 +9,7 @@ from django.db import transaction, IntegrityError
 
 from core.models import Profile
 from core.utils.responses import success_response, error_response
-from .schemas import UserRegistrationSchema
+from .schemas import UserRegistrationSchema, UserResponse
 
 from features.auth.api import AuthBearer
 
@@ -45,7 +45,7 @@ def _format_user_response(
     return result
 
 
-@router.get("/", response=Dict[str, Any], auth=AuthBearer())
+@router.get("/", response=UserResponse, auth=AuthBearer())
 def get_user(request):
     """Get user profile details."""
     user_id = request.user.id
@@ -56,10 +56,10 @@ def get_user(request):
     profile_data = (
         Profile.objects.filter(user_id=user_id).values(*PROFILE_FIELDS).first()
     )
-    return _format_user_response(user_data, profile_data)
+    return success_response(_format_user_response(user_data, profile_data))
 
 
-@router.post("/", response=Dict[str, Any])
+@router.post("/", response=UserResponse)
 def create_user(request, payload: UserRegistrationSchema):
     """Register a new user with password."""
     # Check for existing email

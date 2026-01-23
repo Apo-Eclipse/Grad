@@ -8,7 +8,6 @@ class Account(models.Model):
     class AccountType(models.TextChoices):
         REGULAR = "REGULAR", "Regular"
         SAVINGS = "SAVINGS", "Savings"
-        CREDIT = "CREDIT", "Credit"
 
     user = models.ForeignKey(User, models.DO_NOTHING)
     name = models.TextField()

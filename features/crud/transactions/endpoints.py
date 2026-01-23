@@ -4,18 +4,60 @@ import logging
 from typing import Any, Dict, Optional
 
 from ninja import Router, Query
-from django.db.models import Q
+from django.db.models import Count
 
 from django.utils import timezone
 
 from core.models import Transaction
 from core.utils.responses import success_response, error_response
-from .schemas import TransactionCreateSchema, TransactionUpdateSchema
+from django.db.models import Sum, Q, DecimalField
+from django.db.models.functions import Coalesce
+
+from .schemas import (
+    TransactionCreateSchema,
+    TransactionUpdateSchema,
+    TransactionOutSchema,
+    TransactionResponse,
+    TransactionListResponse,
+    TransactionSummarySchema,
+)
 
 from features.auth.api import AuthBearer
 
 logger = logging.getLogger(__name__)
 router = Router(auth=AuthBearer())
+
+
+@router.get("/summary", response=TransactionSummarySchema)
+def get_transaction_summary(
+    request,
+    start_date: Optional[str] = Query(None),
+    end_date: Optional[str] = Query(None),
+):
+    """
+    Get total amount and count of transactions for a period.
+    Only counts active expenses.
+    """
+    filters = {
+        "user_id": request.user.id,
+        "active": True,
+        "transaction_type": "EXPENSE",
+    }
+
+    if start_date:
+        filters["date__gte"] = start_date
+    if end_date:
+        filters["date__lte"] = end_date
+
+    agg = Transaction.objects.filter(**filters).aggregate(
+        total=Coalesce(Sum("amount"), 0, output_field=DecimalField()), count=Count("id")
+    )
+
+    return {
+        "total_amount": float(agg["total"]),
+        "currency": "EGP",
+        "count": agg["count"],
+    }
 
 
 # Fields to retrieve for transaction queries
@@ -38,7 +80,10 @@ TRANSACTION_FIELDS = (
     "transfer_to_id",
 )
 
-TRANSACTION_FIELDS_WITH_BUDGET = TRANSACTION_FIELDS + ("budget__budget_name",)
+TRANSACTION_FIELDS_WITH_BUDGET = TRANSACTION_FIELDS + (
+    "budget__budget_name",
+    "budget__description",
+)
 
 
 def _format_transaction(
@@ -51,9 +96,9 @@ def _format_transaction(
         "date": txn["date"],
         "amount": float(txn["amount"]) if txn["amount"] else 0.0,
         "time": str(txn["time"]) if txn["time"] else None,
-        "description": txn.get("description"),  # Was store_name
+        "description": txn.get("description"),
         "city": txn["city"],
-        "category": txn.get("category"),  # Was type_spending
+        "category": txn.get("category"),
         "budget_id": txn["budget_id"],
         "neighbourhood": txn["neighbourhood"],
         "active": txn.get("active", True),
@@ -63,12 +108,19 @@ def _format_transaction(
         "account_id": txn.get("account_id"),
         "transfer_to_id": txn.get("transfer_to_id"),
     }
+
+    # Budget Metadata (if requested)
     if include_budget_name and "budget__budget_name" in txn:
-        result["budget_name"] = txn["budget__budget_name"]
+        if txn.get("budget__budget_name"):
+            result["budget_name"] = txn["budget__budget_name"]
+            result["budget_icon"] = txn.get("budget__icon")
+            result["budget_color"] = txn.get("budget__color")
+        # else: Unbudgeted, no budget metadata to add
+
     return result
 
 
-@router.get("/", response=Dict[str, Any])
+@router.get("/", response=TransactionListResponse)
 def get_transactions(
     request,
     active: Optional[bool] = Query(None),
@@ -91,9 +143,15 @@ def get_transactions(
 
     queryset = Transaction.objects.filter(**filters)
 
-    transactions = queryset.order_by("-date", "-time").values(
-        *TRANSACTION_FIELDS_WITH_BUDGET
-    )[:limit]
+    # Sorting logic: If viewing 'deleted' items, sort by updated_at desc
+    if active is False:
+        ordering = ("-updated_at",)
+    else:
+        ordering = ("-date", "-time")
+
+    transactions = queryset.order_by(*ordering).values(*TRANSACTION_FIELDS_WITH_BUDGET)[
+        :limit
+    ]
 
     result = [
         _format_transaction(txn, include_budget_name=True) for txn in transactions
@@ -101,7 +159,7 @@ def get_transactions(
     return success_response(result)
 
 
-@router.post("/", response=Dict[str, Any])
+@router.post("/", response=TransactionResponse)
 def create_transaction(request, payload: TransactionCreateSchema):
     """Create a new transaction row."""
     try:
@@ -130,20 +188,20 @@ def create_transaction(request, payload: TransactionCreateSchema):
         return error_response(f"Failed to create transaction: {e}")
 
 
-@router.get("/{transaction_id}", response=Dict[str, Any])
+@router.get("/{transaction_id}", response=TransactionResponse)
 def get_transaction(request, transaction_id: int):
     """Get a single transaction."""
     txn = (
         Transaction.objects.filter(id=transaction_id, user_id=request.user.id)
-        .values(*TRANSACTION_FIELDS)
+        .values(*TRANSACTION_FIELDS_WITH_BUDGET)
         .first()
     )
     if not txn:
         return error_response("Transaction not found", code=404)
-    return success_response(_format_transaction(txn))
+    return success_response(_format_transaction(txn, include_budget_name=True))
 
 
-@router.put("/{transaction_id}", response=Dict[str, Any])
+@router.put("/{transaction_id}", response=TransactionResponse)
 def update_transaction(request, transaction_id: int, payload: TransactionUpdateSchema):
     """Update an existing transaction."""
     updates = payload.dict(exclude_unset=True)
@@ -173,7 +231,7 @@ def update_transaction(request, transaction_id: int, payload: TransactionUpdateS
         return error_response(f"Failed to update transaction: {e}")
 
 
-@router.delete("/{transaction_id}", response=Dict[str, Any])
+@router.delete("/{transaction_id}", response=TransactionResponse)
 def delete_transaction(request, transaction_id: int):
     """Soft delete a transaction by setting active to False."""
     try:
@@ -189,7 +247,7 @@ def delete_transaction(request, transaction_id: int):
         return error_response(f"Failed to delete transaction: {e}")
 
 
-@router.get("/search/", response=Dict[str, Any])
+@router.get("/search/", response=TransactionListResponse)
 def search_transactions(
     request,
     query_text: Optional[str] = Query(None, alias="query"),
