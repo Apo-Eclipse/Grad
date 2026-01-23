@@ -225,6 +225,8 @@ erDiagram
         text budget_name
         numeric total_limit
         boolean active
+        text icon
+        text color
     }
     GOALS {
         bigint id PK
@@ -233,11 +235,15 @@ erDiagram
         numeric target
         date due_date
         text plan
+        numeric saved_amount
         boolean active
+        text icon
+        text color
     }
     INCOME {
         bigint id PK
         bigint user_id FK
+        bigint account_id FK
         text type_income
         numeric amount
         text description
@@ -249,8 +255,9 @@ erDiagram
         bigint account_id FK
         date date
         numeric amount
-        text store_name
-        text type_spending
+        text description
+        text category
+        text city
     }
     ACCOUNTS {
         bigint id PK
