@@ -105,7 +105,16 @@ Return ONLY valid JSON.
    - Escape double quotes inside the text (e.g., \\").
 
 Correct Example:
-{{"output": "## October Spending\\n- Total: 500 EGP\\n- Notes: High spending.", "message": ""}}
+{{"output": "## October Spending\\n- Total: 500 EGP\\n- Notes: High spending.", "message": "DIRECTIVE: FETCH budget details for 'Food'..."}}
+
+**DIRECTIVES FOR 'message':**
+- If you need more data: "FETCH: <natural language description of data needed>". **DO NOT WRITE SQL.**
+- If analysis is complete: "DONE: Analysis complete."
+- **CRITICAL**: Do NOT leave 'message' empty if you need action.
+
+**HANDLING NO DATA:**
+- If the acquired data is empty/unavailable, your `output` MUST be: "No data available for this request."
+- Do NOT try to hallucinate an analysis.
 
 Incorrect Example (Illegal newlines):
 {{"output": "## October Spending

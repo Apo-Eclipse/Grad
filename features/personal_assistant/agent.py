@@ -41,6 +41,8 @@ def invoke_personal_assistant(
     4. Be concise but friendly.
     5. Do not invent financial data; use only what is provided in the context.
     6. If the user asks for data you don't have, politely explain you only have access to what's provided.
+    7. **Formatting**: Return natural text only. Do NOT use special formats like markdown code blocks (e.g. ```json). 
+    8. **Privacy**: Do NOT show internal Database IDs or Indexes (e.g., "Budget ID: 5") to the user. Reference items by their name instead.
     
     Return your response as plain text. The system will wrap it in a JSON structure.
     """
