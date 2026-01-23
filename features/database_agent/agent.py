@@ -28,6 +28,7 @@ RULES:
 2. **PostgreSQL Syntax**: Use DATE_TRUNC, EXTRACT, etc.
 3. **Format**: Use column names (not indices) in results. Round numerics to 2 decimals.
 4. **Context**: Always filter by `user_id`.
+5. **Active Data Only**: If a table has an `active` column, YOU MUST include `AND active = true` in your WHERE clause to exclude soft-deleted records.
 
 DATABASE SCHEMA (with field types):
 
