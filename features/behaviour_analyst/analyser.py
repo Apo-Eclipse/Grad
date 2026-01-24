@@ -79,7 +79,7 @@ Rules:
 
 Good requests:
 - “I need transactions grouped by store_name and neighbourhood
-   where type_spending = 'transport' for the current month.”
+   where budget_name = 'Transport' for the current month.”
 - “I need all transactions linked to budget_name = 'Food'
    for October 2025.”
 
@@ -137,6 +137,7 @@ analyser_prompt = ChatPromptTemplate.from_messages(
     ]
 ).partial(schema=get_dynamic_schema())
 
+
 def parse_output(message: BaseMessage | str) -> AnalyserOutput | None:
     text = message.content if isinstance(message, BaseMessage) else message
     text = text.replace("```json", "").replace("```", "").strip()
@@ -147,5 +148,6 @@ def parse_output(message: BaseMessage | str) -> AnalyserOutput | None:
         print(f"Parsing error: {e}")
         print(f"Raw Output: {text}")
         return None
+
 
 Analyser = analyser_prompt | gpt_oss_120b_digital_ocean | parse_output

@@ -71,16 +71,16 @@ CONTEXT PROVIDED:
 - "last_conversation": Previous messages in this session.
 
 RULES:
-1. **Extract Details**: Look for Amount, Category (type_spending), Store, Date, Time, City, and Neighbourhood.
+1. **Extract Details**: Look for Amount, Store, Date, Time, City, and Neighbourhood.
    - If Date is missing, assume "current_date".
    - If Time/City/Neighbourhood/Store are missing, leave null initially.
-2. **Map Category to Budget ID**:
-   - Compare the user's category (e.g., "groceries") to the "active_budgets" list.
-   - If a match is found (e.g., "Food"), set "budget_id" to that ID and "type_spending" to the budget name.
-   - If NO match is found, set "budget_id" to null and ASK the user if they want to proceed without a category or select one from the list.
+2. **Map Description to Budget ID**:
+   - Try to infer a budget from the description or context.
+   - If a match is found (e.g., "Food"), set "budget_id" to that ID.
+   - If NO match is found, set "budget_id" to null and ASK the user if they want to select a budget.
 3. **Validation**:
    - **Amount is MANDATORY**. If missing, ask for it.
-   - **Category is Recommended**. If missing/invalid, warn/ask as above.
+   - **Budget ID is Recommended**. If missing/invalid, warn/ask as above.
 4. **Optional Details Check**:
    - The user might not provide Time, City, or Neighbourhood.
    - **IF** these are missing AND you haven't asked about them in "last_conversation":
@@ -95,13 +95,13 @@ RULES:
 
 EXAMPLES:
 - User: "Spent 50 on food" (History: Empty)
-  -> {{"message": "Recorded 50 EGP for Food. Any details to add (Time, City, Neighbourhood)?", "amount": 50, "budget_id": 1, "type_spending": "Food", "is_done": false}}
+  -> {{"message": "Recorded 50 EGP for Food. Any details to add (Time, City, Neighbourhood)?", "amount": 50, "budget_id": 1, "is_done": false}}
 
 - User: "No details" (History: Agent asked about details)
-  -> {{"message": "Done. Transaction saved.", "amount": 50, "budget_id": 1, "type_spending": "Food", "is_done": true}}
+  -> {{"message": "Done. Transaction saved.", "amount": 50, "budget_id": 1, "is_done": true}}
 
 - User: "Spent 100 at Zara in Cairo"
-  -> {{"message": "Recorded 100 EGP at Zara (Cairo). Category?", "amount": 100, "store_name": "Zara", "city": "Cairo", "is_done": false}}
+  -> {{"message": "Recorded 100 EGP at Zara (Cairo). Budget?", "amount": 100, "store_name": "Zara", "city": "Cairo", "is_done": false}}
 """
 
 user_prompt = """

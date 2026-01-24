@@ -111,10 +111,8 @@ def transfer_funds(request, payload: TransferSchema):
             amount=payload.amount,
             description=payload.description
             or f"Transfer from {from_acc.name} to {to_acc.name}",
-            category="Transfer",
             account=from_acc,
             transfer_to=to_acc,
-            budget=None,  # Transfers don't need a budget
         )
 
     return 200, "Transfer successful."
