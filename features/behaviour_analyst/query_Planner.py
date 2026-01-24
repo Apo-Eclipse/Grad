@@ -25,7 +25,7 @@ Produce a numbered list of no more than 4 short, text-only steps. Each step must
 
 What a step MUST include (plain language, no SQL):
   • Metric: one aggregate (SUM | COUNT | AVG | MAX | MIN)
-  • Dimension: choose exactly ONE lens (time | store_name | city | budget/category | type_spending)
+  • Dimension: choose exactly ONE lens (time | store_name | city | budget/category)
   • Time window: explicit (e.g., current month, last 90 days, last 6 months)
   • Filters: must include user_id, and any request-specific filters
   • Output size: limit results to no more than 10 rows (e.g., “top 10”, “last 6 months”)
@@ -92,6 +92,7 @@ prompt = ChatPromptTemplate.from_messages(
     ]
 ).partial(schema=get_dynamic_schema())
 
+
 def parse_output(message: BaseMessage | str) -> query_plannerOutput | None:
     text = message.content if isinstance(message, BaseMessage) else message
     text = text.replace("```json", "").replace("```", "").strip()
@@ -102,5 +103,6 @@ def parse_output(message: BaseMessage | str) -> query_plannerOutput | None:
         print(f"Parsing error: {e}")
         print(f"Raw Output: {text}")
         return None
+
 
 Query_planner = prompt | gpt_oss_120b_digital_ocean | parse_output
