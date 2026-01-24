@@ -133,33 +133,7 @@ Direct interaction with the Goal Maker agent.
 }
 ```
 
-### Transaction Maker Assistant
-**POST** `/personal_assistant/transaction/assist`
-Direct interaction with the Transaction Maker agent.
 
-**Request Body** (`TransactionMakerRequestSchema`):
-```json
-{
-  "user_request": "Spent 50 at Starbucks",
-  "conversation_id": 12 // Optional
-}
-```
-
-**Response** (`TransactionMakerResponseSchema`):
-```json
-{
-  "conversation_id": 12,
-  "message": "Transaction recorded.",
-  "amount": 50.0,
-  "budget_id": 5,
-  "store_name": "Starbucks",
-  "date": "2025-10-25",
-  "time": "14:30:00",
-  "city": "Cairo",
-  "neighbourhood": "Maadi",
-  "is_done": true
-}
-```
 
 ---
 
