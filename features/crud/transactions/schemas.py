@@ -1,4 +1,4 @@
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 from datetime import date
 from ninja import Schema
 from pydantic import model_validator
@@ -8,26 +8,24 @@ class TransactionCreateSchema(Schema):
     date: date
     amount: float
     time: Optional[str] = None
-    description: Optional[str] = None  # Was store_name
+    description: Optional[str] = None
     city: Optional[str] = None
-    category: Optional[str] = None  # Was type_spending
     budget_id: Optional[int] = None
     neighbourhood: Optional[str] = None
-    account_id: Optional[int] = None  # Link to Account
-    transaction_type: str = "EXPENSE"  # EXPENSE or TRANSFER
+    account_id: Optional[int] = None
+    transaction_type: str = "EXPENSE"
 
 
 class TransactionUpdateSchema(Schema):
     date: Optional[date] = None
     amount: Optional[float] = None
     time: Optional[str] = None
-    description: Optional[str] = None  # Was store_name
+    description: Optional[str] = None
     city: Optional[str] = None
-    category: Optional[str] = None  # Was type_spending
     budget_id: Optional[int] = None
     neighbourhood: Optional[str] = None
     active: Optional[bool] = None
-    account_id: Optional[int] = None  # Link to Account
+    account_id: Optional[int] = None
 
     @model_validator(mode="before")
     @classmethod
@@ -37,6 +35,7 @@ class TransactionUpdateSchema(Schema):
         return values
 
 
+# Base CRUD output (raw data only)
 class TransactionOutSchema(Schema):
     id: int
     user_id: int
@@ -45,19 +44,14 @@ class TransactionOutSchema(Schema):
     time: Optional[str] = None
     description: Optional[str] = None
     city: Optional[str] = None
-    category: Optional[str] = None
     budget_id: Optional[int] = None
     neighbourhood: Optional[str] = None
+    account_id: Optional[int] = None
+    transfer_to_id: Optional[int] = None
+    transaction_type: str
     active: bool
     created_at: Any
     updated_at: Any
-    transaction_type: str
-    account_id: Optional[int] = None
-    transfer_to_id: Optional[int] = None
-    # Optional Budget Metadata
-    budget_name: Optional[str] = None
-    budget_icon: Optional[str] = None
-    budget_color: Optional[str] = None
 
 
 class TransactionResponse(Schema):
@@ -70,10 +64,3 @@ class TransactionListResponse(Schema):
     status: str
     message: str
     data: list[TransactionOutSchema]
-    count: Optional[int] = None
-
-
-class TransactionSummarySchema(Schema):
-    total_amount: float
-    currency: str
-    count: int

@@ -1,22 +1,326 @@
-"""Analytics and administration database operations."""
+"""Analytics endpoints - Aggregations, computed fields, and advanced queries."""
 
 import logging
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
-from ninja import Router
+from ninja import Router, Query
 from django.db.models import Sum, DecimalField, Count, Q
 from django.db.models.functions import Coalesce, TruncMonth
 from django.utils import timezone
 
-# from core.utils.database import run_select, execute_modify, safe_json_body
-from core.models import Transaction, Budget, Income
-
+from core.models import Transaction, Budget, Income, Goal, Account
+from core.utils.responses import success_response, error_response
 from features.auth.api import AuthBearer
-from core.utils.responses import error_response
-from .schemas import MonthlyBreakdownSchema, OverspendResponseSchema
+from .schemas import (
+    MonthlyBreakdownSchema,
+    OverspendResponseSchema,
+    BudgetStatsResponse,
+    BudgetStatsListResponse,
+    GoalStatsResponse,
+    GoalStatsListResponse,
+    TransactionSummarySchema,
+)
 
 logger = logging.getLogger(__name__)
 router = Router(auth=AuthBearer())
+
+
+# =============================================================================
+# Budget Analytics
+# =============================================================================
+
+
+def _compute_budget_stats(budget_obj, spent_amount, tx_count) -> dict:
+    """Compute derived fields for a budget object."""
+    limit = float(budget_obj.total_limit)
+    spent = float(spent_amount) if spent_amount else 0.0
+    remaining = max(0, limit - spent)
+    percentage_used = (spent / limit * 100) if limit > 0 else 0.0
+
+    return {
+        "id": budget_obj.id,
+        "budget_name": budget_obj.budget_name,
+        "description": budget_obj.description,
+        "total_limit": limit,
+        "priority_level_int": budget_obj.priority_level_int,
+        "icon": budget_obj.icon,
+        "color": budget_obj.color,
+        "active": budget_obj.active,
+        "created_at": budget_obj.created_at,
+        "updated_at": budget_obj.updated_at,
+        # Computed
+        "spent": spent,
+        "remaining": remaining,
+        "percentage_used": round(percentage_used, 1),
+        "transaction_count": tx_count,
+    }
+
+
+@router.get("/budgets/stats", response=BudgetStatsListResponse)
+def get_budget_stats(request, active: Optional[bool] = Query(None)):
+    """Get all budgets with computed spending stats."""
+    filters = {"user_id": request.user.id}
+    if active is not None:
+        filters["active"] = active
+
+    now = timezone.now()
+    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+    queryset = Budget.objects.filter(**filters)
+
+    if active is False:
+        queryset = queryset.order_by("-updated_at")
+    else:
+        queryset = queryset.order_by("-priority_level_int")
+
+    budgets = queryset.annotate(
+        monthly_spent=Coalesce(
+            Sum(
+                "transaction__amount",
+                filter=Q(
+                    transaction__date__gte=month_start,
+                    transaction__active=True,
+                    transaction__transaction_type="EXPENSE",
+                ),
+            ),
+            0,
+            output_field=DecimalField(),
+        ),
+        monthly_count=Count(
+            "transaction__id",
+            filter=Q(
+                transaction__date__gte=month_start,
+                transaction__active=True,
+                transaction__transaction_type="EXPENSE",
+            ),
+        ),
+    )
+
+    result = [
+        _compute_budget_stats(b, b.monthly_spent, b.monthly_count) for b in budgets
+    ]
+    return success_response(result)
+
+
+@router.get("/budgets/{budget_id}/stats", response=BudgetStatsResponse)
+def get_single_budget_stats(request, budget_id: int):
+    """Get a single budget with computed spending stats."""
+    now = timezone.now()
+    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+    budget = (
+        Budget.objects.filter(id=budget_id, user_id=request.user.id)
+        .annotate(
+            monthly_spent=Coalesce(
+                Sum(
+                    "transaction__amount",
+                    filter=Q(
+                        transaction__date__gte=month_start,
+                        transaction__active=True,
+                        transaction__transaction_type="EXPENSE",
+                    ),
+                ),
+                0,
+                output_field=DecimalField(),
+            ),
+            monthly_count=Count(
+                "transaction__id",
+                filter=Q(
+                    transaction__date__gte=month_start,
+                    transaction__active=True,
+                    transaction__transaction_type="EXPENSE",
+                ),
+            ),
+        )
+        .first()
+    )
+
+    if not budget:
+        return error_response("Budget not found", code=404)
+
+    return success_response(
+        _compute_budget_stats(budget, budget.monthly_spent, budget.monthly_count)
+    )
+
+
+# =============================================================================
+# Goal Analytics
+# =============================================================================
+
+
+def _compute_goal_stats(goal) -> dict:
+    """Compute derived fields for a goal object."""
+    target = float(goal.target) if goal.target else 0.0
+    saved = float(goal.saved_amount) if goal.saved_amount else 0.0
+    progress = (saved / target * 100) if target > 0 else 0.0
+
+    days_remaining = None
+    if goal.due_date:
+        today = timezone.localdate()
+        delta = (goal.due_date - today).days
+        days_remaining = max(0, delta)
+
+    return {
+        "id": goal.id,
+        "user_id": goal.user_id,
+        "goal_name": goal.goal_name,
+        "description": goal.description,
+        "target": target,
+        "saved_amount": saved,
+        "start_date": goal.start_date,
+        "due_date": goal.due_date,
+        "icon": goal.icon,
+        "color": goal.color,
+        "plan": goal.plan,
+        "active": goal.active,
+        "created_at": goal.created_at,
+        "updated_at": goal.updated_at,
+        # Computed
+        "progress_percentage": round(progress, 1),
+        "days_remaining": days_remaining,
+    }
+
+
+@router.get("/goals/stats", response=GoalStatsListResponse)
+def get_goal_stats(request, active: Optional[bool] = Query(None)):
+    """Get all goals with computed progress stats."""
+    filters = {"user_id": request.user.id}
+    if active is not None:
+        filters["active"] = active
+
+    queryset = Goal.objects.filter(**filters)
+
+    if active is False:
+        queryset = queryset.order_by("-updated_at")
+    else:
+        queryset = queryset.order_by("-created_at")
+
+    result = [_compute_goal_stats(g) for g in queryset]
+    return success_response(result)
+
+
+@router.get("/goals/{goal_id}/stats", response=GoalStatsResponse)
+def get_single_goal_stats(request, goal_id: int):
+    """Get a single goal with computed progress stats."""
+    goal = Goal.objects.filter(id=goal_id, user_id=request.user.id).first()
+
+    if not goal:
+        return error_response("Goal not found", code=404)
+
+    return success_response(_compute_goal_stats(goal))
+
+
+# =============================================================================
+# Transaction Analytics
+# =============================================================================
+
+
+@router.get("/transactions/summary", response=TransactionSummarySchema)
+def get_transaction_summary(
+    request,
+    start_date: Optional[str] = Query(None),
+    end_date: Optional[str] = Query(None),
+):
+    """Get total amount and count of transactions for a period."""
+    filters = {
+        "user_id": request.user.id,
+        "active": True,
+        "transaction_type": "EXPENSE",
+    }
+
+    if start_date:
+        filters["date__gte"] = start_date
+    if end_date:
+        filters["date__lte"] = end_date
+
+    agg = Transaction.objects.filter(**filters).aggregate(
+        total=Coalesce(Sum("amount"), 0, output_field=DecimalField()), count=Count("id")
+    )
+
+    return {
+        "total_amount": float(agg["total"]),
+        "currency": "EGP",
+        "count": agg["count"],
+    }
+
+
+@router.get("/transactions/search", response=Dict[str, Any])
+def search_transactions(
+    request,
+    query_text: Optional[str] = Query(None, alias="query"),
+    category: Optional[str] = Query(None),
+    min_amount: Optional[float] = Query(None),
+    max_amount: Optional[float] = Query(None),
+    start_date: Optional[str] = Query(None),
+    end_date: Optional[str] = Query(None),
+    city: Optional[str] = Query(None),
+    neighbourhood: Optional[str] = Query(None),
+    limit: int = Query(100, le=1000),
+):
+    """Advanced transaction search."""
+    queryset = Transaction.objects.filter(user_id=request.user.id, active=True)
+
+    if query_text:
+        queryset = queryset.filter(
+            Q(description__icontains=query_text)
+            | Q(budget__budget_name__icontains=query_text)
+        )
+
+    if category:
+        queryset = queryset.filter(Q(budget__budget_name__icontains=category))
+
+    if min_amount is not None:
+        queryset = queryset.filter(amount__gte=min_amount)
+
+    if max_amount is not None:
+        queryset = queryset.filter(amount__lte=max_amount)
+
+    if start_date:
+        queryset = queryset.filter(date__gte=start_date)
+
+    if end_date:
+        queryset = queryset.filter(date__lte=end_date)
+
+    if city:
+        queryset = queryset.filter(city__icontains=city)
+
+    if neighbourhood:
+        queryset = queryset.filter(neighbourhood__icontains=neighbourhood)
+
+    transactions = queryset.order_by("-date").values(
+        "id",
+        "date",
+        "amount",
+        "description",
+        "budget__budget_name",
+        "city",
+        "neighbourhood",
+        "account_id",
+        "transaction_type",
+    )[:limit]
+
+    result = []
+    for txn in transactions:
+        result.append(
+            {
+                "id": txn["id"],
+                "date": txn["date"],
+                "amount": float(txn["amount"]),
+                "description": txn.get("description"),
+                "budget_name": txn.get("budget__budget_name"),
+                "city": txn.get("city"),
+                "neighbourhood": txn.get("neighbourhood"),
+                "account_id": txn.get("account_id"),
+                "transaction_type": txn.get("transaction_type"),
+            }
+        )
+
+    return {"status": "success", "message": "", "data": result, "count": len(result)}
+
+
+# =============================================================================
+# Existing Analytics (unchanged)
+# =============================================================================
 
 
 @router.get("/monthly-spend", response=Dict[str, Any])
@@ -39,7 +343,6 @@ def get_monthly_spend(request):
         .order_by("-total_spent")
     )
 
-    # Format to match original response structure
     data = [
         {
             "budget_name": r["budget__budget_name"],
@@ -58,9 +361,6 @@ def get_overspend(request):
     current_month_start = timezone.now().replace(
         day=1, hour=0, minute=0, second=0, microsecond=0
     )
-
-    # 1. Spend vs Limit per budget - using Django ORM
-    from django.db.models import Q
 
     budgets = (
         Budget.objects.filter(user_id=request.user.id, active=True)
@@ -91,23 +391,14 @@ def get_overspend(request):
             "spent": spent,
             "total_limit": limit,
             "pct_of_limit": round(pct, 2),
+            "is_overspent": pct > 100,
         }
-
-        if pct > 100:
-            row_data["is_overspent"] = True
-        else:
-            row_data["is_overspent"] = False
-
         overspend_data.append(row_data)
 
-    # 2. Total Income (Legacy metric, kept for reference)
     income_total = Income.objects.filter(user_id=request.user.id).aggregate(
         total=Coalesce(Sum("amount"), 0, output_field=DecimalField())
     )["total"]
     total_income = float(income_total) if income_total else 0.0
-
-    # 3. Account Balances (Real Net Worth)
-    from core.models import Account
 
     accounts = Account.objects.filter(user_id=request.user.id, active=True)
 
@@ -115,7 +406,6 @@ def get_overspend(request):
     total_liabilities = 0.0
     total_regular = 0.0
     total_savings = 0.0
-
     account_breakdown = []
 
     for acc in accounts:
@@ -124,18 +414,14 @@ def get_overspend(request):
             {"id": acc.id, "name": acc.name, "type": acc.type, "balance": bal}
         )
 
-        # Break down by type
         if acc.type == Account.AccountType.SAVINGS:
             total_savings += bal
         else:
-            # Regular accounts (Spendable Cash)
             total_regular += bal
 
-        # All accounts are assets in this simplified model
         if bal >= 0:
             total_assets += bal
         else:
-            # Overdraft
             total_liabilities += abs(bal)
 
     net_worth = total_assets - total_liabilities
@@ -146,19 +432,9 @@ def get_overspend(request):
         "net_position": net_worth,
         "total_assets": total_assets,
         "total_liabilities": total_liabilities,
-        "total_regular": total_regular,  # Spendable
-        "total_savings": total_savings,  # Reserved
+        "total_regular": total_regular,
+        "total_savings": total_savings,
         "is_deficit": (total_spent_all > total_income),
-        "accounts": account_breakdown,
-    }
-
-    summary = {
-        "total_income": total_income,
-        "total_spent": total_spent_all,
-        "net_position": net_worth,  # Now reflects Real Net Worth
-        "total_assets": total_assets,
-        "total_liabilities": total_liabilities,
-        "is_deficit": (total_spent_all > total_income),  # Keep monthly flow logic
         "accounts": account_breakdown,
     }
 
@@ -182,13 +458,9 @@ def get_total_income(request):
 
 @router.get("/monthly-breakdown", response=MonthlyBreakdownSchema)
 def get_monthly_breakdown(request, month: str = None):
-    """
-    Get detailed breakdown for a specific month.
-    Query Param: month (YYYY-MM-DD), defaults to current month.
-    """
+    """Get detailed breakdown for a specific month."""
     user_id = request.user.id
 
-    # Date Range Calculation
     if month:
         try:
             target_date = timezone.datetime.strptime(month, "%Y-%m-%d").date()
@@ -198,20 +470,16 @@ def get_monthly_breakdown(request, month: str = None):
     else:
         start_date = timezone.now().date().replace(day=1)
 
-    # Calculate end_date (start of next month)
     if start_date.month == 12:
         end_date = start_date.replace(year=start_date.year + 1, month=1, day=1)
     else:
         end_date = start_date.replace(month=start_date.month + 1, day=1)
 
-    # 1. Total Income (Recurring Model - Active items)
-    # We sum all active income sources as they are monthly recurring
     income_agg = Income.objects.filter(user_id=user_id, active=True).aggregate(
         total=Coalesce(Sum("amount"), 0, output_field=DecimalField())
     )
     total_income = float(income_agg["total"])
 
-    # 2. Transactions (Expenses only)
     tx_filter = Q(
         user_id=user_id,
         active=True,
@@ -220,7 +488,6 @@ def get_monthly_breakdown(request, month: str = None):
         date__lt=end_date,
     )
 
-    # Aggregate Totals
     tx_stats = Transaction.objects.filter(tx_filter).aggregate(
         total_spent=Coalesce(Sum("amount"), 0, output_field=DecimalField()),
         count=Count("id"),
@@ -229,8 +496,6 @@ def get_monthly_breakdown(request, month: str = None):
     total_spent = float(tx_stats["total_spent"])
     transaction_count = tx_stats["count"]
 
-    # 3. Category Breakdown (Group by Budget)
-    # Group by budget to get the color/icon from budget description
     category_rows = (
         Transaction.objects.filter(tx_filter)
         .values("budget__budget_name", "budget__icon", "budget__color")
@@ -244,17 +509,15 @@ def get_monthly_breakdown(request, month: str = None):
     categories = []
     for row in category_rows:
         amount = float(row["cat_total"])
-        # Handle unbudgeted transactions
         if row["budget__budget_name"]:
             name = row["budget__budget_name"]
             color = row["budget__color"]
             icon = row["budget__icon"]
         else:
             name = "Unbudgeted"
-            color = "#9ca3af"  # Gray
-            icon = "help-circle-outline"  # or similar
+            color = "#9ca3af"
+            icon = "help-circle-outline"
 
-        # Percentage
         pct = (amount / total_spent * 100) if total_spent > 0 else 0.0
 
         categories.append(
@@ -268,7 +531,6 @@ def get_monthly_breakdown(request, month: str = None):
             }
         )
 
-    # 5. Construct Flat Response (matching frontend interface)
     net_savings = total_income - total_spent
     avg_txn = (total_spent / transaction_count) if transaction_count > 0 else 0.0
 
@@ -280,56 +542,4 @@ def get_monthly_breakdown(request, month: str = None):
         "transaction_count": transaction_count,
         "avg_per_transaction": round(avg_txn, 2),
         "categories": categories,
-        # "period": {"start": start_date, "end": end_date} # Optional, can be removed if strict
     }
-
-
-# ============================================================================
-# Admin/Debug endpoints - kept as raw SQL intentionally
-# ============================================================================
-
-
-# @router.post("/execute/select", response=Dict[str, Any])
-# def execute_select_query(request):
-#     """
-#     Safe(-ish) endpoint for read-only SQL queries.
-#     Expects JSON: {"query": "SELECT ...", "params": [...]}
-#     """
-#     body = safe_json_body(request)
-#     raw_query = body.get("query", "").strip()
-#     params = body.get("params", [])
-#     limit = body.get("limit", 100)
-
-#     if not raw_query:
-#         return {"error": "No query provided"}
-
-#     # Basic keyword check
-#     lower_q = raw_query.lower()
-#     if not lower_q.startswith("select") and not lower_q.startswith("with"):
-#         return {"error": "Only SELECT or CTE queries allowed"}
-#     if ";" in raw_query:
-#         return {"error": "Multiple statements not allowed"}
-
-#     # Force LIMIT if not present
-#     if "limit" not in lower_q:
-#         raw_query += f" LIMIT {int(limit)}"
-
-#     rows = run_select(raw_query, params, log_name="execute_select")
-#     return {"data": rows}
-
-
-# @router.post("/execute/modify", response=Dict[str, Any])
-# def execute_modify_query(request):
-#     """
-#     Endpoint for INSERT/UPDATE/DELETE queries.
-#     Expects JSON: {"query": "INSERT ...", "params": [...]}
-#     """
-#     body = safe_json_body(request)
-#     raw_query = body.get("query", "").strip()
-#     params = body.get("params", [])
-
-#     if not raw_query:
-#         return {"error": "No query provided"}
-
-#     rows_affected = execute_modify(raw_query, params, log_name="execute_modify")
-#     return {"success": True, "rows_affected": rows_affected}

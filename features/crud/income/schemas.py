@@ -7,6 +7,7 @@ class IncomeCreateSchema(Schema):
     type_income: str
     amount: float
     description: Optional[str] = None
+    account_id: Optional[int] = None
 
 
 class IncomeUpdateSchema(Schema):
@@ -29,6 +30,7 @@ class IncomeOutSchema(Schema):
     type_income: str
     amount: float
     description: Optional[str] = None
+    account_id: Optional[int] = None
     active: bool
     created_at: Any
     updated_at: Any

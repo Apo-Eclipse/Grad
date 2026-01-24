@@ -18,7 +18,6 @@ class Transaction(models.Model):
     amount = models.DecimalField(max_digits=12, decimal_places=2)
     time = models.TimeField(blank=True, null=True)
     description = models.TextField(blank=True, null=True)  # Was store_name
-    category = models.TextField(blank=True, null=True)  # Was type_spending
     city = models.TextField(blank=True, null=True)
     user = models.ForeignKey(User, models.DO_NOTHING, blank=True, null=True)
     budget = models.ForeignKey(

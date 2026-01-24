@@ -143,7 +143,7 @@ def fetch_spending_stats(user_id: int, months_back: int = 3) -> dict:
             date__lte=historical_end,
             active=True,
         )
-        .values("type_spending")
+        .values("category")
         .annotate(total=Sum("amount"))
         .order_by("-total")
     )
@@ -156,7 +156,7 @@ def fetch_spending_stats(user_id: int, months_back: int = 3) -> dict:
             date__lte=historical_end,
             active=True,
         )
-        .values("store_name")
+        .values("description")
         .annotate(total=Sum("amount"))
         .order_by("-total")[:10]
     )
@@ -237,9 +237,9 @@ def format_spending_section(spending_stats: dict) -> list[str]:
     top_cats = spending_stats.get("top_categories", [])
     if top_cats:
         cat_strs = [
-            f"{c['type_spending']} ({float(c['total']):.2f})"
+            f"{c['category']} ({float(c['total']):.2f})"
             for c in top_cats
-            if c.get("type_spending")
+            if c.get("category")
         ]
         if cat_strs:
             parts.append("Top Spending Categories: " + ", ".join(cat_strs))
@@ -248,9 +248,9 @@ def format_spending_section(spending_stats: dict) -> list[str]:
     top_stores = spending_stats.get("top_stores", [])
     if top_stores:
         store_strs = [
-            f"{s['store_name']} ({float(s['total']):.2f})"
+            f"{s['description']} ({float(s['total']):.2f})"
             for s in top_stores
-            if s.get("store_name")
+            if s.get("description")
         ]
         if store_strs:
             parts.append("Top Stores: " + ", ".join(store_strs))

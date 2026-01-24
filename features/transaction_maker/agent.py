@@ -2,24 +2,36 @@ from core.llm_providers.digital_ocean import gpt_oss_120b_digital_ocean
 from langchain_core.prompts import ChatPromptTemplate
 from pydantic import Field, BaseModel
 from typing import Optional
+import json
+import re
+from langchain_core.messages import BaseMessage
 
 
 class TransactionMakerOutput(BaseModel):
     message: str = Field(
         ...,
-        description="Natural language response to the user (confirmation, clarification question, or error)."
+        description="Natural language response to the user (confirmation, clarification question, or error).",
     )
     amount: Optional[float] = Field(None, description="The transaction amount.")
-    budget_id: Optional[int] = Field(None, description="The ID of the matching budget category.")
-    store_name: Optional[str] = Field(None, description="Name of the store or merchant.")
-    date: Optional[str] = Field(None, description="Date of the transaction (ISO format YYYY-MM-DD).")
+    budget_id: Optional[int] = Field(
+        None, description="The ID of the matching budget category."
+    )
+    store_name: Optional[str] = Field(
+        None, description="Name of the store or merchant."
+    )
+    date: Optional[str] = Field(
+        None, description="Date of the transaction (ISO format YYYY-MM-DD)."
+    )
     time: Optional[str] = Field(None, description="Time of the transaction (HH:MM:SS).")
-    city: Optional[str] = Field(None, description="City where the transaction occurred.")
-    neighbourhood: Optional[str] = Field(None, description="Neighbourhood where the transaction occurred.")
-    type_spending: Optional[str] = Field(None, description="The category name (e.g., 'Food').")
+    city: Optional[str] = Field(
+        None, description="City where the transaction occurred."
+    )
+    neighbourhood: Optional[str] = Field(
+        None, description="Neighbourhood where the transaction occurred."
+    )
     is_done: bool = Field(
         False,
-        description="True if mandatory details are present AND user has been given a chance to add optional details."
+        description="True if mandatory details are present AND user has been given a chance to add optional details.",
     )
 
 
@@ -49,7 +61,6 @@ Example match:
   "time": "14:30:00",
   "city": "Cairo",
   "neighbourhood": "Zamalek",
-  "type_spending": "Food",
   "is_done": true
 }}
 
@@ -100,14 +111,13 @@ last_conversation: {last_conversation}
 user_request: {user_request}
 """
 
-prompt = ChatPromptTemplate.from_messages([
-    ("system", system_prompt),
-    ("user", user_prompt),
-])
+prompt = ChatPromptTemplate.from_messages(
+    [
+        ("system", system_prompt),
+        ("user", user_prompt),
+    ]
+)
 
-import json
-import re
-from langchain_core.messages import BaseMessage
 
 def parse_output(message: BaseMessage | str) -> TransactionMakerOutput | None:
     text = message.content if isinstance(message, BaseMessage) else message
@@ -119,5 +129,6 @@ def parse_output(message: BaseMessage | str) -> TransactionMakerOutput | None:
         print(f"Parsing error: {e}")
         print(f"Raw Output: {text}")
         return None
+
 
 Transaction_maker_agent = prompt | gpt_oss_120b_digital_ocean | parse_output
