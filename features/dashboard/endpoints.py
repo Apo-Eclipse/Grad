@@ -1,7 +1,7 @@
 """Dashboard endpoints for frontend visualization."""
 
 import logging
-from typing import Any, Dict, List
+from typing import List
 from .schemas import DashboardBudgetSchema, DashboardSummarySchema
 
 

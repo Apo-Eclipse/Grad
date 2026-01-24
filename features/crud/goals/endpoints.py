@@ -1,8 +1,8 @@
-"""Goals database operations."""
+"""Goals database operations - CRUD only."""
 
 import logging
 from django.utils import timezone
-from typing import Any, Dict, Optional
+from typing import Optional
 
 from ninja import Router, Query
 
@@ -39,44 +39,29 @@ GOAL_FIELDS = (
 )
 
 
-def _compute_goal_stats(goal: Dict[str, Any]) -> Dict[str, Any]:
-    """Compute derived fields for a goal dict."""
-    # Ensure numbers are float
-    target = float(goal["target"]) if goal["target"] else 0.0
-    saved = float(goal.get("saved_amount", 0.0))
-
-    # Metadata
-    # display_info = parse_budget_display_info(goal["description"])
-
-    # Progress
-    progress = (saved / target * 100) if target > 0 else 0.0
-
-    # Days Remaining
-    days_remaining = None
-    if goal["due_date"]:
-        today = timezone.localdate()
-        delta = (goal["due_date"] - today).days
-        days_remaining = max(0, delta)
-
-    # Update dict
-    goal["target"] = target
-    goal["current_amount"] = saved  # Alias for frontend
-    goal["saved_amount"] = saved
-    goal["progress_percentage"] = round(progress, 1)
-    goal["days_remaining"] = days_remaining
-
-    # Metadata fields
-    # goal["icon"] = display_info["icon"]
-    # goal["color"] = display_info["color"]
-    # goal["clean_description"] = display_info["description"]
-    goal["clean_description"] = goal["description"]
-
-    return goal
+def _format_goal(goal: dict) -> dict:
+    """Format goal dict for JSON response."""
+    return {
+        "id": goal["id"],
+        "user_id": goal["user_id"],
+        "goal_name": goal["goal_name"],
+        "description": goal.get("description"),
+        "target": float(goal["target"]) if goal["target"] else 0.0,
+        "saved_amount": float(goal.get("saved_amount", 0.0)),
+        "start_date": goal.get("start_date"),
+        "due_date": goal.get("due_date"),
+        "icon": goal.get("icon"),
+        "color": goal.get("color"),
+        "plan": goal.get("plan"),
+        "active": goal.get("active", True),
+        "created_at": goal["created_at"],
+        "updated_at": goal.get("updated_at"),
+    }
 
 
 @router.get("/", response=GoalListResponse)
 def get_goals(request, active: Optional[bool] = Query(None)):
-    """Retrieve goals for a user."""
+    """Retrieve goals for a user (raw data)."""
     filters = {"user_id": request.user.id}
     if active is not None:
         filters["active"] = active
@@ -87,18 +72,16 @@ def get_goals(request, active: Optional[bool] = Query(None)):
     if active is False:
         queryset = queryset.order_by("-updated_at")
     else:
-        # Default sort (created_at desc was previous default)
         queryset = queryset.order_by("-created_at")
 
     goals = queryset.values(*GOAL_FIELDS)
-
-    result = [_compute_goal_stats(g) for g in goals]
+    result = [_format_goal(g) for g in goals]
     return success_response(result)
 
 
 @router.get("/{goal_id}", response=GoalResponse)
 def get_goal(request, goal_id: int):
-    """Get a single goal."""
+    """Get a single goal (raw data)."""
     goal = (
         Goal.objects.filter(id=goal_id, user_id=request.user.id)
         .values(*GOAL_FIELDS)
@@ -107,7 +90,7 @@ def get_goal(request, goal_id: int):
     if not goal:
         return error_response("Goal not found", code=404)
 
-    return success_response(_compute_goal_stats(goal))
+    return success_response(_format_goal(goal))
 
 
 @router.post("/", response=GoalResponse)
@@ -116,7 +99,7 @@ def create_goal(request, payload: GoalCreateSchema):
     try:
         goal = Goal.objects.create(
             user_id=request.user.id,
-            goal_name=payload.name,  # Map name -> goal_name
+            goal_name=payload.name,
             description=payload.description,
             target=payload.target,
             start_date=timezone.localdate(),
@@ -125,11 +108,8 @@ def create_goal(request, payload: GoalCreateSchema):
             color=payload.color,
             plan=payload.plan,
         )
-        # Fetch created goal as dict
         created = Goal.objects.filter(id=goal.id).values(*GOAL_FIELDS).first()
-        return success_response(
-            _compute_goal_stats(created), "Goal created successfully"
-        )
+        return success_response(_format_goal(created), "Goal created successfully")
     except Exception as e:
         logger.exception("Failed to create goal")
         return error_response(f"Failed to create goal: {e}")
@@ -164,7 +144,7 @@ def update_goal(request, goal_id: int, payload: GoalUpdateSchema):
             return error_response("Goal not found", code=404)
 
         goal = Goal.objects.filter(id=goal_id).values(*GOAL_FIELDS).first()
-        return success_response(_compute_goal_stats(goal), "Goal updated successfully")
+        return success_response(_format_goal(goal), "Goal updated successfully")
     except Exception as e:
         logger.exception("Failed to update goal")
         return error_response(f"Failed to update goal: {e}")

@@ -103,7 +103,6 @@ def transaction_assist(request, payload: TransactionMakerRequestSchema):
                     "time": txn_result.time,
                     "city": txn_result.city,
                     "neighbourhood": txn_result.neighbourhood,
-                    "type_spending": txn_result.type_spending,
                 }
 
                 if any(txn_payload.values()):
@@ -132,6 +131,5 @@ def transaction_assist(request, payload: TransactionMakerRequestSchema):
         "time": txn_result.time,
         "city": txn_result.city,
         "neighbourhood": txn_result.neighbourhood,
-        "type_spending": txn_result.type_spending,
         "is_done": txn_result.is_done,
     }

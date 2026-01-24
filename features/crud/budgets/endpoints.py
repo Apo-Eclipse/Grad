@@ -1,12 +1,15 @@
-"""Budgets database operations."""
+"""Budgets database operations - CRUD only."""
 
 import logging
 from django.utils import timezone
-from typing import Any, Dict, Optional
+from typing import Optional
+from decimal import Decimal
 
 from ninja import Router, Query
+from django.db.models import Sum
+from django.db.models.functions import Coalesce
 
-from core.models import Budget
+from core.models import Budget, Account
 from core.utils.responses import success_response, error_response
 from .schemas import (
     BudgetCreateSchema,
@@ -16,8 +19,6 @@ from .schemas import (
 )
 
 from features.auth.api import AuthBearer
-from django.db.models import Sum, Q, DecimalField, Count
-from django.db.models.functions import Coalesce
 
 logger = logging.getLogger(__name__)
 router = Router(auth=AuthBearer())
@@ -31,159 +32,124 @@ BUDGET_FIELDS = (
     "description",
     "total_limit",
     "priority_level_int",
+    "icon",
+    "color",
     "active",
     "created_at",
     "updated_at",
 )
 
 
-def _compute_budget_stats(budget_obj, spent_amount, tx_count):
-    """Compute derived fields for a budget object."""
-    limit = float(budget_obj.total_limit)
-    spent = float(spent_amount) if spent_amount else 0.0
-    remaining = max(0, limit - spent)
-    percentage_used = (spent / limit * 100) if limit > 0 else 0.0
-
-    percentage_used = (spent / limit * 100) if limit > 0 else 0.0
-
+def _format_budget(budget: dict) -> dict:
+    """Format budget dict for JSON response."""
     return {
-        "id": budget_obj.id,
-        "uuid": budget_obj.id,  # Keep id as standard, some frontends look for ids
-        "budget_name": budget_obj.budget_name,
-        "total_limit": limit,
-        "priority_level": budget_obj.priority_level_int,  # legacy name support if needed? No, model has priority_level_int
-        "priority_level_int": budget_obj.priority_level_int,
-        "active": budget_obj.active,
-        "created_at": budget_obj.created_at,
-        "updated_at": budget_obj.updated_at,
-        # Computed
-        "spent": spent,
-        "remaining": remaining,
-        "percentage_used": round(percentage_used, 1),
-        "transaction_count": tx_count,
-        "description": budget_obj.description,
-        "icon": budget_obj.icon,
-        "color": budget_obj.color,
-        "clean_description": budget_obj.description,  # Explicit alias for backward compatibility
+        "id": budget["id"],
+        "budget_name": budget["budget_name"],
+        "description": budget.get("description"),
+        "total_limit": float(budget["total_limit"]),
+        "priority_level_int": budget.get("priority_level_int"),
+        "icon": budget.get("icon"),
+        "color": budget.get("color"),
+        "active": budget.get("active", True),
+        "created_at": budget["created_at"],
+        "updated_at": budget.get("updated_at"),
     }
+
+
+def _get_available_balance(user_id: int, exclude_budget_id: int = None) -> float:
+    """Calculate available balance for budget allocation.
+
+    Returns: total_regular_account_balance - sum_of_active_budget_limits
+    Optionally excludes a specific budget (for updates).
+    """
+    # Sum of all active REGULAR account balances
+    total_regular = Account.objects.filter(
+        user_id=user_id, active=True, type=Account.AccountType.REGULAR
+    ).aggregate(total=Coalesce(Sum("balance"), Decimal("0.00")))["total"]
+
+    # Sum of all active budget limits (excluding the one being updated if applicable)
+    budget_filter = {"user_id": user_id, "active": True}
+    budget_queryset = Budget.objects.filter(**budget_filter)
+    if exclude_budget_id:
+        budget_queryset = budget_queryset.exclude(id=exclude_budget_id)
+
+    total_allocated = budget_queryset.aggregate(
+        total=Coalesce(Sum("total_limit"), Decimal("0.00"))
+    )["total"]
+
+    return float(total_regular) - float(total_allocated)
 
 
 @router.get("/", response=BudgetListResponse)
 def get_budgets(request, active: Optional[bool] = Query(None)):
-    """Retrieve budgets for a user with computed stats."""
+    """Retrieve budgets for a user (raw data)."""
     filters = {"user_id": request.user.id}
     if active is not None:
         filters["active"] = active
-
-    # Timeframe for "spent": Current Month
-    now = timezone.now()
-    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
     queryset = Budget.objects.filter(**filters)
 
     # Sorting
     if active is False:
-        # Inactive/Deleted -> Sort by updated_at desc
         queryset = queryset.order_by("-updated_at")
     else:
-        # Active -> Priority
         queryset = queryset.order_by("-priority_level_int")
 
-    # Annotate spend and count
-    # Note: Only count active EXPENSES
-    budgets = queryset.annotate(
-        monthly_spent=Coalesce(
-            Sum(
-                "transaction__amount",
-                filter=Q(
-                    transaction__date__gte=month_start,
-                    transaction__active=True,
-                    transaction__transaction_type="EXPENSE",
-                ),
-            ),
-            0,
-            output_field=DecimalField(),
-        ),
-        monthly_count=Count(
-            "transaction__id",
-            filter=Q(
-                transaction__date__gte=month_start,
-                transaction__active=True,
-                transaction__transaction_type="EXPENSE",
-            ),
-        ),
-    )
-
-    result = []
-    for b in budgets:
-        result.append(_compute_budget_stats(b, b.monthly_spent, b.monthly_count))
-
+    budgets = queryset.values(*BUDGET_FIELDS)
+    result = [_format_budget(b) for b in budgets]
     return success_response(result)
-
-
-def _get_budget_with_stats(budget_id: int, user_id: int):
-    """Helper to fetch a single budget with computed stats."""
-    now = timezone.now()
-    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-
-    budget = (
-        Budget.objects.filter(id=budget_id, user_id=user_id)
-        .annotate(
-            monthly_spent=Coalesce(
-                Sum(
-                    "transaction__amount",
-                    filter=Q(
-                        transaction__date__gte=month_start,
-                        transaction__active=True,
-                        transaction__transaction_type="EXPENSE",
-                    ),
-                ),
-                0,
-                output_field=DecimalField(),
-            ),
-            monthly_count=Count(
-                "transaction__id",
-                filter=Q(
-                    transaction__date__gte=month_start,
-                    transaction__active=True,
-                    transaction__transaction_type="EXPENSE",
-                ),
-            ),
-        )
-        .first()
-    )
-
-    if not budget:
-        return None
-
-    return _compute_budget_stats(budget, budget.monthly_spent, budget.monthly_count)
 
 
 @router.get("/{budget_id}", response=BudgetResponse)
 def get_budget(request, budget_id: int):
-    """Get a single budget with computed stats."""
-    result = _get_budget_with_stats(budget_id, request.user.id)
-    if not result:
+    """Get a single budget (raw data)."""
+    budget = (
+        Budget.objects.filter(id=budget_id, user_id=request.user.id)
+        .values(*BUDGET_FIELDS)
+        .first()
+    )
+    if not budget:
         return error_response("Budget not found", code=404)
-    return success_response(result)
+    return success_response(_format_budget(budget))
 
 
 @router.post("/", response=BudgetResponse)
 def create_budget(request, payload: BudgetCreateSchema):
     """Create a new budget."""
     try:
+        # Check available balance
+        available = _get_available_balance(request.user.id)
+        if payload.total_limit > available:
+            return error_response(
+                f"Insufficient balance. Available: {available:.2f}, Requested: {payload.total_limit:.2f}",
+                code=400,
+            )
+
         budget = Budget.objects.create(
             user_id=request.user.id,
-            budget_name=payload.name,  # Map name -> budget_name
+            budget_name=payload.name,
             description=payload.description,
             icon=payload.icon,
             color=payload.color,
             total_limit=payload.total_limit,
             priority_level_int=payload.priority_level_int,
         )
-        # Fetch created budget with default stats (0 spent)
-        result = _compute_budget_stats(budget, 0, 0)
-        return success_response(result, "Budget created successfully")
+
+        # Construct response directly from instance to ensure immediate consistency
+        data = {
+            "id": budget.id,
+            "budget_name": budget.budget_name,
+            "description": budget.description,
+            "total_limit": float(budget.total_limit),
+            "priority_level_int": budget.priority_level_int,
+            "icon": budget.icon,
+            "color": budget.color,
+            "active": budget.active,
+            "created_at": budget.created_at,
+            "updated_at": budget.updated_at,
+        }
+
+        return success_response(data, "Budget created successfully")
     except Exception as e:
         logger.exception("Failed to create budget")
         return error_response(f"Failed to create budget: {e}")
@@ -195,6 +161,31 @@ def update_budget(request, budget_id: int, payload: BudgetUpdateSchema):
     updates = payload.dict(exclude_unset=True)
     if not updates:
         return error_response("No fields provided for update")
+
+    # If total_limit is being updated, validate against available balance
+    if "total_limit" in updates:
+        current_budget = (
+            Budget.objects.filter(id=budget_id, user_id=request.user.id)
+            .values("total_limit")
+            .first()
+        )
+
+        if not current_budget:
+            return error_response("Budget not found", code=404)
+
+        current_limit = float(current_budget["total_limit"])
+        new_limit = float(updates["total_limit"])
+        additional_needed = new_limit - current_limit
+
+        if additional_needed > 0:
+            available = _get_available_balance(
+                request.user.id, exclude_budget_id=budget_id
+            )
+            if additional_needed > available:
+                return error_response(
+                    f"Insufficient balance. Available: {available:.2f}, Additional needed: {additional_needed:.2f}",
+                    code=400,
+                )
 
     updates["updated_at"] = timezone.now()
 
@@ -209,8 +200,8 @@ def update_budget(request, budget_id: int, payload: BudgetUpdateSchema):
         if rows_affected == 0:
             return error_response("Budget not found", code=404)
 
-        result = _get_budget_with_stats(budget_id, request.user.id)
-        return success_response(result, "Budget updated successfully")
+        budget = Budget.objects.filter(id=budget_id).values(*BUDGET_FIELDS).first()
+        return success_response(_format_budget(budget), "Budget updated successfully")
     except Exception as e:
         logger.exception("Failed to update budget")
         return error_response(f"Failed to update budget: {e}")

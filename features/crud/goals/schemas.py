@@ -14,7 +14,7 @@ class GoalCreateSchema(Schema):
     icon: Optional[str] = "flag-outline"
     color: Optional[str] = "#10b981"
     start_date: Optional[date] = None
-    active: bool = True  # Derived or default
+    active: bool = True
 
 
 class GoalUpdateSchema(Schema):
@@ -37,25 +37,22 @@ class GoalUpdateSchema(Schema):
         return values
 
 
+# Base CRUD output (raw data only)
 class GoalOutSchema(Schema):
     id: int
     user_id: int
     goal_name: str
     description: Optional[str] = None
     target: float
+    saved_amount: float
     start_date: Optional[date] = None
     due_date: Optional[date] = None
-    active: bool
-    saved_amount: float
-    current_amount: float
     icon: Optional[str] = None
     color: Optional[str] = None
     plan: Optional[str] = None
+    active: bool
     created_at: Any
     updated_at: Any
-    progress_percentage: float
-    days_remaining: Optional[int] = None
-    clean_description: Optional[str] = None
 
 
 class GoalResponse(Schema):

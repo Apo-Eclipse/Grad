@@ -30,24 +30,18 @@ class BudgetUpdateSchema(Schema):
         return values
 
 
+# Base CRUD output (raw data only)
 class BudgetOutSchema(Schema):
     id: int
-    uuid: int
     budget_name: str
+    description: Optional[str] = None
     total_limit: float
-    priority_level: Optional[int] = None
     priority_level_int: Optional[int] = None
+    icon: Optional[str] = None
+    color: Optional[str] = None
     active: bool
     created_at: Any
     updated_at: Any
-    spent: float
-    remaining: float
-    percentage_used: float
-    transaction_count: int
-    description: Optional[str] = None
-    icon: Optional[str] = None
-    color: Optional[str] = None
-    clean_description: Optional[str] = None
 
 
 class BudgetResponse(Schema):

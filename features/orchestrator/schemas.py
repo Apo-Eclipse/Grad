@@ -88,5 +88,4 @@ class TransactionMakerResponseSchema(Schema):
     time: Optional[str] = None
     city: Optional[str] = None
     neighbourhood: Optional[str] = None
-    type_spending: Optional[str] = None
     is_done: bool = False

@@ -1,12 +1,13 @@
 """Income database operations."""
 
 import logging
+from decimal import Decimal
 from django.utils import timezone
 from typing import Any, Dict, Optional
 
 from ninja import Router, Query
 
-from core.models import Income
+from core.models import Income, Account
 from core.utils.responses import success_response, error_response
 from .schemas import (
     IncomeCreateSchema,
@@ -24,6 +25,7 @@ router = Router(auth=AuthBearer())
 INCOME_FIELDS = (
     "id",
     "user_id",
+    "account_id",
     "type_income",
     "amount",
     "description",
@@ -99,12 +101,31 @@ def get_single_income(request, income_id: int):
 def create_income(request, payload: IncomeCreateSchema):
     """Add a new income source."""
     try:
+        # Validate account if provided
+        account = None
+        if payload.account_id:
+            try:
+                account = Account.objects.get(
+                    id=payload.account_id, user_id=request.user.id, active=True
+                )
+            except Account.DoesNotExist:
+                return error_response(
+                    "Account not found or does not belong to user", code=404
+                )
+
         income = Income.objects.create(
             user_id=request.user.id,
+            account=account,
             type_income=payload.type_income,
             amount=payload.amount,
             description=payload.description,
         )
+
+        # Update account balance if account is linked
+        if account:
+            account.balance += Decimal(str(payload.amount))
+            account.save(update_fields=["balance"])
+
         # Fetch created income as dict
         created = Income.objects.filter(id=income.id).values(*INCOME_FIELDS).first()
         return success_response(
