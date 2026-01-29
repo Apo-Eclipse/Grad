@@ -13,7 +13,7 @@ An advanced, conversational financial advisor powered by Large Language Models (
     *   **Behaviour Analyst**: Analyzes spending patterns, detects "emotional spending," and identifies habits. (Model: GPT-OSS-120B / Digital Ocean)
     *   **Goal Maker**: Specialized agent for defining **and updating** SMART financial goals. (Model: GPT-OSS-120B / Digital Ocean)
     *   **Budget Maker**: Interactive agent for defining and updating budgets. (Model: GPT-OSS-120B / Digital Ocean)
-    *   **Transaction Maker** (In Progress): Context-aware agent for recording detailed transactions. Currently under development. (Model: GPT-OSS-120B / Digital Ocean)
+    
 *   **Budget Notification System**: **[NEW]** Real-time alerts when spending exceeds defined budget limits.
 *   **Psychological Profiling**: Understands the *why* behind your spending.
 *   **Probabilistic Validation**: A corrective mechanism specifically for the **Explainer Agent** to ensure data accuracy before presenting it to the user.
@@ -125,8 +125,7 @@ graph TD
     User3[User Budget Request] --> BudgetMaker[Budget Maker Agent]
     BudgetMaker --> API
     
-    User4[User Transaction Request] --> TransactionMaker[Transaction Maker]
-    TransactionMaker --> API
+
     
     API -->|Save| DB[(Database)]
     DB -->|Signal Trigger| NotificationSystem[Notification System]
@@ -189,27 +188,18 @@ The system exposes a robust REST API built with **Django Ninja**.
 The system uses a normalized PostgreSQL database.
 
 ```mermaid
-erDiagram
-    USERS ||--|| PROFILES : "has profile"
-    USERS ||--o{ BUDGETS : "defines"
-    USERS ||--o{ GOALS : "sets"
-    USERS ||--o{ INCOME : "receives"
-    USERS ||--o{ TRANSACTIONS : "makes"
-    USERS ||--o{ ACCOUNTS : "owns"
-    USERS ||--o{ NOTIFICATIONS : "receives"
-    USERS ||--o{ CHAT_CONVERSATIONS : "participates"
-    BUDGETS ||--o{ TRANSACTIONS : "categorizes"
-    ACCOUNTS ||--o{ TRANSACTIONS : "funds"
-    CHAT_CONVERSATIONS ||--o{ CHAT_MESSAGES : "contains"
+classDiagram
+    direction TD
 
-    USERS {
+    class USERS {
         bigint id PK
         varchar username
         varchar email
         varchar first_name
         varchar last_name
     }
-    PROFILES {
+
+    class PROFILES {
         bigint id PK
         bigint user_id FK
         text job_title
@@ -219,7 +209,8 @@ erDiagram
         text employment_status
         jsonb user_persona
     }
-    BUDGETS {
+
+    class BUDGETS {
         bigint id PK
         bigint user_id FK
         text budget_name
@@ -228,7 +219,8 @@ erDiagram
         text icon
         text color
     }
-    GOALS {
+
+    class GOALS {
         bigint id PK
         bigint user_id FK
         text goal_name
@@ -240,7 +232,8 @@ erDiagram
         text icon
         text color
     }
-    INCOME {
+
+    class INCOME {
         bigint id PK
         bigint user_id FK
         bigint account_id FK
@@ -248,7 +241,8 @@ erDiagram
         numeric amount
         text description
     }
-    TRANSACTIONS {
+
+    class TRANSACTIONS {
         bigint id PK
         bigint user_id FK
         bigint budget_id FK
@@ -259,7 +253,8 @@ erDiagram
         text category
         text city
     }
-    ACCOUNTS {
+
+    class ACCOUNTS {
         bigint id PK
         bigint user_id FK
         text name
@@ -267,7 +262,8 @@ erDiagram
         text type
         boolean active
     }
-    NOTIFICATIONS {
+
+    class NOTIFICATIONS {
         bigint id PK
         bigint user_id FK
         varchar title
@@ -275,20 +271,36 @@ erDiagram
         boolean is_read
         varchar notification_type
     }
-    CHAT_CONVERSATIONS {
+
+    class CHAT_CONVERSATIONS {
         bigint id PK
         bigint user_id FK
         text title
         text channel
         timestamp last_message_at
     }
-    CHAT_MESSAGES {
+
+    class CHAT_MESSAGES {
         bigint id PK
         bigint conversation_id FK
         text sender_type
         text source_agent
         text content
     }
+
+    USERS "1" -- "1" PROFILES : has
+    USERS "1" -- "*" BUDGETS : defines
+    USERS "1" -- "*" GOALS : sets
+    USERS "1" -- "*" INCOME : receives
+    USERS "1" -- "*" TRANSACTIONS : makes
+    USERS "1" -- "*" ACCOUNTS : owns
+    USERS "1" -- "*" NOTIFICATIONS : receives
+    USERS "1" -- "*" CHAT_CONVERSATIONS : participates
+
+    BUDGETS "1" -- "*" TRANSACTIONS : categorizes
+    ACCOUNTS "1" -- "*" TRANSACTIONS : funds
+    ACCOUNTS "1" -- "*" INCOME : deposits
+    CHAT_CONVERSATIONS "1" -- "*" CHAT_MESSAGES : contains
 ```
 
 ### Full Detailed Schema
