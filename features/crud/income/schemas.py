@@ -1,4 +1,4 @@
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 from ninja import Schema
 from pydantic import model_validator
 
@@ -8,14 +8,16 @@ class IncomeCreateSchema(Schema):
     amount: float
     description: Optional[str] = None
     account_id: Optional[int] = None
+    payment_day: Optional[int] = None
 
 
 class IncomeUpdateSchema(Schema):
     type_income: Optional[str] = None
     amount: Optional[float] = None
     description: Optional[str] = None
-    active: Optional[bool] = None
+    payment_day: Optional[int] = None
 
+    
     @model_validator(mode="before")
     @classmethod
     def at_least_one_field(cls, values):
@@ -31,6 +33,8 @@ class IncomeOutSchema(Schema):
     amount: float
     description: Optional[str] = None
     account_id: Optional[int] = None
+    payment_day: Optional[int] = None
+    next_payment_date: Any = None
     active: bool
     created_at: Any
     updated_at: Any

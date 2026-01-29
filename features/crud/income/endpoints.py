@@ -32,6 +32,8 @@ INCOME_FIELDS = (
     "active",
     "created_at",
     "updated_at",
+    "payment_day",
+    "next_payment_date",
 )
 
 
@@ -39,6 +41,8 @@ def _format_income(income: Dict[str, Any]) -> Dict[str, Any]:
     """Format income dict for JSON response."""
     income["amount"] = float(income["amount"]) if income["amount"] else None
     income["active"] = income.get("active", True)
+    income["payment_day"] = income.get("payment_day")
+    income["next_payment_date"] = income.get("next_payment_date")
 
     # Static visual fields
     income["icon"] = "cash-outline"
@@ -75,16 +79,7 @@ def get_single_income(request, income_id: int):
     """Get a single income source."""
     income = (
         Income.objects.filter(id=income_id, user_id=request.user.id)
-        .values(
-            "id",
-            "user_id",
-            "type_income",
-            "amount",
-            "description",
-            "active",
-            "created_at",
-            "updated_at",
-        )
+        .values(*INCOME_FIELDS)
         .first()
     )
 
@@ -119,10 +114,48 @@ def create_income(request, payload: IncomeCreateSchema):
             type_income=payload.type_income,
             amount=payload.amount,
             description=payload.description,
+            payment_day=payload.payment_day,
         )
 
-        # Update account balance if account is linked
-        if account:
+        # Handle Recurring vs One-time Logic
+        should_pay_now = False
+        if payload.payment_day:
+            today = timezone.now().date()
+            should_pay_now = payload.payment_day == today.day
+
+            # Helper to get safe date
+            import calendar
+
+            def get_safe_date(year, month, day):
+                while month > 12:
+                    month -= 12
+                    year += 1
+                _, last = calendar.monthrange(year, month)
+                return today.replace(year=year, month=month, day=min(day, last))
+
+            if should_pay_now:
+                # Pay now. Next schedule is next month.
+                income.next_payment_date = get_safe_date(
+                    today.year, today.month + 1, payload.payment_day
+                )
+            elif payload.payment_day > today.day:
+                # Payment day is later this month.
+                income.next_payment_date = get_safe_date(
+                    today.year, today.month, payload.payment_day
+                )
+            else:
+                # Payment day passed this month. Schedule for next month.
+                income.next_payment_date = get_safe_date(
+                    today.year, today.month + 1, payload.payment_day
+                )
+
+            income.save()
+        else:
+            # Not recurring = One-time payment = Pay now
+            should_pay_now = True
+
+        # Update account balance if needed
+        if should_pay_now and account:
             account.balance += Decimal(str(payload.amount))
             account.save(update_fields=["balance"])
 
@@ -144,6 +177,34 @@ def update_income(request, income_id: int, payload: IncomeUpdateSchema):
         return error_response("No fields provided for update")
 
     updates["updated_at"] = timezone.now()
+
+    # Recalculate next_payment_date if payment_day is changing
+    if "payment_day" in updates and updates["payment_day"] is not None:
+        p_day = updates["payment_day"]
+        today = timezone.now().date()
+
+        # Logic: If day is in future this month, schedule for this month.
+        # If day is today or past, schedule for NEXT month.
+        # (We do not force immediate payment on update to avoid double-charging or side effects)
+
+        target_month = today.month
+        target_year = today.year
+
+        if p_day <= today.day:
+            target_month += 1
+
+        if target_month > 12:
+            target_month = 1
+            target_year += 1
+
+        import calendar
+
+        _, last_day = calendar.monthrange(target_year, target_month)
+        target_day = min(p_day, last_day)
+
+        updates["next_payment_date"] = today.replace(
+            year=target_year, month=target_month, day=target_day
+        )
 
     try:
         rows_affected = Income.objects.filter(

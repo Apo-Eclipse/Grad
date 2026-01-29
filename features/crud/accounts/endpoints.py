@@ -18,12 +18,6 @@ class AccountSchema(Schema):
     balance: float
 
 
-class CreateAccountSchema(Schema):
-    name: str
-    type: str = "REGULAR"
-    initial_balance: float = 0.0
-
-
 class TransferSchema(Schema):
     from_account_id: int
     to_account_id: int
@@ -38,18 +32,6 @@ def list_accounts(request, type: str = None):
     if type:
         qs = qs.filter(type=type)
     return qs.order_by("id")
-
-
-@router.post("/", response=AccountSchema)
-def create_account(request, payload: CreateAccountSchema):
-    """Create a new account."""
-    account = Account.objects.create(
-        user=request.user,
-        name=payload.name,
-        type=payload.type,
-        balance=payload.initial_balance,
-    )
-    return account
 
 
 @router.post("/transfer", response={200: str, 400: str})

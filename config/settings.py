@@ -44,6 +44,7 @@ INSTALLED_APPS = [
     # --- 3. YOUR APPS ---
     "core",  # Main Django app with models
     "features.notifications",  # Notification system
+    "django_cron",
 ]
 
 MIDDLEWARE = [
@@ -181,3 +182,9 @@ NINJA_JWT = {
     "SLIDING_TOKEN_LIFETIME": timedelta(minutes=5),
     "SLIDING_TOKEN_REFRESH_LIFETIME": timedelta(days=1),
 }
+
+
+# Django Cron Settings
+CRON_CLASSES = [
+    "features.crud.income.cron.RecurringIncomeJob",
+]

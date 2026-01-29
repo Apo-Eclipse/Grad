@@ -16,7 +16,6 @@ class Transaction(models.Model):
     )
     date = models.DateField()
     amount = models.DecimalField(max_digits=12, decimal_places=2)
-    time = models.TimeField(blank=True, null=True)
     description = models.TextField(blank=True, null=True)  # Was store_name
     city = models.TextField(blank=True, null=True)
     user = models.ForeignKey(User, models.DO_NOTHING, blank=True, null=True)

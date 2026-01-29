@@ -19,7 +19,6 @@ class TransactionCreateSchema(Schema):
 class TransactionUpdateSchema(Schema):
     date: Optional[date] = None
     amount: Optional[float] = None
-    time: Optional[str] = None
     description: Optional[str] = None
     city: Optional[str] = None
     budget_id: Optional[int] = None
@@ -41,7 +40,6 @@ class TransactionOutSchema(Schema):
     user_id: int
     date: date
     amount: float
-    time: Optional[str] = None
     description: Optional[str] = None
     city: Optional[str] = None
     budget_id: Optional[int] = None

@@ -7,7 +7,7 @@ from ninja import Router
 from django.contrib.auth.models import User
 from django.db import transaction, IntegrityError
 
-from core.models import Profile
+from core.models import Profile, Account
 from core.utils.responses import success_response, error_response
 from .schemas import UserRegistrationSchema, UserResponse
 
@@ -90,6 +90,20 @@ def create_user(request, payload: UserRegistrationSchema):
                 gender=payload.gender,
                 employment_status=payload.employment_status,
                 education_level=payload.education_level,
+            )
+
+            # Create default accounts
+            Account.objects.create(
+                user=user,
+                name="Regular Account",
+                type="REGULAR",
+                balance=0.0,
+            )
+            Account.objects.create(
+                user=user,
+                name="Savings Account",
+                type="SAVINGS",
+                balance=0.0,
             )
 
         return success_response(

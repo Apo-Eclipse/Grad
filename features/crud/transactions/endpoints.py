@@ -29,7 +29,6 @@ TRANSACTION_FIELDS = (
     "user_id",
     "date",
     "amount",
-    "time",
     "description",
     "city",
     "budget_id",
@@ -50,7 +49,6 @@ def _format_transaction(txn: Dict[str, Any]) -> Dict[str, Any]:
         "user_id": txn["user_id"],
         "date": txn["date"],
         "amount": float(txn["amount"]) if txn["amount"] else 0.0,
-        "time": str(txn["time"]) if txn["time"] else None,
         "description": txn.get("description"),
         "city": txn.get("city"),
         "budget_id": txn.get("budget_id"),
@@ -89,7 +87,7 @@ def get_transactions(
     if active is False:
         ordering = ("-updated_at",)
     else:
-        ordering = ("-date", "-time")
+        ordering = ("-date", "-created_at")
 
     transactions = queryset.order_by(*ordering).values(*TRANSACTION_FIELDS)[:limit]
     result = [_format_transaction(txn) for txn in transactions]
@@ -135,7 +133,6 @@ def create_transaction(request, payload: TransactionCreateSchema):
             user_id=request.user.id,
             date=payload.date,
             amount=payload.amount,
-            time=payload.time,
             description=payload.description,
             city=payload.city,
             budget_id=payload.budget_id,
