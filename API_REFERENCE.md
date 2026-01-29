@@ -57,7 +57,7 @@ Obtain a new access token using a valid refresh token.
 
 ### Analyze Request
 **POST** `/personal_assistant/analyze`
-Main entry point for the AI assistant. Handles queries, routes them to sub-agents, and returns a natural language response.
+**Personal Assistant Agent**: A specialized agent that acts as the analysis and retrieval interface. It communicates **only** with the **Behaviour Analyst** (for deep insights) and the **Database Agent** (for read-only data). It does not perform general system orchestration capabilities beyond this scope. Its primary focus is interpreting user intent for analysis and delivering clear, empathetic responses.
 
 **Request Body** (`AnalysisRequestSchema`):
 ```json
