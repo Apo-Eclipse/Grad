@@ -94,6 +94,8 @@ def personal_assistant_orchestrator(state: OrchestratorState) -> dict:
         else "No history."
     )
 
+    print("conversation_memory_str", conversation_memory_str)
+
     user_message = state.get("user_message", "")
 
     # System prompt for routing decision
