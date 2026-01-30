@@ -10,6 +10,7 @@ class Transaction(models.Model):
     class TransactionType(models.TextChoices):
         EXPENSE = "EXPENSE", "Expense"
         TRANSFER = "TRANSFER", "Transfer"
+        DEPOSIT = "DEPOSIT", "Deposit"
 
     transaction_type = models.TextField(
         choices=TransactionType.choices, default=TransactionType.EXPENSE

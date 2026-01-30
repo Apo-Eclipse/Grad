@@ -95,13 +95,13 @@ def create_user(request, payload: UserRegistrationSchema):
             # Create default accounts
             Account.objects.create(
                 user=user,
-                name="Regular Account",
+                name="Regular",
                 type="REGULAR",
                 balance=0.0,
             )
             Account.objects.create(
                 user=user,
-                name="Savings Account",
+                name="Savings",
                 type="SAVINGS",
                 balance=0.0,
             )

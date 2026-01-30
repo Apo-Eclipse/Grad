@@ -9,6 +9,9 @@ from features.crud.budgets.endpoints import router as db_budgets_router
 from features.crud.goals.endpoints import router as db_goals_router
 from features.crud.income.endpoints import router as db_income_router
 from features.crud.transactions.endpoints import router as db_transactions_router
+from features.crud.transactions.expenses.endpoints import router as db_expenses_router
+from features.crud.transactions.transfers.endpoints import router as db_transfers_router
+from features.crud.transactions.deposits.endpoints import router as db_deposits_router
 from features.crud.users.endpoints import router as db_users_router
 from features.crud.accounts.endpoints import router as db_accounts_router
 from features.goal_maker.endpoints import router as goal_router
@@ -39,6 +42,9 @@ api.add_router(
 api.add_router(
     "/database/transaction", db_transactions_router, tags=["Database - Transactions"]
 )
+api.add_router("/database/expense", db_expenses_router, tags=["Database - Expenses"])
+api.add_router("/database/transfer", db_transfers_router, tags=["Database - Transfers"])
+api.add_router("/database/deposit", db_deposits_router, tags=["Database - Deposits"])
 api.add_router("/database/budget", db_budgets_router, tags=["Database - Budgets"])
 api.add_router("/database/goal", db_goals_router, tags=["Database - Goals"])
 api.add_router("/database/income", db_income_router, tags=["Database - Income"])
