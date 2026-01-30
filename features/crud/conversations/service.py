@@ -78,7 +78,7 @@ def fetch_recent_messages(
     messages = list(
         queryset.order_by("-id").values(
             "content_type", "source_agent", "sender_type", "content"
-        )[:limit]
+        )
     )
 
     # Reverse to get chronological order (oldest first)
