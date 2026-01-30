@@ -155,16 +155,57 @@ def update_goal(request, goal_id: int, payload: GoalUpdateSchema):
 
 @router.delete("/{goal_id}", response=GoalResponse)
 def delete_goal(request, goal_id: int):
-    """Soft delete a goal."""
+    """Soft delete a goal. Refunds saved_amount to Savings Account."""
     try:
-        rows_affected = Goal.objects.filter(id=goal_id, user_id=request.user.id).update(
-            active=False, updated_at=timezone.now()
-        )
-        if rows_affected == 0:
-            return error_response("Goal not found", code=404)
+        with db_transaction.atomic():
+            # 1. Fetch the goal
+            goal = Goal.objects.select_for_update().filter(
+                id=goal_id, user_id=request.user.id, active=True
+            ).first()
 
-        return success_response(None, "Goal deactivated successfully")
+            if not goal:
+                return error_response("Goal not found", code=404)
+
+            # 2. Refund logic if there is money saved
+            if goal.saved_amount > 0:
+                try:
+                    savings_acc = Account.objects.select_for_update().get(
+                        user_id=request.user.id, type="SAVINGS", active=True
+                    )
+                    savings_acc.balance = F("balance") + goal.saved_amount
+                    savings_acc.save(update_fields=["balance"])
+                    
+                    # Reset goal saved amount to 0 since funds are moved
+                    goal.saved_amount = 0.0
+                    
+                except Account.DoesNotExist:
+                    # If no savings account, we can either error out or just delete.
+                    # Given the "Bank" model, a user should have one. 
+                    # If missing, we log a warning but proceed with deletion (or error to protect funds).
+                    # Safest approach: Error to prevent fund loss.
+                    return error_response(
+                        "Cannot refund saved amount: No active Savings account found.", 
+                        code=400
+                    )
+                except Account.MultipleObjectsReturned:
+                     # Fallback: take the first one
+                    savings_acc = Account.objects.select_for_update().filter(
+                        user_id=request.user.id, type="SAVINGS", active=True
+                    ).first()
+                    if savings_acc:
+                        savings_acc.balance = F("balance") + goal.saved_amount
+                        savings_acc.save(update_fields=["balance"])
+                        goal.saved_amount = 0.0
+
+            # 3. Soft Delete
+            goal.active = False
+            goal.updated_at = timezone.now()
+            goal.save(update_fields=["active", "updated_at", "saved_amount"])
+
+        return success_response(None, "Goal deleted and funds refunded successfully")
+
     except Exception as e:
+        logger.exception("Failed to delete goal")
         return error_response(f"Failed to delete goal: {e}")
 
 

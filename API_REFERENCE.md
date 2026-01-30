@@ -451,6 +451,14 @@ Mark a specific notification as read.
 }
 ```
 
+#### Delete Goal
+**DELETE** `/database/goal/{id}`
+Soft deletes the goal. **Automatically refunds** any `saved_amount` to the User's Savings Account.
+
+**Error Response**:
+- `404`: Goal not found.
+- `400`: Cannot refund (No active Savings account found).
+
 #### Delete Income
 **DELETE** `/database/income/{id}`
 Soft deletes the income source.
