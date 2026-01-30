@@ -30,6 +30,12 @@ Authenticate user with email and password to obtain access/refresh tokens.
 }
 ```
 
+**Error Response**:
+- `401`: Invalid credentials / User account is disabled.
+
+**Error Response**:
+- `401`: Invalid credentials / User account is disabled.
+
 ### Refresh Token
 **POST** `/auth/refresh`
 Obtain a new access token using a valid refresh token.
@@ -50,6 +56,9 @@ Obtain a new access token using a valid refresh token.
   "email": "user@example.com"
 }
 ```
+
+**Error Response**:
+- `401`: User not found / User account is disabled / Invalid refresh token.
 
 ---
 
@@ -133,8 +142,33 @@ Direct interaction with the Goal Maker agent.
 }
 ```
 
+### Transaction Maker Assistant
+**POST** `/personal_assistant/transaction/assist`
+Direct interaction with the Transaction Maker agent for logging expenses.
 
+**Request Body** (`TransactionMakerRequestSchema`):
+```json
+{
+  "user_request": "I spent 50 EGP at Starbucks",
+  "conversation_id": 12 // Optional
+}
+```
 
+**Response** (`TransactionMakerResponseSchema`):
+```json
+{
+  "conversation_id": 12,
+  "message": "Transaction logged successfully.",
+  "amount": 50.0,
+  "budget_id": 2,
+  "store_name": "Starbucks",
+  "date": "2025-10-27",
+  "time": "14:30:00",
+  "city": "Cairo",
+  "neighbourhood": "Zamalek",
+  "is_done": true
+}
+```
 ---
 
 ## 📊 Dashboard
@@ -237,8 +271,12 @@ Mark a specific notification as read.
 }
 ```
 
-#### Register User
+**Error Response**:
+- `404`: User not found.
+
+#### Register User (Public)
 **POST** `/database/user/`
+*Note: This endpoint automatically creates default "Regular" and "Savings" accounts for the new user.*
 
 **Request Body** (`UserRegistrationSchema`):
 ```json
@@ -271,6 +309,9 @@ Mark a specific notification as read.
   }
 }
 ```
+
+**Error Response**:
+- `400`: Email already registered / Username already taken.
 
 ### 💰 Accounts
 
@@ -326,6 +367,12 @@ Mark a specific notification as read.
 
 **Response**:
 `"Transfer successful."` (200 OK) or Error Message (400 Bad Request)
+
+**Error Response** (HTTP 400):
+- "Amount must be positive."
+- "One or both accounts not found."
+- "Cannot transfer to the same account."
+- "Insufficient balance."
 
 ### 💸 Income
 
@@ -389,6 +436,10 @@ Mark a specific notification as read.
 }
 ```
 
+**Error Response**:
+- `404`: Account not found.
+- `400`: System error.
+
 #### Update Income
 **PUT** `/database/income/{id}`
 
@@ -400,9 +451,24 @@ Mark a specific notification as read.
 }
 ```
 
-### 💳 Transactions
+#### Delete Goal
+**DELETE** `/database/goal/{id}`
+Soft deletes the goal. **Automatically refunds** any `saved_amount` to the User's Savings Account.
 
-#### List Transactions
+**Error Response**:
+- `404`: Goal not found.
+- `400`: Cannot refund (No active Savings account found).
+
+#### Delete Income
+**DELETE** `/database/income/{id}`
+Soft deletes the income source.
+
+**Error Response**:
+- `404`: Income not found.
+
+### 💳 Transactions (Generic)
+
+#### List All Transactions
 **GET** `/database/transaction/`
 Query Params: `active=true`, `start_date=2025-01-01`, `end_date=2025-01-31`, `transaction_type=EXPENSE`, `limit=50`.
 
@@ -433,15 +499,22 @@ Query Params: `active=true`, `start_date=2025-01-01`, `end_date=2025-01-31`, `tr
 }
 ```
 
-#### Create Transaction
-**POST** `/database/transaction/`
+#### Get Transaction
+**GET** `/database/transaction/{id}`
 
-**Request Body** (`TransactionCreateSchema`):
+---
+
+### 💸 Expenses
+
+#### Create Expense
+**POST** `/database/expense/`
+Deducts amount from the specified Account.
+
+**Request Body** (`ExpenseCreateSchema`):
 ```json
 {
   "date": "2025-10-27",
   "amount": 120.50,
-  "transaction_type": "EXPENSE", // EXPENSE, INCOME, TRANSFER
   "description": "Grocery run", // Optional
   "budget_id": 2,               // Optional
   "account_id": 1,              // Optional
@@ -451,16 +524,90 @@ Query Params: `active=true`, `start_date=2025-01-01`, `end_date=2025-01-31`, `tr
 }
 ```
 
-#### Update Transaction
-**PUT** `/database/transaction/{id}`
+**Error Response**:
+- `400`: Insufficient balance / Amount must be positive.
+- `404`: Account not found.
 
-**Request Body** (`TransactionUpdateSchema`):
+#### Update Expense
+**PUT** `/database/expense/{id}`
+Updates the expense and adjusts the account balance if amount changed.
+
+**Request Body** (`ExpenseUpdateSchema`):
 ```json
 {
   "amount": 130.00,
   "description": "Added milk"
 }
 ```
+
+**Error Response**:
+- `400`: Insufficient balance (if increasing amount).
+- `404`: Expense not found.
+
+#### Delete Expense
+**DELETE** `/database/expense/{id}`
+Soft deletes the expense and refunds the account balance.
+
+**Error Response**:
+- `404`: Expense not found.
+
+---
+
+### 🏦 Deposits
+
+#### Create Deposit
+**POST** `/database/deposit/`
+Adds amount to the specified Account.
+
+**Request Body** (`DepositCreateSchema`):
+```json
+{
+  "date": "2025-10-27",
+  "amount": 5000.0,
+  "description": "Salary",
+  "account_id": 1
+}
+```
+
+**Error Response**:
+- `400`: Amount must be positive.
+- `404`: Account not found.
+
+#### Update Deposit
+**PUT** `/database/deposit/{id}`
+
+#### Delete Deposit
+**DELETE** `/database/deposit/{id}`
+
+---
+
+### ↔️ Transfers
+
+#### Create Transfer
+**POST** `/database/transfer/`
+Moves funds from one account to another.
+
+**Request Body** (`TransferCreateSchema`):
+```json
+{
+  "date": "2025-10-27",
+  "amount": 500.0,
+  "from_account_id": 1,
+  "to_account_id": 2,
+  "description": "Saving"
+}
+```
+
+**Error Response**:
+- `400`: Insufficient balance / Same account / Amount negative.
+- `404`: Account not found.
+
+#### Delete Transfer
+**DELETE** `/database/transfer/{id}`
+Reverses the funds movement and marks transaction as inactive.
+
+**Error Response**:
+- `404`: Transfer not found.
 
 ### 📉 Budgets
 
@@ -503,6 +650,9 @@ Query Params: `active=true`, `start_date=2025-01-01`, `end_date=2025-01-31`, `tr
     "color": "#ff0000"      // Optional
 }
 ```
+
+**Error Response**:
+- `400`: Insufficient income (if budget limit > unallocated income).
 
 #### Update Budget
 **PUT** `/database/budget/{id}`
@@ -572,6 +722,31 @@ Query Params: `active=true`, `start_date=2025-01-01`, `end_date=2025-01-31`, `tr
   "status": "active" // Optional: "active", "archive", "deleted"
 }
 ```
+
+#### Sync Goal Savings
+**POST** `/database/goal/{id}/contribute`
+Sets the goal's `saved_amount` to a specific value and automatically adjusts the User's Savings Account balance based on the difference (deducts if increasing goal, refunds if decreasing).
+
+**Request Body** (`GoalContributionSchema`):
+```json
+{
+  "amount": 1500.0 // The NEW total saved amount
+}
+```
+
+**Error Response** (Soft Error - HTTP 200/400):
+```json
+{
+  "status": "error",
+  "message": "Insufficient funds in Savings. Needed: 100.00, Available: 50.00",
+  "code": 400
+}
+```
+**Common Errors:**
+- `400`: Amount cannot be negative.
+- `400`: Insufficient funds in Savings (only happens when **increasing** the saved amount).
+- `404`: No active Savings account found for user.
+
 
 ### 💬 Conversations
 

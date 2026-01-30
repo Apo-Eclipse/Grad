@@ -37,6 +37,11 @@ class GoalUpdateSchema(Schema):
         return values
 
 
+class GoalContributionSchema(Schema):
+    amount: float
+
+
+
 # Base CRUD output (raw data only)
 class GoalOutSchema(Schema):
     id: int
