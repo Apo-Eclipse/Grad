@@ -9,7 +9,7 @@ from ninja import Router, Query
 from django.db.models import Sum
 from django.db.models.functions import Coalesce
 
-from core.models import Budget, Account
+from core.models import Budget, Income
 from core.utils.responses import success_response, error_response
 from .schemas import (
     BudgetCreateSchema,
@@ -56,18 +56,18 @@ def _format_budget(budget: dict) -> dict:
     }
 
 
-def _get_available_balance(user_id: int, exclude_budget_id: int = None) -> float:
-    """Calculate available balance for budget allocation.
+def _get_unallocated_income(user_id: int, exclude_budget_id: int = None) -> float:
+    """Calculate unallocated income.
 
-    Returns: total_regular_account_balance - sum_of_active_budget_limits
+    Returns: total_active_monthly_income - sum_of_active_budget_limits
     Optionally excludes a specific budget (for updates).
     """
-    # Sum of all active REGULAR account balances
-    total_regular = Account.objects.filter(
-        user_id=user_id, active=True, type=Account.AccountType.REGULAR
-    ).aggregate(total=Coalesce(Sum("balance"), Decimal("0.00")))["total"]
+    # 1. Sum of all active INCOME sources
+    total_income = Income.objects.filter(user_id=user_id, active=True).aggregate(
+        total=Coalesce(Sum("amount"), Decimal("0.00"))
+    )["total"]
 
-    # Sum of all active budget limits (excluding the one being updated if applicable)
+    # 2. Sum of all active budget limits (excluding the one being updated if applicable)
     budget_filter = {"user_id": user_id, "active": True}
     budget_queryset = Budget.objects.filter(**budget_filter)
     if exclude_budget_id:
@@ -77,7 +77,7 @@ def _get_available_balance(user_id: int, exclude_budget_id: int = None) -> float
         total=Coalesce(Sum("total_limit"), Decimal("0.00"))
     )["total"]
 
-    return float(total_regular) - float(total_allocated)
+    return float(total_income) - float(total_allocated)
 
 
 @router.get("/", response=BudgetListResponse)
@@ -117,11 +117,11 @@ def get_budget(request, budget_id: int):
 def create_budget(request, payload: BudgetCreateSchema):
     """Create a new budget."""
     try:
-        # Check available balance
-        available = _get_available_balance(request.user.id)
-        if payload.total_limit > available:
+        # Check unallocated income
+        unallocated = _get_unallocated_income(request.user.id)
+        if payload.total_limit > unallocated:
             return error_response(
-                f"Insufficient balance. Available: {available:.2f}, Requested: {payload.total_limit:.2f}",
+                f"Insufficient income. Unallocated Income: {unallocated:.2f}, Requested Budget: {payload.total_limit:.2f}",
                 code=400,
             )
 
@@ -162,7 +162,7 @@ def update_budget(request, budget_id: int, payload: BudgetUpdateSchema):
     if not updates:
         return error_response("No fields provided for update")
 
-    # If total_limit is being updated, validate against available balance
+    # If total_limit is being updated, validate against unallocated income
     if "total_limit" in updates:
         current_budget = (
             Budget.objects.filter(id=budget_id, user_id=request.user.id)
@@ -178,12 +178,21 @@ def update_budget(request, budget_id: int, payload: BudgetUpdateSchema):
         additional_needed = new_limit - current_limit
 
         if additional_needed > 0:
-            available = _get_available_balance(
+            unallocated = _get_unallocated_income(
                 request.user.id, exclude_budget_id=budget_id
             )
-            if additional_needed > available:
+            # Since we excluded the current budget, 'unallocated' is (Income - Other_Budgets).
+            # We need to check if New_Limit <= (Income - Other_Budgets)
+            # Which is equivalent to: New_Limit <= unallocated
+
+            # Wait, calculation check:
+            # _get_unallocated_income(exclude=this) returns: Income - Sum(Others)
+            # Validation: New_Limit <= (Income - Sum(Others))
+            # Validation: New_Limit <= unallocated. Correct.
+
+            if new_limit > unallocated:
                 return error_response(
-                    f"Insufficient balance. Available: {available:.2f}, Additional needed: {additional_needed:.2f}",
+                    f"Insufficient income. Unallocated (excluding this budget): {unallocated:.2f}, New Limit: {new_limit:.2f}",
                     code=400,
                 )
 
