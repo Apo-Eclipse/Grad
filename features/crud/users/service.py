@@ -116,15 +116,15 @@ def fetch_spending_stats(user_id: int, months_back: int = 3) -> dict:
     # Current month boundaries (for current month spending)
     current_month_start = today.replace(day=1)
 
-    # Calculate start of historical period (N months before current month start)
-    # Go back N months from the start of current month
-    historical_start = current_month_start
-    for _ in range(months_back):
-        # Go to previous month
-        historical_start = (historical_start - timedelta(days=1)).replace(day=1)
-
-    # Historical period: from historical_start to end of last month (day before current month)
-    historical_end = current_month_start - timedelta(days=1)
+    # Calculate start of period: Current Month + Previous (N-1) Months
+    # e.g., if months_back=3: Current + Last 2
+    period_start = current_month_start
+    if months_back > 1:
+        for _ in range(months_back - 1):
+            period_start = (period_start - timedelta(days=1)).replace(day=1)
+    
+    # End is today (include current spending)
+    period_end = today
 
     # --- Current month spending ---
     current_month_result = Transaction.objects.filter(
@@ -135,39 +135,40 @@ def fetch_spending_stats(user_id: int, months_back: int = 3) -> dict:
     ).aggregate(total=Coalesce(Sum("amount"), Decimal("0.00")))
     current_month_spent = current_month_result["total"]
 
-    # --- Historical spending (last N complete months) ---
-    historical_result = Transaction.objects.filter(
+    # --- Average Spending (over last N months including current) ---
+    period_result = Transaction.objects.filter(
         user_id=user_id,
-        date__gte=historical_start,
-        date__lte=historical_end,
+        date__gte=period_start,
+        date__lte=period_end,
         active=True,
     ).aggregate(total=Coalesce(Sum("amount"), Decimal("0.00")))
-    historical_total = historical_result["total"]
+    period_total = period_result["total"]
 
     # Calculate monthly average (avoid division by zero)
     monthly_average = (
-        historical_total / Decimal(months_back) if months_back > 0 else Decimal("0.00")
+        period_total / Decimal(months_back) if months_back > 0 else Decimal("0.00")
     )
 
-    # --- Top categories (from historical period) ---
+    # --- Top categories (from period, using Budget Name) ---
     top_categories = list(
         Transaction.objects.filter(
             user_id=user_id,
-            date__gte=historical_start,
-            date__lte=historical_end,
+            date__gte=period_start,
+            date__lte=period_end,
             active=True,
+            budget__isnull=False
         )
-        .values("category")
+        .values("budget__budget_name")
         .annotate(total=Sum("amount"))
         .order_by("-total")
     )
 
-    # --- Top stores (from historical period) ---
+    # --- Top stores (from period) ---
     top_stores = list(
         Transaction.objects.filter(
             user_id=user_id,
-            date__gte=historical_start,
-            date__lte=historical_end,
+            date__gte=period_start,
+            date__lte=period_end,
             active=True,
         )
         .values("description")
@@ -178,7 +179,7 @@ def fetch_spending_stats(user_id: int, months_back: int = 3) -> dict:
     return {
         "monthly_average": monthly_average,
         "current_month_spent": current_month_spent,
-        "historical_total": historical_total,
+        "historical_total": period_total,
         "months_back": months_back,
         "top_categories": top_categories,
         "top_stores": top_stores,
@@ -278,9 +279,9 @@ def format_spending_section(spending_stats: dict) -> list[str]:
     top_cats = spending_stats.get("top_categories", [])
     if top_cats:
         cat_strs = [
-            f"{c['category']} ({float(c['total']):.2f})"
+            f"{c['budget__budget_name']} ({float(c['total']):.2f})"
             for c in top_cats
-            if c.get("category")
+            if c.get("budget__budget_name")
         ]
         if cat_strs:
             parts.append("Top Spending Categories: " + ", ".join(cat_strs))

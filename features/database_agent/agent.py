@@ -34,18 +34,12 @@ DATABASE SCHEMA (with field types):
 
 {schema}
 
-COMMON PATTERNS:
-- Monthly spend by budget:
-  SELECT b.budget_name, DATE_TRUNC('month', t.date) AS month, ROUND(SUM(t.amount)::numeric, 2) AS total_spent
-  FROM transactions t JOIN budget b ON t.budget_id = b.budget_id
-  WHERE t.user_id = $USER_ID GROUP BY b.budget_name, month ORDER BY month DESC
-
-- Overspend detection:
-  SELECT b.budget_name, ROUND(SUM(t.amount)::numeric, 2) AS spent, b.total_limit,
-  ROUND(100.0 * SUM(t.amount) / NULLIF(b.total_limit, 0), 2) AS pct_of_limit
-  FROM transactions t JOIN budget b ON t.budget_id = b.budget_id
-  WHERE t.user_id = $USER_ID AND DATE_TRUNC('month', t.date) = DATE_TRUNC('month', CURRENT_DATE)
-  GROUP BY b.budget_name, b.total_limit ORDER BY pct_of_limit DESC
+**CRITICAL: FOREIGN KEYS**
+- The schema uses Django conventions.
+- Foreign Key columns ALWAYS end in `_id`.
+- **DO NOT** select `budget`, `account`, `user`.
+- **YOU MUST SELECT** `budget_id`, `account_id`, `user_id`.
+- e.g. `SELECT budget_id FROM core_transaction` (CORRECT) vs `SELECT budget ...` (WRONG).
 """
 
 user_prompt = """
