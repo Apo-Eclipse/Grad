@@ -2,12 +2,14 @@
 
 import logging
 from django.utils import timezone
+from django.db import transaction as db_transaction
+from django.db.models import F
 from typing import Optional
 from django.db.models import F
 
 from ninja import Router, Query
 
-from core.models import Goal
+from core.models import Goal, Account
 from features.auth.api import AuthBearer
 from core.utils.responses import success_response, error_response
 from .schemas import (

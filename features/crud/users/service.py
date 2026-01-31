@@ -8,7 +8,7 @@ from django.db.models import Sum
 from django.db.models.functions import Coalesce
 from django.utils import timezone
 
-from core.models import Goal, Income, Profile, Transaction
+from core.models import Goal, Income, Profile, Transaction, Account
 from features.crud.budgets.service import fetch_active_budgets
 
 logger = logging.getLogger(__name__)
@@ -73,6 +73,20 @@ def fetch_active_goals(user_id: int) -> list[dict]:
         Goal.objects.filter(user_id=user_id, active=True)
         .order_by("due_date")
         .values("id", "goal_name", "target", "due_date")
+    )
+
+
+def fetch_user_accounts(user_id: int) -> list[dict]:
+    """
+    Fetch the user's main accounts (Regular and Savings).
+
+    Returns:
+        List of account dictionaries with name, type, and balance.
+    """
+    return list(
+        Account.objects.filter(user_id=user_id, active=True, type__in=["REGULAR", "SAVINGS"])
+        .order_by("type")
+        .values("name", "type", "balance")
     )
 
 
@@ -196,6 +210,33 @@ def format_income_section(income: Decimal) -> str:
     return f"Income (Monthly approx): {float(income):.2f}"
 
 
+def format_accounts_section(accounts: list[dict]) -> str:
+    """
+    Format the accounts section of the summary with role explanations.
+    
+    - REGULAR: Used for daily expenses and transactions.
+    - SAVINGS: Used for goal contributions and long-term saving.
+    """
+    if not accounts:
+        return "Accounts: None found."
+    
+    lines = ["Accounts:"]
+    for acc in accounts:
+        balance = float(acc["balance"])
+        acc_type = acc["type"]
+        
+        if acc_type == "REGULAR":
+            role = "(Daily Expenses)"
+        elif acc_type == "SAVINGS":
+            role = "(Source for Goal Contributions - funds are deducted here when adding to goals)"
+        else:
+            role = ""
+        
+        lines.append(f"  - {acc['name']} {role}: {balance:.2f}")
+    
+    return "\n".join(lines)
+
+
 def format_goals_section(goals: list[dict]) -> str:
     """Format the goals section of the summary."""
     if not goals:
@@ -262,6 +303,7 @@ def format_user_summary(
     user_id: int,
     profile: dict,
     income: Decimal,
+    accounts: list[dict],
     goals: list[dict],
     budgets: list[dict],
     spending_stats: dict,
@@ -273,6 +315,7 @@ def format_user_summary(
         user_id: The user's ID.
         profile: Profile data from fetch_user_profile.
         income: Total income from fetch_income_total.
+        accounts: Accounts list from fetch_user_accounts.
         goals: Goals list from fetch_active_goals.
         budgets: Budgets list from fetch_active_budgets.
         spending_stats: Spending data from fetch_spending_stats.
@@ -287,6 +330,9 @@ def format_user_summary(
 
     # Income section
     parts.append(format_income_section(income))
+
+    # Accounts section
+    parts.append(format_accounts_section(accounts))
 
     # Goals section
     parts.append(format_goals_section(goals))
@@ -324,6 +370,7 @@ def get_user_summary(user_id: int) -> str:
             return f"User {user_id} (no profile found)."
 
         income = fetch_income_total(user_id)
+        accounts = fetch_user_accounts(user_id)
         goals = fetch_active_goals(user_id)
         budgets = fetch_active_budgets(user_id)
         spending_stats = fetch_spending_stats(user_id, months_back=3)
@@ -333,6 +380,7 @@ def get_user_summary(user_id: int) -> str:
             user_id=user_id,
             profile=profile,
             income=income,
+            accounts=accounts,
             goals=goals,
             budgets=budgets,
             spending_stats=spending_stats,
