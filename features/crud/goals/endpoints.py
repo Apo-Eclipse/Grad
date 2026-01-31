@@ -5,10 +5,9 @@ from django.utils import timezone
 from django.db import transaction as db_transaction
 from django.db.models import F
 from typing import Optional
-from django.db.models import F
+from asgiref.sync import sync_to_async
 
 from ninja import Router, Query
-
 from core.models import Goal, Account
 from features.auth.api import AuthBearer
 from core.utils.responses import success_response, error_response
@@ -150,40 +149,105 @@ async def update_goal(request, goal_id: int, payload: GoalUpdateSchema):
         return error_response(f"Failed to update goal: {e}")
 
 
+@sync_to_async
+def _handle_goal_transaction(user_id: int, goal_id: int, amount: float, operation: str):
+    """
+    Sync helper to handle goal transactions atomically.
+    Operation: "DEPOSIT" (Savings -> Goal) or "WITHDRAW" (Goal -> Savings)
+    """
+    with db_transaction.atomic():
+        # 1. Fetch Goal
+        goal = Goal.objects.select_for_update().filter(
+            id=goal_id, user_id=user_id, active=True
+        ).first()
+        if not goal:
+            return {"error": "Goal not found", "code": 404}
+
+        # 2. Fetch Savings Account
+        savings = Account.objects.select_for_update().filter(
+            user_id=user_id, type="SAVINGS", active=True
+        ).first()
+        if not savings:
+             return {"error": "No active Savings account found", "code": 400}
+
+        amount_decimal = float(amount)
+        
+        if operation == "DEPOSIT":
+            # Deduct from Savings, Add to Goal
+            if float(savings.balance) < amount_decimal:
+                return {
+                    "error": f"Insufficient funds in Savings. Available: {savings.balance}",
+                    "code": 400
+                }
+            savings.balance = float(savings.balance) - amount_decimal
+            goal.saved_amount = float(goal.saved_amount) + amount_decimal
+            
+        elif operation == "WITHDRAW":
+            # Deduct from Goal, Return to Savings
+            if float(goal.saved_amount) < amount_decimal:
+                return {
+                    "error": f"Insufficient funds in Goal. Available: {goal.saved_amount}",
+                    "code": 400
+                }
+            goal.saved_amount = float(goal.saved_amount) - amount_decimal
+            savings.balance = float(savings.balance) + amount_decimal
+
+        savings.save()
+        goal.save()
+        return {"goal": _format_goal(Goal.objects.filter(id=goal.id).values(*GOAL_FIELDS).first())}
+
+
 @router.delete("/{goal_id}", response=GoalResponse)
 async def delete_goal(request, goal_id: int):
-    """Soft delete a goal."""
-    try:
-        rows_affected = await Goal.objects.filter(
-            id=goal_id, user_id=request.user.id
-        ).aupdate(active=False, updated_at=timezone.now())
-        if rows_affected == 0:
-            return error_response("Goal not found", code=404)
-        return success_response(None, "Goal deactivated successfully")
-    except Exception as e:
-        logger.exception("Failed to delete goal")
-        return error_response(f"Failed to delete goal: {e}")
+    """Soft delete a goal. Refunds saved_amount to Savings Account."""
+    @sync_to_async
+    def _delete_logic():
+        with db_transaction.atomic():
+            goal = Goal.objects.select_for_update().filter(
+                id=goal_id, user_id=request.user.id, active=True
+            ).first()
+            if not goal:
+                return {"error": "Goal not found", "code": 404}
+
+            if goal.saved_amount > 0:
+                savings = Account.objects.select_for_update().filter(
+                    user_id=request.user.id, type="SAVINGS", active=True
+                ).first()
+                if not savings:
+                    return {"error": "Cannot refund: No Savings account", "code": 400}
+                
+                savings.balance = float(savings.balance) + float(goal.saved_amount)
+                savings.save()
+            
+            goal.saved_amount = 0.0
+            goal.active = False
+            goal.updated_at = timezone.now()
+            goal.save()
+            return {"success": True}
+
+    result = await _delete_logic()
+    if "error" in result:
+        return error_response(result["error"], code=result["code"])
+    return success_response(None, "Goal deleted and funds refunded successfully")
 
 
 @router.post("/{goal_id}/deposit", response=GoalResponse)
 async def deposit_to_goal(request, goal_id: int, payload: GoalDepositSchema):
-    """Add money to a goal (atomic update)."""
-    try:
-        goal_exists = await Goal.objects.filter(
-            id=goal_id, user_id=request.user.id
-        ).aexists()
-        if not goal_exists:
-            return error_response("Goal not found", code=404)
+    """Add money to a goal (Deducts from Savings)."""
+    result = await _handle_goal_transaction(
+        request.user.id, goal_id, payload.amount, "DEPOSIT"
+    )
+    if "error" in result:
+        return error_response(result["error"], code=result["code"])
+    return success_response(result["goal"], "Funds deposited successfully")
 
-        await Goal.objects.filter(id=goal_id, user_id=request.user.id).aupdate(
-            saved_amount=F("saved_amount") + payload.amount, updated_at=timezone.now()
-        )
-        updated_goal = (
-            await Goal.objects.filter(id=goal_id).values(*GOAL_FIELDS).afirst()
-        )
-        return success_response(
-            _format_goal(updated_goal), "Funds deposited successfully"
-        )
-    except Exception as e:
-        logger.exception("Failed to deposit to goal")
-        return error_response(f"Failed to deposit to goal: {e}")
+
+@router.post("/{goal_id}/withdraw", response=GoalResponse)
+async def withdraw_from_goal(request, goal_id: int, payload: GoalDepositSchema):
+    """Withdraw money from a goal (Refunds to Savings)."""
+    result = await _handle_goal_transaction(
+        request.user.id, goal_id, payload.amount, "WITHDRAW"
+    )
+    if "error" in result:
+        return error_response(result["error"], code=result["code"])
+    return success_response(result["goal"], "Funds withdrawn successfully")
