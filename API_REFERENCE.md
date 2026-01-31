@@ -723,30 +723,44 @@ Reverses the funds movement and marks transaction as inactive.
 }
 ```
 
-#### Sync Goal Savings
-**POST** `/database/goal/{id}/contribute`
-Sets the goal's `saved_amount` to a specific value and automatically adjusts the User's Savings Account balance based on the difference (deducts if increasing goal, refunds if decreasing).
+#### Delete Goal
+**DELETE** `/database/goal/{id}`
+Soft deletes the goal. **Automatically refunds** any `saved_amount` to the User's Savings Account.
 
-**Request Body** (`GoalContributionSchema`):
+**Error Response**:
+- `404`: Goal not found.
+- `400`: Cannot refund (No active Savings account found).
+
+#### Deposit to Goal
+**POST** `/database/goal/{id}/deposit`
+Adds funds to the goal by **deducting from Savings Account**.
+
+**Request Body** (`GoalDepositSchema`):
 ```json
 {
-  "amount": 1500.0 // The NEW total saved amount
+  "amount": 500.0
 }
 ```
 
-**Error Response** (Soft Error - HTTP 200/400):
+**Error Response**:
+- `400`: Insufficient funds in Savings.
+- `400`: Amount must be positive.
+- `404`: Goal or Savings account not found.
+
+#### Withdraw from Goal
+**POST** `/database/goal/{id}/withdraw`
+Withdraws funds from the goal and **refunds to Savings Account**.
+
+**Request Body** (`GoalDepositSchema`):
 ```json
 {
-  "status": "error",
-  "message": "Insufficient funds in Savings. Needed: 100.00, Available: 50.00",
-  "code": 400
+  "amount": 200.0
 }
 ```
-**Common Errors:**
-- `400`: Amount cannot be negative.
-- `400`: Insufficient funds in Savings (only happens when **increasing** the saved amount).
-- `404`: No active Savings account found for user.
 
+**Error Response**:
+- `400`: Insufficient funds in Goal.
+- `404`: Goal or Savings account not found.
 
 ### 💬 Conversations
 
