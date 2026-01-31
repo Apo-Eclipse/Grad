@@ -3,6 +3,7 @@
 import logging
 from django.utils import timezone
 from typing import Optional
+from django.db.models import F
 
 from ninja import Router, Query
 
@@ -14,6 +15,7 @@ from .schemas import (
     GoalUpdateSchema,
     GoalResponse,
     GoalListResponse,
+    GoalDepositSchema,
 )
 
 logger = logging.getLogger(__name__)
@@ -60,44 +62,41 @@ def _format_goal(goal: dict) -> dict:
 
 
 @router.get("/", response=GoalListResponse)
-def get_goals(request, active: Optional[bool] = Query(None)):
+async def get_goals(request, active: Optional[bool] = Query(None)):
     """Retrieve goals for a user (raw data)."""
     filters = {"user_id": request.user.id}
     if active is not None:
         filters["active"] = active
 
     queryset = Goal.objects.filter(**filters)
-
-    # Sorting
     if active is False:
         queryset = queryset.order_by("-updated_at")
     else:
         queryset = queryset.order_by("-created_at")
 
-    goals = queryset.values(*GOAL_FIELDS)
+    goals = [g async for g in queryset.values(*GOAL_FIELDS)]
     result = [_format_goal(g) for g in goals]
     return success_response(result)
 
 
 @router.get("/{goal_id}", response=GoalResponse)
-def get_goal(request, goal_id: int):
+async def get_goal(request, goal_id: int):
     """Get a single goal (raw data)."""
-    goal = (
+    goal = await (
         Goal.objects.filter(id=goal_id, user_id=request.user.id)
         .values(*GOAL_FIELDS)
-        .first()
+        .afirst()
     )
     if not goal:
         return error_response("Goal not found", code=404)
-
     return success_response(_format_goal(goal))
 
 
 @router.post("/", response=GoalResponse)
-def create_goal(request, payload: GoalCreateSchema):
+async def create_goal(request, payload: GoalCreateSchema):
     """Create a new goal."""
     try:
-        goal = Goal.objects.create(
+        goal = await Goal.objects.acreate(
             user_id=request.user.id,
             goal_name=payload.name,
             description=payload.description,
@@ -108,7 +107,7 @@ def create_goal(request, payload: GoalCreateSchema):
             color=payload.color,
             plan=payload.plan,
         )
-        created = Goal.objects.filter(id=goal.id).values(*GOAL_FIELDS).first()
+        created = await Goal.objects.filter(id=goal.id).values(*GOAL_FIELDS).afirst()
         return success_response(_format_goal(created), "Goal created successfully")
     except Exception as e:
         logger.exception("Failed to create goal")
@@ -116,7 +115,7 @@ def create_goal(request, payload: GoalCreateSchema):
 
 
 @router.put("/{goal_id}", response=GoalResponse)
-def update_goal(request, goal_id: int, payload: GoalUpdateSchema):
+async def update_goal(request, goal_id: int, payload: GoalUpdateSchema):
     """Update an existing goal."""
     updates = payload.dict(exclude_unset=True)
     if not updates:
@@ -137,13 +136,12 @@ def update_goal(request, goal_id: int, payload: GoalUpdateSchema):
             updates["active"] = False
 
     try:
-        rows_affected = Goal.objects.filter(id=goal_id, user_id=request.user.id).update(
-            **updates
-        )
+        rows_affected = await Goal.objects.filter(
+            id=goal_id, user_id=request.user.id
+        ).aupdate(**updates)
         if rows_affected == 0:
             return error_response("Goal not found", code=404)
-
-        goal = Goal.objects.filter(id=goal_id).values(*GOAL_FIELDS).first()
+        goal = await Goal.objects.filter(id=goal_id).values(*GOAL_FIELDS).afirst()
         return success_response(_format_goal(goal), "Goal updated successfully")
     except Exception as e:
         logger.exception("Failed to update goal")
@@ -151,16 +149,39 @@ def update_goal(request, goal_id: int, payload: GoalUpdateSchema):
 
 
 @router.delete("/{goal_id}", response=GoalResponse)
-def delete_goal(request, goal_id: int):
+async def delete_goal(request, goal_id: int):
     """Soft delete a goal."""
     try:
-        rows_affected = Goal.objects.filter(id=goal_id, user_id=request.user.id).update(
-            active=False, updated_at=timezone.now()
-        )
+        rows_affected = await Goal.objects.filter(
+            id=goal_id, user_id=request.user.id
+        ).aupdate(active=False, updated_at=timezone.now())
         if rows_affected == 0:
             return error_response("Goal not found", code=404)
-
         return success_response(None, "Goal deactivated successfully")
     except Exception as e:
         logger.exception("Failed to delete goal")
         return error_response(f"Failed to delete goal: {e}")
+
+
+@router.post("/{goal_id}/deposit", response=GoalResponse)
+async def deposit_to_goal(request, goal_id: int, payload: GoalDepositSchema):
+    """Add money to a goal (atomic update)."""
+    try:
+        goal_exists = await Goal.objects.filter(
+            id=goal_id, user_id=request.user.id
+        ).aexists()
+        if not goal_exists:
+            return error_response("Goal not found", code=404)
+
+        await Goal.objects.filter(id=goal_id, user_id=request.user.id).aupdate(
+            saved_amount=F("saved_amount") + payload.amount, updated_at=timezone.now()
+        )
+        updated_goal = (
+            await Goal.objects.filter(id=goal_id).values(*GOAL_FIELDS).afirst()
+        )
+        return success_response(
+            _format_goal(updated_goal), "Funds deposited successfully"
+        )
+    except Exception as e:
+        logger.exception("Failed to deposit to goal")
+        return error_response(f"Failed to deposit to goal: {e}")

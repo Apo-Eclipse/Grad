@@ -2,6 +2,7 @@
 
 import logging
 from typing import Any, Dict, Optional
+from asgiref.sync import sync_to_async
 
 from ninja import Router, Query
 from django.db.models import Sum, DecimalField, Count, Q
@@ -57,60 +58,26 @@ def _compute_budget_stats(budget_obj, spent_amount, tx_count) -> dict:
 
 
 @router.get("/budgets/stats", response=BudgetStatsListResponse)
-def get_budget_stats(request, active: Optional[bool] = Query(None)):
+async def get_budget_stats(request, active: Optional[bool] = Query(None)):
     """Get all budgets with computed spending stats."""
-    filters = {"user_id": request.user.id}
-    if active is not None:
-        filters["active"] = active
 
-    now = timezone.now()
-    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    @sync_to_async
+    def fetch_budget_stats():
+        filters = {"user_id": request.user.id}
+        if active is not None:
+            filters["active"] = active
 
-    queryset = Budget.objects.filter(**filters)
+        now = timezone.now()
+        month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
-    if active is False:
-        queryset = queryset.order_by("-updated_at")
-    else:
-        queryset = queryset.order_by("-priority_level_int")
+        queryset = Budget.objects.filter(**filters)
 
-    budgets = queryset.annotate(
-        monthly_spent=Coalesce(
-            Sum(
-                "transaction__amount",
-                filter=Q(
-                    transaction__date__gte=month_start,
-                    transaction__active=True,
-                    transaction__transaction_type="EXPENSE",
-                ),
-            ),
-            0,
-            output_field=DecimalField(),
-        ),
-        monthly_count=Count(
-            "transaction__id",
-            filter=Q(
-                transaction__date__gte=month_start,
-                transaction__active=True,
-                transaction__transaction_type="EXPENSE",
-            ),
-        ),
-    )
+        if active is False:
+            queryset = queryset.order_by("-updated_at")
+        else:
+            queryset = queryset.order_by("-priority_level_int")
 
-    result = [
-        _compute_budget_stats(b, b.monthly_spent, b.monthly_count) for b in budgets
-    ]
-    return success_response(result)
-
-
-@router.get("/budgets/{budget_id}/stats", response=BudgetStatsResponse)
-def get_single_budget_stats(request, budget_id: int):
-    """Get a single budget with computed spending stats."""
-    now = timezone.now()
-    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-
-    budget = (
-        Budget.objects.filter(id=budget_id, user_id=request.user.id)
-        .annotate(
+        budgets = queryset.annotate(
             monthly_spent=Coalesce(
                 Sum(
                     "transaction__amount",
@@ -132,15 +99,59 @@ def get_single_budget_stats(request, budget_id: int):
                 ),
             ),
         )
-        .first()
-    )
 
-    if not budget:
+        return [
+            _compute_budget_stats(b, b.monthly_spent, b.monthly_count) for b in budgets
+        ]
+
+    result = await fetch_budget_stats()
+    return success_response(result)
+
+
+@router.get("/budgets/{budget_id}/stats", response=BudgetStatsResponse)
+async def get_single_budget_stats(request, budget_id: int):
+    """Get a single budget with computed spending stats."""
+
+    @sync_to_async
+    def fetch_single_budget_stats():
+        now = timezone.now()
+        month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+        budget = (
+            Budget.objects.filter(id=budget_id, user_id=request.user.id)
+            .annotate(
+                monthly_spent=Coalesce(
+                    Sum(
+                        "transaction__amount",
+                        filter=Q(
+                            transaction__date__gte=month_start,
+                            transaction__active=True,
+                            transaction__transaction_type="EXPENSE",
+                        ),
+                    ),
+                    0,
+                    output_field=DecimalField(),
+                ),
+                monthly_count=Count(
+                    "transaction__id",
+                    filter=Q(
+                        transaction__date__gte=month_start,
+                        transaction__active=True,
+                        transaction__transaction_type="EXPENSE",
+                    ),
+                ),
+            )
+            .first()
+        )
+
+        if not budget:
+            return None
+        return _compute_budget_stats(budget, budget.monthly_spent, budget.monthly_count)
+
+    result = await fetch_single_budget_stats()
+    if not result:
         return error_response("Budget not found", code=404)
-
-    return success_response(
-        _compute_budget_stats(budget, budget.monthly_spent, budget.monthly_count)
-    )
+    return success_response(result)
 
 
 # =============================================================================
@@ -182,31 +193,39 @@ def _compute_goal_stats(goal) -> dict:
 
 
 @router.get("/goals/stats", response=GoalStatsListResponse)
-def get_goal_stats(request, active: Optional[bool] = Query(None)):
+async def get_goal_stats(request, active: Optional[bool] = Query(None)):
     """Get all goals with computed progress stats."""
-    filters = {"user_id": request.user.id}
-    if active is not None:
-        filters["active"] = active
 
-    queryset = Goal.objects.filter(**filters)
+    @sync_to_async
+    def fetch_goal_stats():
+        filters = {"user_id": request.user.id}
+        if active is not None:
+            filters["active"] = active
 
-    if active is False:
-        queryset = queryset.order_by("-updated_at")
-    else:
-        queryset = queryset.order_by("-created_at")
+        queryset = Goal.objects.filter(**filters)
 
-    result = [_compute_goal_stats(g) for g in queryset]
+        if active is False:
+            queryset = queryset.order_by("-updated_at")
+        else:
+            queryset = queryset.order_by("-created_at")
+
+        return [_compute_goal_stats(g) for g in queryset]
+
+    result = await fetch_goal_stats()
     return success_response(result)
 
 
 @router.get("/goals/{goal_id}/stats", response=GoalStatsResponse)
-def get_single_goal_stats(request, goal_id: int):
+async def get_single_goal_stats(request, goal_id: int):
     """Get a single goal with computed progress stats."""
-    goal = Goal.objects.filter(id=goal_id, user_id=request.user.id).first()
 
+    @sync_to_async
+    def fetch_single_goal():
+        return Goal.objects.filter(id=goal_id, user_id=request.user.id).first()
+
+    goal = await fetch_single_goal()
     if not goal:
         return error_response("Goal not found", code=404)
-
     return success_response(_compute_goal_stats(goal))
 
 
@@ -216,36 +235,42 @@ def get_single_goal_stats(request, goal_id: int):
 
 
 @router.get("/transactions/summary", response=TransactionSummarySchema)
-def get_transaction_summary(
+async def get_transaction_summary(
     request,
     start_date: Optional[str] = Query(None),
     end_date: Optional[str] = Query(None),
 ):
     """Get total amount and count of transactions for a period."""
-    filters = {
-        "user_id": request.user.id,
-        "active": True,
-        "transaction_type": "EXPENSE",
-    }
 
-    if start_date:
-        filters["date__gte"] = start_date
-    if end_date:
-        filters["date__lte"] = end_date
+    @sync_to_async
+    def fetch_transaction_summary():
+        filters = {
+            "user_id": request.user.id,
+            "active": True,
+            "transaction_type": "EXPENSE",
+        }
 
-    agg = Transaction.objects.filter(**filters).aggregate(
-        total=Coalesce(Sum("amount"), 0, output_field=DecimalField()), count=Count("id")
-    )
+        if start_date:
+            filters["date__gte"] = start_date
+        if end_date:
+            filters["date__lte"] = end_date
 
-    return {
-        "total_amount": float(agg["total"]),
-        "currency": "EGP",
-        "count": agg["count"],
-    }
+        agg = Transaction.objects.filter(**filters).aggregate(
+            total=Coalesce(Sum("amount"), 0, output_field=DecimalField()),
+            count=Count("id"),
+        )
+
+        return {
+            "total_amount": float(agg["total"]),
+            "currency": "EGP",
+            "count": agg["count"],
+        }
+
+    return await fetch_transaction_summary()
 
 
 @router.get("/transactions/search", response=Dict[str, Any])
-def search_transactions(
+async def search_transactions(
     request,
     query_text: Optional[str] = Query(None, alias="query"),
     category: Optional[str] = Query(None),
@@ -258,64 +283,74 @@ def search_transactions(
     limit: int = Query(100, le=1000),
 ):
     """Advanced transaction search."""
-    queryset = Transaction.objects.filter(user_id=request.user.id, active=True)
 
-    if query_text:
-        queryset = queryset.filter(
-            Q(description__icontains=query_text)
-            | Q(budget__budget_name__icontains=query_text)
-        )
+    @sync_to_async
+    def perform_search():
+        queryset = Transaction.objects.filter(user_id=request.user.id, active=True)
 
-    if category:
-        queryset = queryset.filter(Q(budget__budget_name__icontains=category))
+        if query_text:
+            queryset = queryset.filter(
+                Q(description__icontains=query_text)
+                | Q(budget__budget_name__icontains=query_text)
+            )
 
-    if min_amount is not None:
-        queryset = queryset.filter(amount__gte=min_amount)
+        if category:
+            queryset = queryset.filter(Q(budget__budget_name__icontains=category))
 
-    if max_amount is not None:
-        queryset = queryset.filter(amount__lte=max_amount)
+        if min_amount is not None:
+            queryset = queryset.filter(amount__gte=min_amount)
 
-    if start_date:
-        queryset = queryset.filter(date__gte=start_date)
+        if max_amount is not None:
+            queryset = queryset.filter(amount__lte=max_amount)
 
-    if end_date:
-        queryset = queryset.filter(date__lte=end_date)
+        if start_date:
+            queryset = queryset.filter(date__gte=start_date)
 
-    if city:
-        queryset = queryset.filter(city__icontains=city)
+        if end_date:
+            queryset = queryset.filter(date__lte=end_date)
 
-    if neighbourhood:
-        queryset = queryset.filter(neighbourhood__icontains=neighbourhood)
+        if city:
+            queryset = queryset.filter(city__icontains=city)
 
-    transactions = queryset.order_by("-date").values(
-        "id",
-        "date",
-        "amount",
-        "description",
-        "budget__budget_name",
-        "city",
-        "neighbourhood",
-        "account_id",
-        "transaction_type",
-    )[:limit]
+        if neighbourhood:
+            queryset = queryset.filter(neighbourhood__icontains=neighbourhood)
 
-    result = []
-    for txn in transactions:
-        result.append(
-            {
-                "id": txn["id"],
-                "date": txn["date"],
-                "amount": float(txn["amount"]),
-                "description": txn.get("description"),
-                "budget_name": txn.get("budget__budget_name"),
-                "city": txn.get("city"),
-                "neighbourhood": txn.get("neighbourhood"),
-                "account_id": txn.get("account_id"),
-                "transaction_type": txn.get("transaction_type"),
-            }
-        )
+        transactions = queryset.order_by("-date").values(
+            "id",
+            "date",
+            "amount",
+            "description",
+            "budget__budget_name",
+            "city",
+            "neighbourhood",
+            "account_id",
+            "transaction_type",
+        )[:limit]
 
-    return {"status": "success", "message": "", "data": result, "count": len(result)}
+        result = []
+        for txn in transactions:
+            result.append(
+                {
+                    "id": txn["id"],
+                    "date": txn["date"],
+                    "amount": float(txn["amount"]),
+                    "description": txn.get("description"),
+                    "budget_name": txn.get("budget__budget_name"),
+                    "city": txn.get("city"),
+                    "neighbourhood": txn.get("neighbourhood"),
+                    "account_id": txn.get("account_id"),
+                    "transaction_type": txn.get("transaction_type"),
+                }
+            )
+
+        return {
+            "status": "success",
+            "message": "",
+            "data": result,
+            "count": len(result),
+        }
+
+    return await perform_search()
 
 
 # =============================================================================
@@ -324,222 +359,247 @@ def search_transactions(
 
 
 @router.get("/monthly-spend", response=Dict[str, Any])
-def get_monthly_spend(request):
+async def get_monthly_spend(request):
     """Aggregate spending by user's budgets for the current month."""
-    current_month_start = timezone.now().replace(
-        day=1, hour=0, minute=0, second=0, microsecond=0
-    )
 
-    rows = (
-        Transaction.objects.filter(
-            user_id=request.user.id, date__gte=current_month_start
+    @sync_to_async
+    def fetch_monthly_spend():
+        current_month_start = timezone.now().replace(
+            day=1, hour=0, minute=0, second=0, microsecond=0
         )
-        .select_related("budget")
-        .values("budget__budget_name")
-        .annotate(
-            month=TruncMonth("date"),
-            total_spent=Coalesce(Sum("amount"), 0, output_field=DecimalField()),
+
+        rows = (
+            Transaction.objects.filter(
+                user_id=request.user.id, date__gte=current_month_start
+            )
+            .select_related("budget")
+            .values("budget__budget_name")
+            .annotate(
+                month=TruncMonth("date"),
+                total_spent=Coalesce(Sum("amount"), 0, output_field=DecimalField()),
+            )
+            .order_by("-total_spent")
         )
-        .order_by("-total_spent")
-    )
 
-    data = [
-        {
-            "budget_name": r["budget__budget_name"],
-            "month": r["month"],
-            "total_spent": float(r["total_spent"]),
-        }
-        for r in rows
-    ]
+        data = [
+            {
+                "budget_name": r["budget__budget_name"],
+                "month": r["month"],
+                "total_spent": float(r["total_spent"]),
+            }
+            for r in rows
+        ]
 
-    return {"data": data}
+        return {"data": data}
+
+    return await fetch_monthly_spend()
 
 
 @router.get("/overspend", response=OverspendResponseSchema)
-def get_overspend(request):
+async def get_overspend(request):
     """Identify categories where spending exceeds the budget limit."""
-    current_month_start = timezone.now().replace(
-        day=1, hour=0, minute=0, second=0, microsecond=0
-    )
 
-    budgets = (
-        Budget.objects.filter(user_id=request.user.id, active=True)
-        .annotate(
-            spent=Coalesce(
-                Sum(
-                    "transaction__amount",
-                    filter=Q(transaction__date__gte=current_month_start),
-                ),
-                0,
-                output_field=DecimalField(),
+    @sync_to_async
+    def fetch_overspend():
+        current_month_start = timezone.now().replace(
+            day=1, hour=0, minute=0, second=0, microsecond=0
+        )
+
+        budgets = (
+            Budget.objects.filter(user_id=request.user.id, active=True)
+            .annotate(
+                spent=Coalesce(
+                    Sum(
+                        "transaction__amount",
+                        filter=Q(transaction__date__gte=current_month_start),
+                    ),
+                    0,
+                    output_field=DecimalField(),
+                )
             )
+            .values("budget_name", "spent", "total_limit")
         )
-        .values("budget_name", "spent", "total_limit")
-    )
 
-    overspend_data = []
-    total_spent_all = 0.0
+        overspend_data = []
+        total_spent_all = 0.0
 
-    for r in budgets:
-        spent = float(r["spent"])
-        limit = float(r["total_limit"])
-        total_spent_all += spent
+        for r in budgets:
+            spent = float(r["spent"])
+            limit_val = float(r["total_limit"])
+            total_spent_all += spent
 
-        pct = (spent / limit * 100) if limit > 0 else 0
-        row_data = {
-            "budget_name": r["budget_name"],
-            "spent": spent,
-            "total_limit": limit,
-            "pct_of_limit": round(pct, 2),
-            "is_overspent": pct > 100,
+            pct = (spent / limit_val * 100) if limit_val > 0 else 0
+            row_data = {
+                "budget_name": r["budget_name"],
+                "spent": spent,
+                "total_limit": limit_val,
+                "pct_of_limit": round(pct, 2),
+                "is_overspent": pct > 100,
+            }
+            overspend_data.append(row_data)
+
+        income_total = Income.objects.filter(user_id=request.user.id).aggregate(
+            total=Coalesce(Sum("amount"), 0, output_field=DecimalField())
+        )["total"]
+        total_income = float(income_total) if income_total else 0.0
+
+        accounts = Account.objects.filter(user_id=request.user.id, active=True)
+
+        total_assets = 0.0
+        total_liabilities = 0.0
+        total_regular = 0.0
+        total_savings = 0.0
+        account_breakdown = []
+
+        for acc in accounts:
+            bal = float(acc.balance)
+            account_breakdown.append(
+                {"id": acc.id, "name": acc.name, "type": acc.type, "balance": bal}
+            )
+
+            if acc.type == Account.AccountType.SAVINGS:
+                total_savings += bal
+            else:
+                total_regular += bal
+
+            if bal >= 0:
+                total_assets += bal
+            else:
+                total_liabilities += abs(bal)
+
+        net_worth = total_assets - total_liabilities
+
+        summary = {
+            "total_income": total_income,
+            "total_spent": total_spent_all,
+            "net_position": net_worth,
+            "total_assets": total_assets,
+            "total_liabilities": total_liabilities,
+            "total_regular": total_regular,
+            "total_savings": total_savings,
+            "is_deficit": (total_spent_all > total_income),
+            "accounts": account_breakdown,
         }
-        overspend_data.append(row_data)
 
-    income_total = Income.objects.filter(user_id=request.user.id).aggregate(
-        total=Coalesce(Sum("amount"), 0, output_field=DecimalField())
-    )["total"]
-    total_income = float(income_total) if income_total else 0.0
+        return {"data": overspend_data, "summary": summary}
 
-    accounts = Account.objects.filter(user_id=request.user.id, active=True)
-
-    total_assets = 0.0
-    total_liabilities = 0.0
-    total_regular = 0.0
-    total_savings = 0.0
-    account_breakdown = []
-
-    for acc in accounts:
-        bal = float(acc.balance)
-        account_breakdown.append(
-            {"id": acc.id, "name": acc.name, "type": acc.type, "balance": bal}
-        )
-
-        if acc.type == Account.AccountType.SAVINGS:
-            total_savings += bal
-        else:
-            total_regular += bal
-
-        if bal >= 0:
-            total_assets += bal
-        else:
-            total_liabilities += abs(bal)
-
-    net_worth = total_assets - total_liabilities
-
-    summary = {
-        "total_income": total_income,
-        "total_spent": total_spent_all,
-        "net_position": net_worth,
-        "total_assets": total_assets,
-        "total_liabilities": total_liabilities,
-        "total_regular": total_regular,
-        "total_savings": total_savings,
-        "is_deficit": (total_spent_all > total_income),
-        "accounts": account_breakdown,
-    }
-
-    return {"data": overspend_data, "summary": summary}
+    return await fetch_overspend()
 
 
 @router.get("/income-total", response=Dict[str, Any])
-def get_total_income(request):
+async def get_total_income(request):
     """Aggregate active income items by type."""
-    rows = (
-        Income.objects.filter(user_id=request.user.id)
-        .values("type_income")
-        .annotate(total=Coalesce(Sum("amount"), 0, output_field=DecimalField()))
-        .order_by("-total")
-    )
 
-    data = [{"type_income": r["type_income"], "total": float(r["total"])} for r in rows]
+    @sync_to_async
+    def fetch_income_total():
+        rows = (
+            Income.objects.filter(user_id=request.user.id)
+            .values("type_income")
+            .annotate(total=Coalesce(Sum("amount"), 0, output_field=DecimalField()))
+            .order_by("-total")
+        )
 
-    return {"data": data}
+        data = [
+            {"type_income": r["type_income"], "total": float(r["total"])} for r in rows
+        ]
+
+        return {"data": data}
+
+    return await fetch_income_total()
 
 
 @router.get("/monthly-breakdown", response=MonthlyBreakdownSchema)
-def get_monthly_breakdown(request, month: str = None):
+async def get_monthly_breakdown(request, month: str = None):
     """Get detailed breakdown for a specific month."""
-    user_id = request.user.id
 
-    if month:
-        try:
-            target_date = timezone.datetime.strptime(month, "%Y-%m-%d").date()
-            start_date = target_date.replace(day=1)
-        except ValueError:
-            return error_response("Invalid date format. Use YYYY-MM-DD")
-    else:
-        start_date = timezone.now().date().replace(day=1)
+    @sync_to_async
+    def fetch_monthly_breakdown():
+        user_id = request.user.id
 
-    if start_date.month == 12:
-        end_date = start_date.replace(year=start_date.year + 1, month=1, day=1)
-    else:
-        end_date = start_date.replace(month=start_date.month + 1, day=1)
-
-    income_agg = Income.objects.filter(user_id=user_id, active=True).aggregate(
-        total=Coalesce(Sum("amount"), 0, output_field=DecimalField())
-    )
-    total_income = float(income_agg["total"])
-
-    tx_filter = Q(
-        user_id=user_id,
-        active=True,
-        transaction_type="EXPENSE",
-        date__gte=start_date,
-        date__lt=end_date,
-    )
-
-    tx_stats = Transaction.objects.filter(tx_filter).aggregate(
-        total_spent=Coalesce(Sum("amount"), 0, output_field=DecimalField()),
-        count=Count("id"),
-    )
-
-    total_spent = float(tx_stats["total_spent"])
-    transaction_count = tx_stats["count"]
-
-    category_rows = (
-        Transaction.objects.filter(tx_filter)
-        .values("budget__budget_name", "budget__icon", "budget__color")
-        .annotate(
-            cat_total=Coalesce(Sum("amount"), 0, output_field=DecimalField()),
-            cat_count=Count("id"),
-        )
-        .order_by("-cat_total")
-    )
-
-    categories = []
-    for row in category_rows:
-        amount = float(row["cat_total"])
-        if row["budget__budget_name"]:
-            name = row["budget__budget_name"]
-            color = row["budget__color"]
-            icon = row["budget__icon"]
+        if month:
+            try:
+                target_date = timezone.datetime.strptime(month, "%Y-%m-%d").date()
+                start_date = target_date.replace(day=1)
+            except ValueError:
+                return None, "Invalid date format. Use YYYY-MM-DD"
         else:
-            name = "Unbudgeted"
-            color = "#9ca3af"
-            icon = "help-circle-outline"
+            start_date = timezone.now().date().replace(day=1)
 
-        pct = (amount / total_spent * 100) if total_spent > 0 else 0.0
+        if start_date.month == 12:
+            end_date = start_date.replace(year=start_date.year + 1, month=1, day=1)
+        else:
+            end_date = start_date.replace(month=start_date.month + 1, day=1)
 
-        categories.append(
-            {
-                "name": name,
-                "amount": amount,
-                "count": row["cat_count"],
-                "percentage": round(pct, 1),
-                "color": color,
-                "icon": icon,
-            }
+        income_agg = Income.objects.filter(user_id=user_id, active=True).aggregate(
+            total=Coalesce(Sum("amount"), 0, output_field=DecimalField())
+        )
+        total_income = float(income_agg["total"])
+
+        tx_filter = Q(
+            user_id=user_id,
+            active=True,
+            transaction_type="EXPENSE",
+            date__gte=start_date,
+            date__lt=end_date,
         )
 
-    net_savings = total_income - total_spent
-    avg_txn = (total_spent / transaction_count) if transaction_count > 0 else 0.0
+        tx_stats = Transaction.objects.filter(tx_filter).aggregate(
+            total_spent=Coalesce(Sum("amount"), 0, output_field=DecimalField()),
+            count=Count("id"),
+        )
 
-    return {
-        "total_income": total_income,
-        "total_spent": total_spent,
-        "net_savings": net_savings,
-        "surplus": net_savings >= 0,
-        "transaction_count": transaction_count,
-        "avg_per_transaction": round(avg_txn, 2),
-        "categories": categories,
-    }
+        total_spent = float(tx_stats["total_spent"])
+        transaction_count = tx_stats["count"]
+
+        category_rows = (
+            Transaction.objects.filter(tx_filter)
+            .values("budget__budget_name", "budget__icon", "budget__color")
+            .annotate(
+                cat_total=Coalesce(Sum("amount"), 0, output_field=DecimalField()),
+                cat_count=Count("id"),
+            )
+            .order_by("-cat_total")
+        )
+
+        categories = []
+        for row in category_rows:
+            amount = float(row["cat_total"])
+            if row["budget__budget_name"]:
+                name = row["budget__budget_name"]
+                color = row["budget__color"]
+                icon = row["budget__icon"]
+            else:
+                name = "Unbudgeted"
+                color = "#9ca3af"
+                icon = "help-circle-outline"
+
+            pct = (amount / total_spent * 100) if total_spent > 0 else 0.0
+
+            categories.append(
+                {
+                    "name": name,
+                    "amount": amount,
+                    "count": row["cat_count"],
+                    "percentage": round(pct, 1),
+                    "color": color,
+                    "icon": icon,
+                }
+            )
+
+        net_savings = total_income - total_spent
+        avg_txn = (total_spent / transaction_count) if transaction_count > 0 else 0.0
+
+        return {
+            "total_income": total_income,
+            "total_spent": total_spent,
+            "net_savings": net_savings,
+            "surplus": net_savings >= 0,
+            "transaction_count": transaction_count,
+            "avg_per_transaction": round(avg_txn, 2),
+            "categories": categories,
+        }, None
+
+    result, error = await fetch_monthly_breakdown()
+    if error:
+        return error_response(error)
+    return result

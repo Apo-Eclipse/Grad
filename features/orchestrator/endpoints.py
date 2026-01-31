@@ -138,6 +138,6 @@ async def analyze(request, payload: AnalysisRequestSchema):
 
 
 @router.get("/health")
-def health(request):
+async def health(request):
     """Health check endpoint."""
     return {"status": "healthy", "service": "PersonalAssistantAPI"}

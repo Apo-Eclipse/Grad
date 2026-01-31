@@ -1,6 +1,8 @@
 """Account management endpoints."""
 
 from typing import List, Optional
+from asgiref.sync import sync_to_async
+
 from django.db import transaction
 from django.db.models import F
 from django.utils import timezone
@@ -26,75 +28,61 @@ class TransferSchema(Schema):
 
 
 @router.get("/", response=List[AccountSchema])
-def list_accounts(request, type: str = None):
+async def list_accounts(request, type: str = None):
     """List all active accounts for the user, optionally filtered by type."""
     qs = Account.objects.filter(user=request.user, active=True)
     if type:
         qs = qs.filter(type=type)
-    return qs.order_by("id")
+
+    accounts = [acc async for acc in qs.order_by("id")]
+    return accounts
 
 
 @router.post("/transfer", response={200: str, 400: str})
-def transfer_funds(request, payload: TransferSchema):
+async def transfer_funds(request, payload: TransferSchema):
     """Transfer funds between accounts."""
     if payload.amount <= 0:
         return 400, "Amount must be positive."
 
-    with transaction.atomic():
-        try:
-            from_acc = Account.objects.select_for_update().get(
-                id=payload.from_account_id, user=request.user, active=True
+    # Complex transactional logic with select_for_update - keep in sync_to_async
+    @sync_to_async
+    def perform_transfer():
+        with transaction.atomic():
+            try:
+                from_acc = Account.objects.select_for_update().get(
+                    id=payload.from_account_id, user=request.user, active=True
+                )
+                to_acc = Account.objects.select_for_update().get(
+                    id=payload.to_account_id, user=request.user, active=True
+                )
+            except Account.DoesNotExist:
+                return 400, "One or both accounts not found."
+
+            if from_acc.id == to_acc.id:
+                return 400, "Cannot transfer to the same account."
+
+            # Update Balances
+            from_acc.balance = F("balance") - payload.amount
+            to_acc.balance = F("balance") + payload.amount
+
+            from_acc.save()
+            to_acc.save()
+
+            from_acc.refresh_from_db()
+            to_acc.refresh_from_db()
+
+            # Create Transaction Record
+            Transaction.objects.create(
+                user=request.user,
+                transaction_type=Transaction.TransactionType.TRANSFER,
+                date=timezone.now().date(),
+                amount=payload.amount,
+                description=payload.description
+                or f"Transfer from {from_acc.name} to {to_acc.name}",
+                account=from_acc,
+                transfer_to=to_acc,
             )
-            to_acc = Account.objects.select_for_update().get(
-                id=payload.to_account_id, user=request.user, active=True
-            )
-        except Account.DoesNotExist:
-            return 400, "One or both accounts not found."
 
-        if from_acc.id == to_acc.id:
-            return 400, "Cannot transfer to the same account."
+        return 200, "Transfer successful."
 
-        # Check balance if Regular/Savings (Credit accounts can go negative/positive freely,
-        # but usually you pay TO credit or spend FROM credit.
-        # If transferring FROM Regular, you need balance.
-        # If transferring FROM Credit, you are effectively taking a cash advance?
-        # Let's assume you can always transfer for now, or add check for REGULAR/SAVINGS.
-        # For simplicity: Allow overdraft for now or check balance?
-        # User said "Regular" has balance. Debit card.
-        # Let's enforce non-negative for REGULAR/SAVINGS if we want strictness.
-        # For now, minimal restriction.
-
-        # 1. Update Balances
-        from_acc.balance = F("balance") - payload.amount
-        to_acc.balance = F("balance") + payload.amount
-
-        from_acc.save()
-        to_acc.save()
-
-        from_acc.refresh_from_db()
-        to_acc.refresh_from_db()
-
-        # 2. Create Transaction Record (for history)
-        # We model this as a Transaction on the source account with transfer_to set
-        # This way it appears in the ledger of the source account.
-        # What about the destination?
-        # Ideally we might want two transactions or one linked one.
-        # Our model has `account` and `transfer_to`.
-        # Let's create one transaction record that represents this move.
-
-        # However, for the UI to show it in both places, we might need 2 records
-        # OR the query logic looks for `account=X OR transfer_to=X`.
-        # Let's use 1 record with `transfer_to`.
-
-        Transaction.objects.create(
-            user=request.user,
-            transaction_type=Transaction.TransactionType.TRANSFER,
-            date=timezone.now().date(),
-            amount=payload.amount,
-            description=payload.description
-            or f"Transfer from {from_acc.name} to {to_acc.name}",
-            account=from_acc,
-            transfer_to=to_acc,
-        )
-
-    return 200, "Transfer successful."
+    return await perform_transfer()

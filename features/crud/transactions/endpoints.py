@@ -23,7 +23,7 @@ router = Router(auth=AuthBearer())
 
 
 @router.get("/", response=TransactionListResponse)
-def get_transactions(
+async def get_transactions(
     request,
     active: Optional[bool] = Query(None),
     start_date: Optional[str] = Query(None),
@@ -43,24 +43,31 @@ def get_transactions(
         filters["transaction_type"] = transaction_type
 
     queryset = Transaction.objects.filter(**filters)
-
     if active is False:
         ordering = ("-updated_at",)
     else:
         ordering = ("-date", "-created_at")
 
-    transactions = queryset.order_by(*ordering).values(*TRANSACTION_FIELDS)[:limit]
+    # Use async for with slicing via list comprehension
+    transactions = []
+    count = 0
+    async for txn in queryset.order_by(*ordering).values(*TRANSACTION_FIELDS):
+        if count >= limit:
+            break
+        transactions.append(txn)
+        count += 1
+
     result = [format_transaction(txn) for txn in transactions]
     return success_response(result)
 
 
 @router.get("/{transaction_id}", response=TransactionResponse)
-def get_transaction(request, transaction_id: int):
+async def get_transaction(request, transaction_id: int):
     """Get a single transaction (any type)."""
-    txn = (
+    txn = await (
         Transaction.objects.filter(id=transaction_id, user_id=request.user.id)
         .values(*TRANSACTION_FIELDS)
-        .first()
+        .afirst()
     )
     if not txn:
         return error_response("Transaction not found", code=404)

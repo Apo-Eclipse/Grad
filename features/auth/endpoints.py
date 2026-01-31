@@ -1,3 +1,5 @@
+from asgiref.sync import sync_to_async
+
 from ninja import Router
 from django.contrib.auth import authenticate, get_user_model
 from core.utils.responses import error_response
@@ -9,61 +11,79 @@ User = get_user_model()
 
 
 @router.post("/login", response=TokenSchema)
-def login(request, payload: LoginSchema):
+async def login(request, payload: LoginSchema):
     """
     Authenticate user with email and password, return access/refresh tokens.
     """
+    # Get user by email using native async
     try:
-        user_obj = User.objects.get(email=payload.email)
+        user_obj = await User.objects.aget(email=payload.email)
     except User.DoesNotExist:
         return error_response("Invalid credentials", code=401)
 
-    user = authenticate(username=user_obj.username, password=payload.password)
+    # authenticate() is sync, must wrap
+    @sync_to_async
+    def do_authenticate():
+        return authenticate(username=user_obj.username, password=payload.password)
+
+    user = await do_authenticate()
     if not user:
         return error_response("Invalid credentials", code=401)
 
     if not user.is_active:
         return error_response("User account is disabled", code=401)
 
-    tokens = create_token_pair(user)
+    # create_token_pair is sync, wrap it
+    @sync_to_async
+    def do_create_tokens():
+        return create_token_pair(user)
+
+    tokens = await do_create_tokens()
     return tokens
 
 
 @router.post("/refresh", response=TokenSchema)
-def refresh_token(request, payload: RefreshSchema):
+async def refresh_token(request, payload: RefreshSchema):
     """
     Refresh access token using a valid refresh token.
     """
-    from ninja_jwt.tokens import RefreshToken
-    from ninja_jwt.exceptions import TokenError, InvalidToken
 
-    try:
-        refresh = RefreshToken(payload.refresh)
+    # Token operations involve JWT library which is sync
+    @sync_to_async
+    def refresh_access_token():
+        from ninja_jwt.tokens import RefreshToken
+        from ninja_jwt.exceptions import TokenError, InvalidToken
 
-        # Check if user exists and is active
-        user_id = refresh.payload.get("user_id")
         try:
-            user = User.objects.get(id=user_id)
-            if not user.is_active:
-                return error_response("User account is disabled", code=401)
-        except User.DoesNotExist:
-            return error_response("User not found", code=401)
+            refresh = RefreshToken(payload.refresh)
 
-        # Generate new access token
-        # refresh.access_token returns a new access token
-        # We can also start a new refresh token if we want rotation, but for now
-        # let's return the new access and the original (or rotated) refresh.
+            # Check if user exists and is active
+            user_id = refresh.payload.get("user_id")
+            try:
+                user = User.objects.get(id=user_id)
+                if not user.is_active:
+                    return None, "User account is disabled"
+            except User.DoesNotExist:
+                return None, "User not found"
 
-        # Validating the token automatically checks expiration.
+            return {
+                "access": str(refresh.access_token),
+                "refresh": str(refresh),
+                "user_id": user.id,
+                "email": user.email,
+            }, None
 
-        return {
-            "access": str(refresh.access_token),
-            "refresh": str(refresh),  # Retrieve the token string
-            "user_id": user.id,
-            "email": user.email,
-        }
+        except (TokenError, InvalidToken) as e:
+            return None, f"Invalid refresh token: {str(e)}"
+        except Exception:
+            return None, "Token refresh failed"
 
-    except (TokenError, InvalidToken) as e:
-        return error_response(f"Invalid refresh token: {str(e)}", code=401)
-    except Exception:
-        return error_response("Token refresh failed", code=400)
+    result, error = await refresh_access_token()
+    if error:
+        return error_response(
+            error,
+            code=401
+            if "Invalid" in error or "disabled" in error or "not found" in error
+            else 400,
+        )
+    return result

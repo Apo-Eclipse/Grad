@@ -3,6 +3,7 @@
 import json
 import logging
 from django.utils import timezone
+from asgiref.sync import sync_to_async
 
 from ninja import Router
 from django.db import transaction
@@ -26,7 +27,7 @@ router = Router(auth=AuthBearer())
 
 
 @router.post("/assist", response=GoalMakerResponseSchema)
-def goals_assist(request, payload: GoalMakerRequestSchema):
+async def goals_assist(request, payload: GoalMakerRequestSchema):
     """
     Manages its own chat history subset or links to main conversation.
     """
@@ -34,18 +35,22 @@ def goals_assist(request, payload: GoalMakerRequestSchema):
     conversation_id = payload.conversation_id or 0
     user_request = payload.user_request
 
-    # 1. Fetch Context
-    user_summary = get_user_summary(user_id)
-    conversation_summary = (
-        get_conversation_summary(conversation_id, limit=10)
-        if conversation_id
-        else "No history."
-    )
-    print("user_summary", user_summary)
+    # 1. Fetch Context (sync ORM operations wrapped)
+    @sync_to_async
+    def fetch_context():
+        user_summary = get_user_summary(user_id)
+        conversation_summary = (
+            get_conversation_summary(conversation_id, limit=10)
+            if conversation_id
+            else "No history."
+        )
+        return user_summary, conversation_summary
 
-    # 2. Invoke Agent
+    user_summary, conversation_summary = await fetch_context()
+
+    # 2. Invoke Agent using native async (.ainvoke)
     try:
-        goal_result = Goal_maker_agent.invoke(
+        goal_result = await Goal_maker_agent.ainvoke(
             {
                 "user_info": user_summary,
                 "user_request": user_request,
@@ -70,7 +75,10 @@ def goals_assist(request, payload: GoalMakerRequestSchema):
         }
 
     # 3. Store interaction using Django ORM
-    if conversation_id:
+    @sync_to_async
+    def store_interaction():
+        if not conversation_id:
+            return
         try:
             with transaction.atomic():
                 # User Msg
@@ -115,6 +123,8 @@ def goals_assist(request, payload: GoalMakerRequestSchema):
                 )
         except Exception:
             logger.exception("Failed to store GoalMaker interaction")
+
+    await store_interaction()
 
     return {
         "conversation_id": conversation_id,

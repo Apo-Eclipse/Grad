@@ -3,6 +3,7 @@
 import json
 import logging
 from django.utils import timezone
+from asgiref.sync import sync_to_async
 
 from ninja import Router
 from django.db import transaction
@@ -26,7 +27,7 @@ router = Router(auth=AuthBearer())
 
 
 @router.post("/assist", response=BudgetMakerResponseSchema)
-def budget_assist(request, payload: BudgetMakerRequestSchema):
+async def budget_assist(request, payload: BudgetMakerRequestSchema):
     """
     Direct endpoint for the Budget Maker Agent.
     """
@@ -35,21 +36,24 @@ def budget_assist(request, payload: BudgetMakerRequestSchema):
     conversation_id = payload.conversation_id or 0
     user_request = payload.user_request
 
-    # 1. Fetch Context
-    user_summary = get_user_summary(user_id)
+    # 1. Fetch Context (sync ORM operations wrapped)
+    @sync_to_async
+    def fetch_context():
+        user_summary = get_user_summary(user_id)
+        if conversation_id:
+            context = get_conversation_context(conversation_id, limit=10)
+            conversation_history = context["history"]
+            current_state = context["current_state"]
+        else:
+            conversation_history = "No history."
+            current_state = None
+        return user_summary, conversation_history, current_state
 
-    # Get both conversation history and current budget state
-    if conversation_id:
-        context = get_conversation_context(conversation_id, limit=10)
-        conversation_history = context["history"]
-        current_state = context["current_state"]
-    else:
-        conversation_history = "No history."
-        current_state = None
+    user_summary, conversation_history, current_state = await fetch_context()
 
-    # 2. Invoke Agent
+    # 2. Invoke Agent using native async (.ainvoke)
     try:
-        budget_result = Budget_maker_agent.invoke(
+        budget_result = await Budget_maker_agent.ainvoke(
             {
                 "user_info": user_summary,
                 "user_request": user_request,
@@ -75,7 +79,10 @@ def budget_assist(request, payload: BudgetMakerRequestSchema):
         }
 
     # 3. Store interaction using Django ORM
-    if conversation_id:
+    @sync_to_async
+    def store_interaction():
+        if not conversation_id:
+            return
         try:
             with transaction.atomic():
                 # User Msg
@@ -118,6 +125,8 @@ def budget_assist(request, payload: BudgetMakerRequestSchema):
                 )
         except Exception:
             logger.exception("Failed to store BudgetMaker interaction")
+
+    await store_interaction()
 
     return {
         "conversation_id": conversation_id,

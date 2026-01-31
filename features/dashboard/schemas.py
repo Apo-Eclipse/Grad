@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional
+from typing import Optional
 from ninja import Schema
 
 
@@ -21,3 +21,8 @@ class DashboardSummarySchema(Schema):
     net_position: float
     is_deficit: bool
     month_label: str
+    daily_average_spend: float
+    spend_percentage: float
+    total_budgeted_amount: float
+    budget_allocation_percentage: float
+    total_assets: float

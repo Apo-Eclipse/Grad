@@ -8,6 +8,7 @@ from decimal import Decimal
 from ninja import Router, Query
 from django.db.models import Sum
 from django.db.models.functions import Coalesce
+from asgiref.sync import sync_to_async
 
 from core.models import Budget, Income
 from core.utils.responses import success_response, error_response
@@ -56,57 +57,62 @@ def _format_budget(budget: dict) -> dict:
     }
 
 
-def _get_unallocated_income(user_id: int, exclude_budget_id: int = None) -> float:
+async def _get_unallocated_income(user_id: int, exclude_budget_id: int = None) -> float:
     """Calculate unallocated income.
 
     Returns: total_active_monthly_income - sum_of_active_budget_limits
     Optionally excludes a specific budget (for updates).
     """
-    # 1. Sum of all active INCOME sources
-    total_income = Income.objects.filter(user_id=user_id, active=True).aggregate(
-        total=Coalesce(Sum("amount"), Decimal("0.00"))
-    )["total"]
 
-    # 2. Sum of all active budget limits (excluding the one being updated if applicable)
-    budget_filter = {"user_id": user_id, "active": True}
-    budget_queryset = Budget.objects.filter(**budget_filter)
-    if exclude_budget_id:
-        budget_queryset = budget_queryset.exclude(id=exclude_budget_id)
+    # Note: Django's async ORM doesn't fully support aggregate yet,
+    # so we use sync_to_async for this complex operation
+    @sync_to_async
+    def calculate():
+        # 1. Sum of all active INCOME sources
+        total_income = Income.objects.filter(user_id=user_id, active=True).aggregate(
+            total=Coalesce(Sum("amount"), Decimal("0.00"))
+        )["total"]
 
-    total_allocated = budget_queryset.aggregate(
-        total=Coalesce(Sum("total_limit"), Decimal("0.00"))
-    )["total"]
+        # 2. Sum of all active budget limits (excluding the one being updated if applicable)
+        budget_filter = {"user_id": user_id, "active": True}
+        budget_queryset = Budget.objects.filter(**budget_filter)
+        if exclude_budget_id:
+            budget_queryset = budget_queryset.exclude(id=exclude_budget_id)
 
-    return float(total_income) - float(total_allocated)
+        total_allocated = budget_queryset.aggregate(
+            total=Coalesce(Sum("total_limit"), Decimal("0.00"))
+        )["total"]
+
+        return float(total_income) - float(total_allocated)
+
+    return await calculate()
 
 
 @router.get("/", response=BudgetListResponse)
-def get_budgets(request, active: Optional[bool] = Query(None)):
+async def get_budgets(request, active: Optional[bool] = Query(None)):
     """Retrieve budgets for a user (raw data)."""
     filters = {"user_id": request.user.id}
     if active is not None:
         filters["active"] = active
 
     queryset = Budget.objects.filter(**filters)
-
-    # Sorting
     if active is False:
         queryset = queryset.order_by("-updated_at")
     else:
         queryset = queryset.order_by("-priority_level_int")
 
-    budgets = queryset.values(*BUDGET_FIELDS)
+    budgets = [b async for b in queryset.values(*BUDGET_FIELDS)]
     result = [_format_budget(b) for b in budgets]
     return success_response(result)
 
 
 @router.get("/{budget_id}", response=BudgetResponse)
-def get_budget(request, budget_id: int):
+async def get_budget(request, budget_id: int):
     """Get a single budget (raw data)."""
-    budget = (
+    budget = await (
         Budget.objects.filter(id=budget_id, user_id=request.user.id)
         .values(*BUDGET_FIELDS)
-        .first()
+        .afirst()
     )
     if not budget:
         return error_response("Budget not found", code=404)
@@ -114,18 +120,18 @@ def get_budget(request, budget_id: int):
 
 
 @router.post("/", response=BudgetResponse)
-def create_budget(request, payload: BudgetCreateSchema):
+async def create_budget(request, payload: BudgetCreateSchema):
     """Create a new budget."""
     try:
         # Check unallocated income
-        unallocated = _get_unallocated_income(request.user.id)
+        unallocated = await _get_unallocated_income(request.user.id)
         if payload.total_limit > unallocated:
             return error_response(
                 f"Insufficient income. Unallocated Income: {unallocated:.2f}, Requested Budget: {payload.total_limit:.2f}",
                 code=400,
             )
 
-        budget = Budget.objects.create(
+        budget = await Budget.objects.acreate(
             user_id=request.user.id,
             budget_name=payload.name,
             description=payload.description,
@@ -134,8 +140,6 @@ def create_budget(request, payload: BudgetCreateSchema):
             total_limit=payload.total_limit,
             priority_level_int=payload.priority_level_int,
         )
-
-        # Construct response directly from instance to ensure immediate consistency
         data = {
             "id": budget.id,
             "budget_name": budget.budget_name,
@@ -148,7 +152,6 @@ def create_budget(request, payload: BudgetCreateSchema):
             "created_at": budget.created_at,
             "updated_at": budget.updated_at,
         }
-
         return success_response(data, "Budget created successfully")
     except Exception as e:
         logger.exception("Failed to create budget")
@@ -156,7 +159,7 @@ def create_budget(request, payload: BudgetCreateSchema):
 
 
 @router.put("/{budget_id}", response=BudgetResponse)
-def update_budget(request, budget_id: int, payload: BudgetUpdateSchema):
+async def update_budget(request, budget_id: int, payload: BudgetUpdateSchema):
     """Update an existing budget."""
     updates = payload.dict(exclude_unset=True)
     if not updates:
@@ -164,12 +167,11 @@ def update_budget(request, budget_id: int, payload: BudgetUpdateSchema):
 
     # If total_limit is being updated, validate against unallocated income
     if "total_limit" in updates:
-        current_budget = (
+        current_budget = await (
             Budget.objects.filter(id=budget_id, user_id=request.user.id)
             .values("total_limit")
-            .first()
+            .afirst()
         )
-
         if not current_budget:
             return error_response("Budget not found", code=404)
 
@@ -178,18 +180,9 @@ def update_budget(request, budget_id: int, payload: BudgetUpdateSchema):
         additional_needed = new_limit - current_limit
 
         if additional_needed > 0:
-            unallocated = _get_unallocated_income(
+            unallocated = await _get_unallocated_income(
                 request.user.id, exclude_budget_id=budget_id
             )
-            # Since we excluded the current budget, 'unallocated' is (Income - Other_Budgets).
-            # We need to check if New_Limit <= (Income - Other_Budgets)
-            # Which is equivalent to: New_Limit <= unallocated
-
-            # Wait, calculation check:
-            # _get_unallocated_income(exclude=this) returns: Income - Sum(Others)
-            # Validation: New_Limit <= (Income - Sum(Others))
-            # Validation: New_Limit <= unallocated. Correct.
-
             if new_limit > unallocated:
                 return error_response(
                     f"Insufficient income. Unallocated (excluding this budget): {unallocated:.2f}, New Limit: {new_limit:.2f}",
@@ -203,13 +196,14 @@ def update_budget(request, budget_id: int, payload: BudgetUpdateSchema):
         updates["budget_name"] = updates.pop("name")
 
     try:
-        rows_affected = Budget.objects.filter(
+        rows_affected = await Budget.objects.filter(
             id=budget_id, user_id=request.user.id
-        ).update(**updates)
+        ).aupdate(**updates)
         if rows_affected == 0:
             return error_response("Budget not found", code=404)
-
-        budget = Budget.objects.filter(id=budget_id).values(*BUDGET_FIELDS).first()
+        budget = (
+            await Budget.objects.filter(id=budget_id).values(*BUDGET_FIELDS).afirst()
+        )
         return success_response(_format_budget(budget), "Budget updated successfully")
     except Exception as e:
         logger.exception("Failed to update budget")
@@ -217,15 +211,14 @@ def update_budget(request, budget_id: int, payload: BudgetUpdateSchema):
 
 
 @router.delete("/{budget_id}", response=BudgetResponse)
-def delete_budget(request, budget_id: int):
+async def delete_budget(request, budget_id: int):
     """Soft delete a budget by setting active to False."""
     try:
-        rows_affected = Budget.objects.filter(
+        rows_affected = await Budget.objects.filter(
             id=budget_id, user_id=request.user.id
-        ).update(active=False, updated_at=timezone.now())
+        ).aupdate(active=False, updated_at=timezone.now())
         if rows_affected == 0:
             return error_response("Budget not found", code=404)
-
         return success_response(None, "Budget deactivated successfully")
     except Exception as e:
         logger.exception("Failed to delete budget")

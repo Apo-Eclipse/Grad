@@ -18,6 +18,7 @@ TRANSACTION_FIELDS = (
     "transaction_type",
     "account_id",
     "transfer_to_id",
+    "income_source_id",
 )
 
 
@@ -34,6 +35,7 @@ def format_transaction(txn: Dict[str, Any]) -> Dict[str, Any]:
         "neighbourhood": txn.get("neighbourhood"),
         "account_id": txn.get("account_id"),
         "transfer_to_id": txn.get("transfer_to_id"),
+        "income_source_id": txn.get("income_source_id"),
         "transaction_type": txn.get("transaction_type", "EXPENSE"),
         "active": txn.get("active", True),
         "created_at": txn["created_at"],

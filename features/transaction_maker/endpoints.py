@@ -3,6 +3,7 @@
 import json
 import logging
 from django.utils import timezone
+from asgiref.sync import sync_to_async
 
 from ninja import Router
 from django.db import transaction
@@ -26,7 +27,7 @@ router = Router(auth=AuthBearer())
 
 
 @router.post("/assist", response=TransactionMakerResponseSchema)
-def transaction_assist(request, payload: TransactionMakerRequestSchema):
+async def transaction_assist(request, payload: TransactionMakerRequestSchema):
     """
     Direct endpoint for the Transaction Maker Agent.
     """
@@ -34,24 +35,28 @@ def transaction_assist(request, payload: TransactionMakerRequestSchema):
     conversation_id = payload.conversation_id or 0
     user_request = payload.user_request
 
-    # 1. Fetch Context
-    conversation_summary = (
-        get_conversation_summary(conversation_id, limit=10)
-        if conversation_id
-        else "No history."
-    )
+    # 1. Fetch Context (sync ORM operations wrapped)
+    @sync_to_async
+    def fetch_context():
+        conversation_summary = (
+            get_conversation_summary(conversation_id, limit=10)
+            if conversation_id
+            else "No history."
+        )
+        active_budgets = fetch_active_budgets(user_id)
+        # Format budgets for prompt
+        budgets_str = (
+            "\n".join([f"- {b['budget_name']} (ID: {b['id']})" for b in active_budgets])
+            if active_budgets
+            else "No active budgets."
+        )
+        return conversation_summary, budgets_str
 
-    active_budgets = fetch_active_budgets(user_id)
-    # Format budgets for prompt
-    budgets_str = (
-        "\n".join([f"- {b['budget_name']} (ID: {b['id']})" for b in active_budgets])
-        if active_budgets
-        else "No active budgets."
-    )
+    conversation_summary, budgets_str = await fetch_context()
 
-    # 2. Invoke Agent
+    # 2. Invoke Agent using native async (.ainvoke)
     try:
-        txn_result = Transaction_maker_agent.invoke(
+        txn_result = await Transaction_maker_agent.ainvoke(
             {
                 "user_request": user_request,
                 "last_conversation": conversation_summary,
@@ -76,7 +81,10 @@ def transaction_assist(request, payload: TransactionMakerRequestSchema):
         }
 
     # 3. Store interaction using Django ORM
-    if conversation_id:
+    @sync_to_async
+    def store_interaction():
+        if not conversation_id:
+            return
         try:
             with transaction.atomic():
                 # User Msg
@@ -120,6 +128,8 @@ def transaction_assist(request, payload: TransactionMakerRequestSchema):
                 )
         except Exception:
             logger.exception("Failed to store TransactionMaker interaction")
+
+    await store_interaction()
 
     return {
         "conversation_id": conversation_id,

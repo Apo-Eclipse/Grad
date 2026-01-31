@@ -29,6 +29,13 @@ class Transaction(models.Model):
     transfer_to = models.ForeignKey(
         Account, models.DO_NOTHING, blank=True, null=True, related_name="transfers_in"
     )
+    income_source = models.ForeignKey(
+        "core.Income",
+        models.DO_NOTHING,
+        blank=True,
+        null=True,
+        related_name="transactions",
+    )
     neighbourhood = models.TextField(blank=True, null=True)
     active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
