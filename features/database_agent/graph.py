@@ -1,7 +1,7 @@
 import asyncio
 from typing import TypedDict, List
 
-from django.db import connection
+from django.db import connection, close_old_connections
 from langgraph.graph import StateGraph, END, START
 
 from features.database_agent.agent import DatabaseAgent
@@ -19,6 +19,8 @@ def _prepare_select_sql(query: str, *, limit: int = 100) -> str:
 
 
 def _execute_select_query(query: str) -> List[dict]:
+    # Ensure fresh connection in this thread
+    close_old_connections()
     normalized_query = _prepare_select_sql(query)
     with connection.cursor() as cursor:
         cursor.execute(normalized_query)
@@ -26,6 +28,8 @@ def _execute_select_query(query: str) -> List[dict]:
 
 
 def _execute_modify_query(query: str) -> str:
+    # Ensure fresh connection in this thread
+    close_old_connections()
     cleaned = (query or "").strip()
     # Normalize whitespace to single spaces for robust checking
     normalized = " ".join(cleaned.split()).upper()
