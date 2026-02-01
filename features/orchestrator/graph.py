@@ -155,6 +155,7 @@ def personal_assistant_orchestrator(state: OrchestratorState) -> dict:
     - Time window (explicit or inferred)
     - Budget/category if mentioned
     - Aggregation required (e.g., total, grouped by month/category)
+    - **PRIVACY FILTER**: "Do NOT return internal IDs (e.g., id, budget_id, user_id). Select only human-readable columns (e.g., budget_name, date, amount, description)."
 
     --------------------------------------------------
 
@@ -190,7 +191,7 @@ def personal_assistant_orchestrator(state: OrchestratorState) -> dict:
     output:
 
     "agent": "database_agent", 
-    "message": "Compute total spending for the Food category for last month and return the total." 
+    "message": "Compute total spending for the Food category for last month and return the total. Do NOT return IDs." 
     =======================================================================
     Example 2 — Behaviour Analyst  
     User: "Why am I overspending on Dining Out?"
